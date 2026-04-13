@@ -92,7 +92,7 @@ const StatCard = ({ title, value, subValue, icon: Icon, trend, trendValue }: any
     );
 };
 
-export const ManagerDashboard = ({ projects, stats }: any) => {
+export const ManagerDashboard = ({ projects, stats, engineers }: any) => {
     // --- État pour la modale de création de projet ---
     const [open, setOpen] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(false);
@@ -127,7 +127,7 @@ export const ManagerDashboard = ({ projects, stats }: any) => {
                 name: projectName,
                 description: projectDesc,
                 deadline: deadline,
-                engineer_id: engineerId || null,
+                engineer_id: engineerId ? parseInt(engineerId) : null,
                 steps: steps.map(s => ({
                     name: s.name,
                     budget: parseFloat(s.budget)
@@ -213,7 +213,25 @@ export const ManagerDashboard = ({ projects, stats }: any) => {
                                 </div>
                                 <div>
                                     <Label htmlFor="engineer-id">Ingénieur assigné</Label>
-                                    <Input id="engineer-id" type="number" value={engineerId} onChange={e => setEngineerId(e.target.value)} placeholder="ID du technicien" />
+                                    {engineers && engineers.length > 0 ? (
+                                        <select
+                                            id="engineer-id"
+                                            value={engineerId}
+                                            onChange={e => setEngineerId(e.target.value)}
+                                            className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                        >
+                                            <option value="">-- Sélectionner un ingénieur --</option>
+                                            {engineers.map((eng: any) => (
+                                                <option key={eng.id} value={eng.id}>
+                                                    {eng.name} ({eng.email})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <p className="text-sm text-amber-600 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                                            ⚠️ Aucun ingénieur disponible. <a href="/users" className="font-semibold underline">Créez d'abord les utilisateurs</a>
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
@@ -250,10 +268,10 @@ export const ManagerDashboard = ({ projects, stats }: any) => {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Budget Total" value={`${(stats.total_budget / 1000).toFixed(1)}k €`} subValue="+12.5% vs mois dernier" icon={TrendingUp} trend="up" trendValue="+12.5%" />
-                <StatCard title="Chantiers Actifs" value={stats.active_projects} subValue="Sur l'ensemble du territoire" icon={MapPin} />
-                <StatCard title="Total Effectif" value={stats.total_workers} subValue="Personnel sur site" icon={Users} trend="up" trendValue="+3" />
-                <StatCard title="Missions Complètes" value={stats.total_tasks} subValue="Livrables validés" icon={CheckCircle2} />
+                <StatCard title="Budget Total" value={`${(stats.total_budget / 1000).toFixed(1)}k €`} subValue={`${projects.length} chantier(s)`} icon={TrendingUp} />
+                <StatCard title="Chantiers Actifs" value={stats.active_projects} subValue="En cours actuellement" icon={MapPin} />
+                <StatCard title="Total Effectif" value={stats.total_workers} subValue="Ouvriers disponibles" icon={Users} />
+                <StatCard title="Missions" value={stats.total_tasks} subValue="Tâches à accomplir" icon={CheckCircle2} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
