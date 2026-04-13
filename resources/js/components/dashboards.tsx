@@ -1,25 +1,3 @@
-import React from 'react';
-import {
-    Users,
-    TrendingUp,
-    BriefcaseBusiness,
-    Search,
-    Clock,
-    MapPin,
-    ArrowUpRight,
-    ArrowDownRight,
-    CheckCircle2,
-    Calendar,
-    AlertCircle,
-    Package,
-    ClipboardCheck,
-    Bell,
-    ChevronRight,
-    PlusCircle,
-    LayoutDashboard,
-    HardHat
-} from 'lucide-react';
-import { Doughnut, Bar } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
     ArcElement,
@@ -30,9 +8,35 @@ import {
     BarElement,
     Title,
 } from 'chart.js';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import {
+    Users,
+    TrendingUp,
+    Clock,
+    MapPin,
+    ArrowUpRight,
+    ArrowDownRight,
+    CheckCircle2,
+    Calendar,
+    ClipboardCheck,
+    ChevronRight,
+    PlusCircle,
+    HardHat,
+    AlertCircle
+} from 'lucide-react';
+import React from 'react';
+import { Doughnut, Bar } from 'react-chartjs-2';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogTitle,
+  DialogClose
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 ChartJS.register(
     ArcElement,
@@ -51,6 +55,7 @@ const StatusBadge = ({ status }: { status: string }) => {
         termine: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800",
         planifie: "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-100 dark:border-indigo-800",
     };
+    
     return (
         <Badge variant="outline" className={`${variants[status] || variants.initialisation} px-2 py-0 h-6 text-[11px] font-semibold border`}>
             {status.replace('_', ' ')}
@@ -86,6 +91,28 @@ const StatCard = ({ title, value, subValue, icon: Icon, trend, trendValue }: any
 };
 
 export const ManagerDashboard = ({ projects, stats }: any) => {
+    // --- État pour la modale de création de projet ---
+    const [open, setOpen] = React.useState(false);
+    const [projectName, setProjectName] = React.useState('');
+    const [projectDesc, setProjectDesc] = React.useState('');
+    const [steps, setSteps] = React.useState([{ name: '', budget: '' }]);
+
+    const handleStepChange = (idx: number, field: 'name' | 'budget', value: string) => {
+        setSteps(steps => steps.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+    };
+    const addStep = () => setSteps(steps => [...steps, { name: '', budget: '' }]);
+    const removeStep = (idx: number) => setSteps(steps => steps.length > 1 ? steps.filter((_, i) => i !== idx) : steps);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        // TODO: Appel API ou Inertia.post('/projects', ...)
+        // Exemple: { name: projectName, description: projectDesc, steps: steps.map(s => ({ name: s.name, budget: parseFloat(s.budget) })) }
+        setOpen(false);
+        setProjectName('');
+        setProjectDesc('');
+        setSteps([{ name: '', budget: '' }]);
+    };
+
     const barData = {
         labels: projects.map((p: any) => p.name.length > 12 ? p.name.substring(0, 10) + '...' : p.name),
         datasets: [{
@@ -107,7 +134,41 @@ export const ManagerDashboard = ({ projects, stats }: any) => {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px]">Rapports</Button>
-                    <Button size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm">Nouveau Site</Button>
+                    <Dialog open={open} onOpenChange={setOpen}>
+                        <DialogTrigger asChild>
+                            <Button size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm">Nouveau Site</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogTitle>Créer un nouveau projet</DialogTitle>
+                            <form className="space-y-4 mt-4" onSubmit={handleSubmit}>
+                                <div>
+                                    <Label htmlFor="project-name">Nom du projet</Label>
+                                    <Input id="project-name" value={projectName} onChange={e => setProjectName(e.target.value)} required />
+                                </div>
+                                <div>
+                                    <Label htmlFor="project-desc">Description</Label>
+                                    <Input id="project-desc" value={projectDesc} onChange={e => setProjectDesc(e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Étapes & Budgets</Label>
+                                    {steps.map((step, idx) => (
+                                        <div key={idx} className="flex gap-2 items-center">
+                                            <Input placeholder={`Étape ${idx + 1}`} value={step.name} onChange={e => handleStepChange(idx, 'name', e.target.value)} required className="flex-1" />
+                                            <Input placeholder="Budget (€)" type="number" min="0" value={step.budget} onChange={e => handleStepChange(idx, 'budget', e.target.value)} required className="w-32" />
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeStep(idx)} disabled={steps.length === 1}>-</Button>
+                                        </div>
+                                    ))}
+                                    <Button type="button" variant="outline" size="sm" onClick={addStep}>Ajouter une étape</Button>
+                                </div>
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline">Annuler</Button>
+                                    </DialogClose>
+                                    <Button type="submit">Créer le projet</Button>
+                                </div>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
 
@@ -154,11 +215,13 @@ export const ManagerDashboard = ({ projects, stats }: any) => {
                                     datasets: [{
                                         data: [28, 72],
                                         backgroundColor: ['hsl(var(--primary))', 'hsl(var(--muted))'],
-                                        borderWidth: 0,
-                                        cutout: '82%'
+                                        borderWidth: 0
                                     }]
                                 }}
-                                options={{ plugins: { legend: { display: false } } }}
+                                options={{
+                                    plugins: { legend: { display: false } },
+                                    cutout: '82%'
+                                }}
                             />
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                                 <span className="text-4xl font-bold tracking-tighter">28%</span>

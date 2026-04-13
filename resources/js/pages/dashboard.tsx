@@ -26,4 +26,4 @@ export default function Dashboard({ projects, stats, tasks }: any) {
             </div>
         </>
     );
-}
+} 

@@ -45,4 +45,20 @@ class Project extends Model
     {
         return $this->hasMany(Attendance::class);
     }
+
+    public function steps()
+    {
+        return $this->hasMany(ProjectStep::class)->orderBy('order');
+    }
+
+    public function getTotalBudgetFromSteps(): float|int
+    {
+        return $this->steps->sum('budget') ?? 0;
+    }
+
+    public function syncBudgetFromSteps(): void
+    {
+        $total = $this->getTotalBudgetFromSteps();
+        $this->update(['budget' => $total]);
+    }
 }
