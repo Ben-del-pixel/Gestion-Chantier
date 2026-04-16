@@ -14,37 +14,52 @@ class AttendanceInitializationController extends Controller
     /**
      * Initialize attendance records for a project on a specific date.
      * Creates attendance records for all workers assigned to the project.
+     * If no workers are assigned, uses all workers.
      */
     public function initializeForProject(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'date' => 'required|date',
             'project_id' => 'required|exists:projects,id',
+            'shifts' => 'nullable|array',
+            'shifts.*' => 'string|in:morning,evening',
         ]);
 
         $project = Project::findOrFail($validated['project_id']);
         $date = Carbon::parse($validated['date'])->startOfDay();
+        $shifts = $validated['shifts'] ?? ['morning', 'evening'];
 
-        // Get all workers assigned to this project
+        // Get all workers assigned to this project, or all workers if none assigned
         $workers = $project->workers()->get();
+        if ($workers->isEmpty()) {
+            $workers = User::where('role', 'worker')->get();
+        }
 
         $created = 0;
         foreach ($workers as $worker) {
-            // Check if attendance record already exists
-            $exists = Attendance::where([
-                ['user_id', '=', $worker->id],
-                ['project_id', '=', $project->id],
-                ['date', '=', $date->toDateString()],
-            ])->exists();
+            foreach ($shifts as $shift) {
+                try {
+                    // Check if attendance record already exists using whereDate to handle datetime comparisons
+                    $exists = Attendance::where('user_id', $worker->id)
+                        ->where('project_id', $project->id)
+                        ->whereDate('date', $date->toDateString())
+                        ->where('shift', $shift)
+                        ->exists();
 
-            if (! $exists) {
-                Attendance::create([
-                    'user_id' => $worker->id,
-                    'project_id' => $project->id,
-                    'date' => $date->toDateString(),
-                    'status' => 'present',
-                ]);
-                $created++;
+                    if (! $exists) {
+                        Attendance::create([
+                            'user_id' => $worker->id,
+                            'project_id' => $project->id,
+                            'date' => $date->toDateString(),
+                            'shift' => $shift,
+                            'status' => 'present',
+                        ]);
+                        $created++;
+                    }
+                } catch (\Exception $e) {
+                    // Skip this record if there's a unique constraint violation
+                    \Log::warning("Failed to create attendance for worker {$worker->id}: {$e->getMessage()}");
+                }
             }
         }
 
@@ -52,6 +67,7 @@ class AttendanceInitializationController extends Controller
             'message' => "Initialized {$created} attendance records",
             'created' => $created,
             'total_workers' => $workers->count(),
+            'shifts' => count($shifts),
         ]);
     }
 

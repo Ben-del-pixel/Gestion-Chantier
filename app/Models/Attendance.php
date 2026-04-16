@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AttendanceShift;
 use App\Enums\AttendanceStatus;
 use Database\Factories\AttendanceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +18,7 @@ class Attendance extends Model
         'user_id',
         'project_id',
         'date',
+        'shift',
         'check_in',
         'check_out',
         'status',
@@ -26,6 +28,7 @@ class Attendance extends Model
 
     protected $casts = [
         'date' => 'date',
+        'shift' => AttendanceShift::class,
         'check_in' => 'datetime',
         'check_out' => 'datetime',
         'status' => AttendanceStatus::class,

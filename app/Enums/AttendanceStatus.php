@@ -22,10 +22,10 @@ enum AttendanceStatus: string
     public function color(): string
     {
         return match ($this) {
-            self::Present => 'green',
-            self::Absent => 'red',
-            self::Late => 'orange',
-            self::Sick => 'yellow',
+            self::Present => 'text-green-600 bg-green-50',
+            self::Absent => 'text-red-600 bg-red-50',
+            self::Late => 'text-orange-600 bg-orange-50',
+            self::Sick => 'text-yellow-600 bg-yellow-50',
         };
     }
 }

@@ -51,6 +51,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Attendance Initialization routes (API)
     Route::post('api/attendance/initialize', [AttendanceInitializationController::class, 'initializeForProject']);
+    Route::get('api/attendance/list', [AttendanceController::class, 'apiList']);
     Route::post('api/projects/{project}/workers', [AttendanceInitializationController::class, 'assignWorkers']);
     Route::get('api/workers/available', [AttendanceInitializationController::class, 'getAvailableWorkers']);
     Route::get('api/projects/{project}/workers', [AttendanceInitializationController::class, 'getProjectWorkers']);

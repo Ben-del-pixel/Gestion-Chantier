@@ -1,31 +1,65 @@
 import { Head } from '@inertiajs/react';
-import { Calendar, Clock, MapPin, User, Users, CheckCircle, XCircle, Plus, Settings } from 'lucide-react';
-import React, { useState } from 'react';
+import { Calendar, Clock, MapPin, User, Users, CheckCircle, XCircle, Plus, Settings, Loader } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function AttendanceIndex({
-  attendances,
+  attendances: initialAttendances,
   date,
   statistics,
   projects,
   workers,
   statuses,
+  shifts,
   selectedProject,
 }: any) {
   const [displayDate, setDisplayDate] = useState(date);
   const [displayProject, setDisplayProject] = useState(selectedProject);
+  const [attendances, setAttendances] = useState(initialAttendances);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showAssignWorkers, setShowAssignWorkers] = useState(false);
   const [showInitialize, setShowInitialize] = useState(false);
-  // Assurer que le statut a toujours une valeur par défaut
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const defaultStatus = statuses && statuses.length > 0 ? statuses[0].value : 'present';
-  const [checkInData, setCheckInData] = useState({ user_id: '', project_id: '', status: defaultStatus });
+  const defaultShift = shifts && shifts.length > 0 ? shifts[0].value : 'morning';
+  const [checkInData, setCheckInData] = useState({ user_id: '', project_id: '', shift: defaultShift, status: defaultStatus });
   const [selectedProjectForAssign, setSelectedProjectForAssign] = useState('');
   const [selectedWorkersForAssign, setSelectedWorkersForAssign] = useState<number[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [attendanceStatuses, setAttendanceStatuses] = useState<Record<number, string>>({});
+  const [selectedShiftsForInit, setSelectedShiftsForInit] = useState<string[]>(['morning', 'evening']);
+
+  // Refresh data from server
+  const refreshAttendances = async () => {
+    setRefreshing(true);
+    try {
+      // Add small delay to ensure database writes are committed
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const params = new URLSearchParams();
+      if (displayDate) params.append('date', displayDate);
+      if (displayProject) params.append('project_id', displayProject);
+      
+      const response = await fetch(`/api/attendance/list?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Refreshed attendances:', data.attendances.length, data.attendances);
+        setAttendances(data.attendances);
+      } else {
+        console.error('Failed to fetch attendances:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error refreshing attendances:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleFiltersChange = () => {
     const params = new URLSearchParams();
@@ -38,8 +72,6 @@ export default function AttendanceIndex({
     e.preventDefault();
     setLoading(true);
 
-    console.log('Submitting check-in data:', checkInData);
-
     try {
       const response = await fetch('/attendance/check-in', {
         method: 'POST',
@@ -50,22 +82,18 @@ export default function AttendanceIndex({
         body: JSON.stringify(checkInData),
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
         const error = await response.json();
-        console.error('Error response:', error);
         alert(error.message || 'Erreur lors de l\'enregistrement');
         return;
       }
 
       const result = await response.json();
-      console.log('Success response:', result);
-
+      // Add new attendance to the list immediately
+      setAttendances([result.attendance, ...attendances]);
       alert('Arrivée enregistrée avec succès');
       setShowCheckIn(false);
       setCheckInData({ user_id: '', project_id: '', status: defaultStatus });
-      window.location.reload();
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors de l\'enregistrement');
@@ -92,8 +120,12 @@ export default function AttendanceIndex({
         return;
       }
 
+      const updatedAttendance = await response.json();
+      // Update attendance in the list
+      setAttendances(
+        attendances.map(a => a.id === attendanceId ? updatedAttendance.attendance : a)
+      );
       alert('Départ enregistré');
-      window.location.reload();
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors du départ');
@@ -116,7 +148,16 @@ export default function AttendanceIndex({
         return;
       }
 
-      setAttendanceStatuses({ ...attendanceStatuses, [attendanceId]: newStatus });
+      const result = await response.json();
+      
+      // Update attendance in the list with proper object cloning
+      setAttendances(prevAttendances =>
+        prevAttendances.map(a => 
+          a.id === attendanceId 
+            ? { ...a, ...result.attendance } 
+            : a
+        )
+      );
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors de la mise à jour du statut');
@@ -129,6 +170,11 @@ export default function AttendanceIndex({
       return;
     }
 
+    if (selectedShiftsForInit.length === 0) {
+      alert('Veuillez sélectionner au moins un shift');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch('/api/attendance/initialize', {
@@ -137,7 +183,7 @@ export default function AttendanceIndex({
           'Content-Type': 'application/json',
           'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
         },
-        body: JSON.stringify({ date: displayDate, project_id: displayProject }),
+        body: JSON.stringify({ date: displayDate, project_id: displayProject, shifts: selectedShiftsForInit }),
       });
 
       if (!response.ok) {
@@ -147,9 +193,10 @@ export default function AttendanceIndex({
       }
 
       const result = await response.json();
-      alert(`${result.created} présences initialisées`);
+      alert(`${result.created} présences initialisées (${result.shifts} shifts)`);
       setShowInitialize(false);
-      window.location.reload();
+      // Refresh the list AFTER closing modal
+      await refreshAttendances();
     } catch (error) {
       console.error('Error:', error);
       alert('Erreur lors de l\'initialisation');
@@ -201,16 +248,6 @@ export default function AttendanceIndex({
     setSelectedWorkersForAssign((prev) =>
       prev.includes(workerId) ? prev.filter((id) => id !== workerId) : [...prev, workerId]
     );
-  };
-
-  const getStatusColor = (status: string) => {
-    const statusObj = statuses?.find((s: any) => s.value === status);
-    return statusObj?.color || 'text-gray-600';
-  };
-
-  const getStatusLabel = (status: string) => {
-    const statusObj = statuses?.find((s: any) => s.value === status);
-    return statusObj?.label || status;
   };
 
   const formatTime = (time: string | null) => {
@@ -315,8 +352,13 @@ export default function AttendanceIndex({
         {/* Attendances List */}
         <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Présences du {new Date(displayDate).toLocaleDateString('fr-FR')}</CardTitle>
-            <CardDescription>{attendances.length} enregistrement(s)</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Présences du {new Date(displayDate).toLocaleDateString('fr-FR')}</CardTitle>
+                <CardDescription>{attendances.length} enregistrement(s)</CardDescription>
+              </div>
+              {refreshing && <Loader className="h-5 w-5 animate-spin text-gray-500" />}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -324,7 +366,7 @@ export default function AttendanceIndex({
                 <div className="text-center py-8 text-muted-foreground">Aucune présence enregistrée</div>
               ) : (
                 attendances.map((attendance: any) => {
-                  const currentStatus = attendanceStatuses[attendance.id] || attendance.status;
+                  const currentStatus = attendance.status;
                   return (
                     <div key={attendance.id} className="p-4 rounded-lg border border-border/50 bg-muted/30">
                       <div className="flex items-start justify-between mb-3">
@@ -332,21 +374,32 @@ export default function AttendanceIndex({
                           <User className="h-5 w-5 text-muted-foreground" />
                           <div>
                             <p className="font-semibold">{attendance.user?.name}</p>
-                            <p className="text-xs text-muted-foreground">{attendance.project?.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-muted-foreground">{attendance.project?.name}</p>
+                              {attendance.shift && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                  {shifts?.find((s: any) => s.value === attendance.shift)?.icon}{' '}
+                                  {shifts?.find((s: any) => s.value === attendance.shift)?.label}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <select
-                            value={currentStatus}
-                            onChange={(e) => handleStatusChange(attendance.id, e.target.value)}
-                            className={`px-2 py-1 rounded text-sm font-semibold border ${getStatusColor(currentStatus)} bg-background`}
-                          >
-                            {statuses?.map((s: any) => (
-                              <option key={s.value} value={s.value}>
-                                {s.label}
-                              </option>
-                            ))}
-                          </select>
+                        {/* Status Badges instead of dropdown */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {statuses?.map((status: any) => (
+                            <button
+                              key={status.value}
+                              onClick={() => handleStatusChange(attendance.id, status.value)}
+                              className={`px-3 py-1 rounded-full text-sm font-semibold transition-all cursor-pointer ${
+                                currentStatus === status.value
+                                  ? `${status.color} ring-2 ring-offset-1 ring-current`
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {status.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
@@ -447,6 +500,22 @@ export default function AttendanceIndex({
                   </div>
 
                   <div className="space-y-2">
+                    <label className="text-sm font-semibold">Shift</label>
+                    <select
+                      value={checkInData.shift}
+                      onChange={(e) => setCheckInData({ ...checkInData, shift: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                      required
+                    >
+                      {shifts?.map((sh: any) => (
+                        <option key={sh.value} value={sh.value}>
+                          {sh.icon} {sh.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
                     <label className="text-sm font-semibold">Statut</label>
                     {!statuses || statuses.length === 0 ? (
                       <div className="p-2 bg-yellow-100 text-yellow-800 rounded text-sm">Statuts non chargés</div>
@@ -515,10 +584,33 @@ export default function AttendanceIndex({
                     </select>
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Shifts</label>
+                    <div className="border rounded-lg p-3 space-y-2 bg-muted/20">
+                      {shifts?.map((shift: any) => (
+                        <label key={shift.value} className="flex items-center gap-2 cursor-pointer hover:bg-accent p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={selectedShiftsForInit.includes(shift.value)}
+                            onChange={(e) =>
+                              setSelectedShiftsForInit(
+                                e.target.checked
+                                  ? [...selectedShiftsForInit, shift.value]
+                                  : selectedShiftsForInit.filter((s) => s !== shift.value)
+                              )
+                            }
+                            className="rounded"
+                          />
+                          <span>{shift.icon} {shift.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex gap-2 pt-4">
                     <Button
                       onClick={handleInitializePresences}
-                      disabled={loading || !displayProject}
+                      disabled={loading || !displayProject || selectedShiftsForInit.length === 0}
                       className="flex-1 rounded-lg"
                     >
                       {loading ? 'Initialisation...' : 'Initialiser'}
