@@ -21,7 +21,7 @@ class AttendanceController extends Controller
         $projectId = request('project_id');
 
         $query = Attendance::with('user', 'project')
-            ->where('date', $date->format('Y-m-d'));
+            ->whereRaw('DATE(date) = ?', [$date->toDateString()]);
 
         if ($projectId) {
             $query->where('project_id', $projectId);
@@ -80,7 +80,7 @@ class AttendanceController extends Controller
         $projectId = request('project_id');
 
         $query = Attendance::with('user', 'project')
-            ->where('date', $date->format('Y-m-d'));
+            ->whereRaw('DATE(date) = ?', [$date->toDateString()]);
 
         if ($projectId) {
             $query->where('project_id', $projectId);

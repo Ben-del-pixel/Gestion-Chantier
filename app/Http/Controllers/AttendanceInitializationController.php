@@ -36,28 +36,32 @@ class AttendanceInitializationController extends Controller
         }
 
         $created = 0;
+        $errors = [];
+        $dateString = $date->toDateString();
+
         foreach ($workers as $worker) {
             foreach ($shifts as $shift) {
                 try {
-                    // Check if attendance record already exists using whereDate to handle datetime comparisons
+                    // Check using raw where to handle SQLite date comparisons correctly
                     $exists = Attendance::where('user_id', $worker->id)
                         ->where('project_id', $project->id)
-                        ->whereDate('date', $date->toDateString())
                         ->where('shift', $shift)
+                        ->whereRaw('DATE(date) = ?', [$dateString])
                         ->exists();
 
                     if (! $exists) {
                         Attendance::create([
                             'user_id' => $worker->id,
                             'project_id' => $project->id,
-                            'date' => $date->toDateString(),
+                            'date' => $dateString,
                             'shift' => $shift,
                             'status' => 'present',
                         ]);
                         $created++;
                     }
                 } catch (\Exception $e) {
-                    // Skip this record if there's a unique constraint violation
+                    // Log the error
+                    $errors[] = "Worker {$worker->id}, shift {$shift}: {$e->getMessage()}";
                     \Log::warning("Failed to create attendance for worker {$worker->id}: {$e->getMessage()}");
                 }
             }
@@ -68,6 +72,7 @@ class AttendanceInitializationController extends Controller
             'created' => $created,
             'total_workers' => $workers->count(),
             'shifts' => count($shifts),
+            'errors' => $errors,
         ]);
     }
 
