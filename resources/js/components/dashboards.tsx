@@ -26,6 +26,11 @@ import {
 } from 'lucide-react';
 import React from 'react';
 import { Doughnut, Bar } from 'react-chartjs-2';
+import { apiList, updateStatus } from '@/actions/App/Http/Controllers/AttendanceController';
+import {
+    assignWorkers,
+    initializeForProject,
+} from '@/actions/App/Http/Controllers/AttendanceInitializationController';
 import { store } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -418,7 +423,185 @@ export const ManagerDashboard = ({ projects, stats, engineers }: any) => {
     );
 };
 
-export const EngineerDashboard = ({ tasks, stats }: any) => {
+export const EngineerDashboard = ({
+    tasks,
+    stats,
+    attendanceProjects = [],
+    attendanceWorkers = [],
+    attendanceStatuses = [],
+    attendanceShifts = [],
+    attendanceDate,
+}: any) => {
+    const [selectedDate, setSelectedDate] = React.useState(attendanceDate || new Date().toISOString().slice(0, 10));
+    const [selectedProjectId, setSelectedProjectId] = React.useState<string>(
+        attendanceProjects[0]?.id ? String(attendanceProjects[0].id) : ''
+    );
+    const [attendances, setAttendances] = React.useState<any[]>([]);
+    const [isRefreshingAttendances, setIsRefreshingAttendances] = React.useState(false);
+    const [isSavingAssignment, setIsSavingAssignment] = React.useState(false);
+    const [isInitializing, setIsInitializing] = React.useState(false);
+    const [selectedWorkers, setSelectedWorkers] = React.useState<number[]>([]);
+    const [selectedShifts, setSelectedShifts] = React.useState<string[]>(['morning', 'evening']);
+    const [showAssignDialog, setShowAssignDialog] = React.useState(false);
+    const [showInitializeDialog, setShowInitializeDialog] = React.useState(false);
+
+    const refreshAttendances = React.useCallback(async () => {
+        if (!selectedProjectId || !selectedDate) {
+            setAttendances([]);
+            return;
+        }
+
+        setIsRefreshingAttendances(true);
+
+        try {
+            const response = await fetch(
+                apiList.url({ query: { date: selectedDate, project_id: selectedProjectId } }),
+                {
+                    method: apiList().method,
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                alert('Erreur lors du chargement des presences');
+                return;
+            }
+
+            const data = await response.json();
+            setAttendances(data.attendances ?? []);
+        } catch {
+            alert('Erreur reseau pendant le chargement des presences');
+        } finally {
+            setIsRefreshingAttendances(false);
+        }
+    }, [selectedDate, selectedProjectId]);
+
+    React.useEffect(() => {
+        void refreshAttendances();
+    }, [refreshAttendances]);
+
+    const handleStatusChange = async (attendanceId: number, status: string) => {
+        try {
+            const response = await fetch(updateStatus.url(attendanceId), {
+                method: updateStatus(attendanceId).method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({ status }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                alert(error.error || 'Erreur lors de la mise a jour du statut');
+                return;
+            }
+
+            const payload = await response.json();
+            setAttendances((prev) =>
+                prev.map((attendance) =>
+                    attendance.id === attendanceId ? { ...attendance, ...payload.attendance } : attendance
+                )
+            );
+        } catch {
+            alert('Erreur reseau lors de la mise a jour du statut');
+        }
+    };
+
+    const toggleWorker = (workerId: number) => {
+        setSelectedWorkers((prev) =>
+            prev.includes(workerId) ? prev.filter((id) => id !== workerId) : [...prev, workerId]
+        );
+    };
+
+    const toggleShift = (shift: string) => {
+        setSelectedShifts((prev) => (prev.includes(shift) ? prev.filter((item) => item !== shift) : [...prev, shift]));
+    };
+
+    const submitWorkersAssignment = async () => {
+        if (!selectedProjectId) {
+            alert('Selectionnez un projet');
+            return;
+        }
+
+        if (selectedWorkers.length === 0) {
+            alert('Selectionnez au moins un ouvrier');
+            return;
+        }
+
+        setIsSavingAssignment(true);
+
+        try {
+            const response = await fetch(assignWorkers.url(Number(selectedProjectId)), {
+                method: assignWorkers(Number(selectedProjectId)).method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({ worker_ids: selectedWorkers }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                alert(error.error || 'Erreur lors de l\'affectation');
+                return;
+            }
+
+            setShowAssignDialog(false);
+            alert('Affectation des ouvriers effectuee');
+        } catch {
+            alert('Erreur reseau lors de l\'affectation des ouvriers');
+        } finally {
+            setIsSavingAssignment(false);
+        }
+    };
+
+    const submitPresenceInitialization = async () => {
+        if (!selectedProjectId) {
+            alert('Selectionnez un projet');
+            return;
+        }
+
+        if (selectedShifts.length === 0) {
+            alert('Selectionnez au moins un shift');
+            return;
+        }
+
+        setIsInitializing(true);
+
+        try {
+            const response = await fetch(initializeForProject.url(), {
+                method: initializeForProject().method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    project_id: Number(selectedProjectId),
+                    date: selectedDate,
+                    shifts: selectedShifts,
+                }),
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                alert(payload.error || payload.message || 'Erreur lors de l\'initialisation');
+                return;
+            }
+
+            setShowInitializeDialog(false);
+            alert(`${payload.created} presences initialisees`);
+            await refreshAttendances();
+        } catch {
+            alert('Erreur reseau lors de l\'initialisation des presences');
+        } finally {
+            setIsInitializing(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex items-end justify-between">
@@ -426,7 +609,84 @@ export const EngineerDashboard = ({ tasks, stats }: any) => {
                     <h1 className="text-3xl font-bold tracking-tight">Espace Ingénierie</h1>
                     <p className="text-sm text-muted-foreground">Superviser l'ordonnancement et les ressources humaines.</p>
                 </div>
-                <Button size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm"><PlusCircle className="mr-2 h-4 w-4" />Nouvelle Tâche</Button>
+                <div className="flex items-center gap-2">
+                    <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm">
+                                Assigner Ouvriers
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-h-[85vh] overflow-y-auto">
+                            <DialogTitle>Affectation des ouvriers</DialogTitle>
+                            <div className="mt-4 space-y-4">
+                                <p className="text-sm text-muted-foreground">Selectionnez les ouvriers a affecter au projet.</p>
+                                <div className="grid grid-cols-1 gap-2 rounded-lg border p-3">
+                                    {attendanceWorkers.length > 0 ? (
+                                        attendanceWorkers.map((worker: any) => (
+                                            <label key={worker.id} className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedWorkers.includes(worker.id)}
+                                                    onChange={() => toggleWorker(worker.id)}
+                                                />
+                                                <span>{worker.name}</span>
+                                            </label>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Aucun ouvrier disponible.</p>
+                                    )}
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline">Annuler</Button>
+                                    </DialogClose>
+                                    <Button type="button" onClick={submitWorkersAssignment} disabled={isSavingAssignment}>
+                                        {isSavingAssignment ? 'Affectation...' : 'Valider'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+                    <Dialog open={showInitializeDialog} onOpenChange={setShowInitializeDialog}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm">
+                                Initialiser Presence
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogTitle>Initialiser la presence du projet</DialogTitle>
+                            <div className="mt-4 space-y-4">
+                                <p className="text-sm text-muted-foreground">Cree des presences vides pour la date et les shifts choisis.</p>
+                                <div className="space-y-2">
+                                    <Label>Shifts</Label>
+                                    <div className="flex flex-wrap gap-4">
+                                        {attendanceShifts.map((shift: any) => (
+                                            <label key={shift.value} className="flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedShifts.includes(shift.value)}
+                                                    onChange={() => toggleShift(shift.value)}
+                                                />
+                                                <span>{shift.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline">Annuler</Button>
+                                    </DialogClose>
+                                    <Button type="button" onClick={submitPresenceInitialization} disabled={isInitializing}>
+                                        {isInitializing ? 'Initialisation...' : 'Initialiser'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+                    <Button size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm"><PlusCircle className="mr-2 h-4 w-4" />Nouvelle Tâche</Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -434,6 +694,93 @@ export const EngineerDashboard = ({ tasks, stats }: any) => {
                 <StatCard icon={HardHat} title="Personnel Site" value={stats?.total_workers_under || 0} subValue="Ouvriers affectés" />
                 <StatCard icon={Clock} title="Heures Chantier" value="142h" subValue="Semaine en cours" />
             </div>
+
+            <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
+                <CardHeader>
+                    <CardTitle className="text-lg font-bold">Gestion Presence Ouvriers</CardTitle>
+                    <CardDescription className="text-xs">Pilotage de la presence quotidienne par projet</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                            <Label>Date</Label>
+                            <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <Label>Projet</Label>
+                            <select
+                                value={selectedProjectId}
+                                onChange={(e) => setSelectedProjectId(e.target.value)}
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                            >
+                                <option value="">-- Selectionner un projet --</option>
+                                {attendanceProjects.map((project: any) => (
+                                    <option key={project.id} value={project.id}>
+                                        {project.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-end">
+                            <Button type="button" variant="outline" className="w-full" onClick={refreshAttendances} disabled={isRefreshingAttendances}>
+                                {isRefreshingAttendances ? 'Actualisation...' : 'Actualiser'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-muted/30">
+                                <tr>
+                                    <th className="px-4 py-2 font-semibold">Ouvrier</th>
+                                    <th className="px-4 py-2 font-semibold">Shift</th>
+                                    <th className="px-4 py-2 font-semibold">Heure Arrivee</th>
+                                    <th className="px-4 py-2 font-semibold">Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {attendances.length > 0 ? (
+                                    attendances.map((attendance) => (
+                                        <tr key={attendance.id} className="border-t">
+                                            <td className="px-4 py-2 font-medium">{attendance.user?.name ?? '-'}</td>
+                                            <td className="px-4 py-2">{attendance.shift}</td>
+                                            <td className="px-4 py-2">
+                                                {attendance.check_in
+                                                    ? new Date(attendance.check_in).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                                                    : '-'}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {attendanceStatuses.map((status: any) => (
+                                                        <button
+                                                            key={status.value}
+                                                            type="button"
+                                                            onClick={() => handleStatusChange(attendance.id, status.value)}
+                                                            className={`rounded-full px-2 py-1 text-xs border transition ${
+                                                                attendance.status === status.value
+                                                                    ? 'bg-primary text-primary-foreground border-primary'
+                                                                    : 'bg-background border-border hover:bg-muted'
+                                                            }`}
+                                                        >
+                                                            {status.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>
+                                            Aucune presence pour cette selection.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
                 <CardHeader>
@@ -478,7 +825,31 @@ export const EngineerDashboard = ({ tasks, stats }: any) => {
     );
 };
 
-export const WorkerDashboard = ({ tasks }: any) => {
+export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanceSummary }: any) => {
+    const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().slice(0, 10));
+
+    const attendanceStatusLabels: Record<string, string> = {
+        present: 'Present',
+        absent: 'Absent',
+        retard: 'Retard',
+        malade: 'Malade',
+    };
+
+    const attendanceStatusClasses: Record<string, string> = {
+        present: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        absent: 'bg-rose-50 text-rose-700 border-rose-200',
+        retard: 'bg-amber-50 text-amber-700 border-amber-200',
+        malade: 'bg-blue-50 text-blue-700 border-blue-200',
+    };
+
+    const recordsForSelectedDate = workerAttendances.filter((attendance: any) => {
+        const attendanceDate = String(attendance.date).slice(0, 10);
+
+        return attendanceDate === selectedDate;
+    });
+
+    const recentAttendances = workerAttendances.slice(0, 12);
+
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in zoom-in duration-500">
             <div className="bg-primary p-12 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/10 relative overflow-hidden group">
@@ -522,6 +893,108 @@ export const WorkerDashboard = ({ tasks }: any) => {
                     <AlertCircle className="ml-4 h-8 w-8" strokeWidth={3} />
                 </Button>
             </div>
+
+            <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm rounded-[2rem] overflow-hidden">
+                <CardHeader className="p-8 border-b border-border/50">
+                    <CardTitle className="text-lg font-bold">Suivi Presence</CardTitle>
+                    <CardDescription>Consulte ton statut du jour et les jours passes.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-8 space-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="rounded-xl border p-3">
+                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Present</p>
+                            <p className="text-2xl font-black">{workerAttendanceSummary?.present ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border p-3">
+                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Absent</p>
+                            <p className="text-2xl font-black">{workerAttendanceSummary?.absent ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border p-3">
+                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Retard</p>
+                            <p className="text-2xl font-black">{workerAttendanceSummary?.retard ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border p-3">
+                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Malade</p>
+                            <p className="text-2xl font-black">{workerAttendanceSummary?.malade ?? 0}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="attendance-date">Choisir une date</Label>
+                        <Input
+                            id="attendance-date"
+                            type="date"
+                            value={selectedDate}
+                            onChange={(event) => setSelectedDate(event.target.value)}
+                            className="max-w-xs"
+                        />
+                    </div>
+
+                    <div className="rounded-xl border overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-muted/30">
+                                <tr>
+                                    <th className="px-4 py-2 font-semibold">Date</th>
+                                    <th className="px-4 py-2 font-semibold">Projet</th>
+                                    <th className="px-4 py-2 font-semibold">Shift</th>
+                                    <th className="px-4 py-2 font-semibold">Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {recordsForSelectedDate.length > 0 ? (
+                                    recordsForSelectedDate.map((attendance: any) => (
+                                        <tr key={attendance.id} className="border-t">
+                                            <td className="px-4 py-2 font-medium">
+                                                {new Date(attendance.date).toLocaleDateString('fr-FR')}
+                                            </td>
+                                            <td className="px-4 py-2">{attendance.project?.name ?? '-'}</td>
+                                            <td className="px-4 py-2 capitalize">{attendance.shift ?? '-'}</td>
+                                            <td className="px-4 py-2">
+                                                <span
+                                                    className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${attendanceStatusClasses[attendance.status] ?? 'bg-muted text-foreground border-border'}`}
+                                                >
+                                                    {attendanceStatusLabels[attendance.status] ?? attendance.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                                            Aucun enregistrement pour cette date.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <p className="text-sm font-semibold mb-3">Historique recent</p>
+                        <div className="space-y-2">
+                            {recentAttendances.length > 0 ? (
+                                recentAttendances.map((attendance: any) => (
+                                    <div key={attendance.id} className="rounded-lg border px-3 py-2 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-semibold text-sm">
+                                                {new Date(attendance.date).toLocaleDateString('fr-FR')} - {attendance.project?.name ?? 'Sans projet'}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">Shift: {attendance.shift ?? '-'}</p>
+                                        </div>
+                                        <span
+                                            className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${attendanceStatusClasses[attendance.status] ?? 'bg-muted text-foreground border-border'}`}
+                                        >
+                                            {attendanceStatusLabels[attendance.status] ?? attendance.status}
+                                        </span>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground">Aucune donnee de presence disponible.</p>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm rounded-[2rem] overflow-hidden">
                 <CardHeader className="p-8 border-b border-border/50">

@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AttendanceShift;
+use App\Enums\AttendanceStatus;
 use App\Enums\UserRole;
+use App\Models\Attendance;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -24,6 +27,18 @@ class DashboardController extends Controller
                 'total_tasks' => 0,
             ],
             'tasks' => [],
+            'attendanceProjects' => [],
+            'attendanceWorkers' => [],
+            'attendanceStatuses' => [],
+            'attendanceShifts' => [],
+            'attendanceDate' => now()->toDateString(),
+            'workerAttendances' => [],
+            'workerAttendanceSummary' => [
+                'present' => 0,
+                'absent' => 0,
+                'retard' => 0,
+                'malade' => 0,
+            ],
         ];
 
         if ($user->role === UserRole::Manager) {
@@ -50,8 +65,50 @@ class DashboardController extends Controller
                     });
                 })->distinct()->count(),
             ];
+
+            $data['attendanceProjects'] = Project::where('engineer_id', $user->id)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+
+            $data['attendanceWorkers'] = User::where('role', UserRole::Worker)
+                ->select('id', 'name', 'email')
+                ->orderBy('name')
+                ->get();
+
+            $data['attendanceStatuses'] = array_map(
+                fn (AttendanceStatus $status) => [
+                    'value' => $status->value,
+                    'label' => $status->label(),
+                    'color' => $status->color(),
+                ],
+                AttendanceStatus::cases()
+            );
+
+            $data['attendanceShifts'] = array_map(
+                fn (AttendanceShift $shift) => [
+                    'value' => $shift->value,
+                    'label' => $shift->label(),
+                    'icon' => $shift->icon(),
+                ],
+                AttendanceShift::cases()
+            );
         } elseif ($user->role === UserRole::Worker) {
             $data['tasks'] = $user->tasks()->with('project')->latest()->get();
+
+            $attendances = Attendance::with('project:id,name')
+                ->where('user_id', $user->id)
+                ->latest('date')
+                ->latest('id')
+                ->get();
+
+            $data['workerAttendances'] = $attendances;
+            $data['workerAttendanceSummary'] = [
+                'present' => $attendances->where('status', AttendanceStatus::Present->value)->count(),
+                'absent' => $attendances->where('status', AttendanceStatus::Absent->value)->count(),
+                'retard' => $attendances->where('status', AttendanceStatus::Late->value)->count(),
+                'malade' => $attendances->where('status', AttendanceStatus::Sick->value)->count(),
+            ];
         }
 
         return Inertia::render('dashboard', $data);

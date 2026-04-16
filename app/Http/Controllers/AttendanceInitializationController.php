@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\UserRole;
 use App\Models\Attendance;
 use App\Models\Project;
 use App\Models\User;
@@ -26,13 +27,21 @@ class AttendanceInitializationController extends Controller
         ]);
 
         $project = Project::findOrFail($validated['project_id']);
+        $authorizationError = $this->authorizeEngineerForProject($request, $project);
+
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
         $date = Carbon::parse($validated['date'])->startOfDay();
         $shifts = $validated['shifts'] ?? ['morning', 'evening'];
 
-        // Get all workers assigned to this project, or all workers if none assigned
+        // Presence initialization must target assigned project workers only.
         $workers = $project->workers()->get();
         if ($workers->isEmpty()) {
-            $workers = User::where('role', 'worker')->get();
+            return response()->json([
+                'error' => 'Aucun ouvrier affecte a ce projet. Veuillez affecter des ouvriers d\'abord.',
+            ], 422);
         }
 
         $created = 0;
@@ -81,6 +90,12 @@ class AttendanceInitializationController extends Controller
      */
     public function assignWorkers(Request $request, Project $project): JsonResponse
     {
+        $authorizationError = $this->authorizeEngineerForProject($request, $project);
+
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
         $validated = $request->validate([
             'worker_ids' => 'required|array',
             'worker_ids.*' => 'required|integer|exists:users,id',
@@ -111,6 +126,13 @@ class AttendanceInitializationController extends Controller
      */
     public function getAvailableWorkers(): JsonResponse
     {
+        $user = request()->user();
+        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier], true)) {
+            return response()->json([
+                'error' => 'Seuls les ingenieurs peuvent consulter cette ressource.',
+            ], 403);
+        }
+
         $workers = User::where('role', 'worker')
             ->select('id', 'name', 'email')
             ->orderBy('name')
@@ -126,6 +148,12 @@ class AttendanceInitializationController extends Controller
      */
     public function getProjectWorkers(Project $project): JsonResponse
     {
+        $authorizationError = $this->authorizeEngineerForProject(request(), $project);
+
+        if ($authorizationError) {
+            return $authorizationError;
+        }
+
         $workers = $project->workers()
             ->select('users.id', 'users.name', 'users.email')
             ->get();
@@ -133,5 +161,24 @@ class AttendanceInitializationController extends Controller
         return response()->json([
             'workers' => $workers,
         ]);
+    }
+
+    private function authorizeEngineerForProject(Request $request, Project $project): ?JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier], true)) {
+            return response()->json([
+                'error' => 'Seuls les ingenieurs peuvent gerer l\'affectation et la presence.',
+            ], 403);
+        }
+
+        if ((int) $project->engineer_id !== (int) $user->id) {
+            return response()->json([
+                'error' => 'Ce projet n\'est pas assigne a cet ingenieur.',
+            ], 403);
+        }
+
+        return null;
     }
 }

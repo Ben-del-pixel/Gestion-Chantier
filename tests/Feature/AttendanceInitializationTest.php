@@ -8,8 +8,12 @@ use App\Models\User;
 beforeEach(function () {
     // Create test data
     $this->manager = User::factory()->create(['role' => 'manager']);
+    $this->engineer = User::factory()->create(['role' => 'engineer']);
     $this->workers = User::factory(3)->create(['role' => 'worker']);
-    $this->project = Project::factory()->create(['manager_id' => $this->manager->id]);
+    $this->project = Project::factory()->create([
+        'manager_id' => $this->manager->id,
+        'engineer_id' => $this->engineer->id,
+    ]);
 
     // Assign workers to project using sync
     $this->project->workers()->sync($this->workers->pluck('id')->toArray());
@@ -18,7 +22,7 @@ beforeEach(function () {
     $count = $this->project->workers()->count();
     expect($count)->toBe(3);
 
-    $this->actingAs($this->manager);
+    $this->actingAs($this->engineer);
 });
 
 it('initializes attendance records for project workers', function () {
@@ -54,6 +58,32 @@ it('assigns workers to a project', function () {
     foreach ($workerIds as $workerId) {
         expect($assignedWorkers)->toContain($workerId);
     }
+});
+
+it('forbids worker assignment by non engineer users', function () {
+    $this->actingAs($this->manager);
+
+    $response = $this->postJson(
+        "/api/projects/{$this->project->id}/workers",
+        ['worker_ids' => $this->workers->pluck('id')->toArray()]
+    );
+
+    $response->assertForbidden();
+});
+
+it('forbids attendance initialization for projects outside engineer scope', function () {
+    $otherEngineer = User::factory()->create(['role' => 'engineer']);
+    $projectFromAnotherEngineer = Project::factory()->create([
+        'manager_id' => $this->manager->id,
+        'engineer_id' => $otherEngineer->id,
+    ]);
+
+    $response = $this->postJson('/api/attendance/initialize', [
+        'date' => now()->toDateString(),
+        'project_id' => $projectFromAnotherEngineer->id,
+    ]);
+
+    $response->assertForbidden();
 });
 
 it('updates attendance status', function () {
