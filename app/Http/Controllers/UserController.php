@@ -43,6 +43,31 @@ class UserController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,'.$user->id,
+            'password' => 'nullable|string|min:8',
+            'role' => 'required|in:'.implode(',', array_map(fn ($role) => $role->value, UserRole::cases())),
+            'daily_rate' => 'nullable|numeric|min:0',
+            'skills' => 'nullable|string',
+        ]);
+
+        if (! empty($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+
+        $user->update($validated);
+
+        return response()->json([
+            'user' => $user,
+            'message' => 'Utilisateur mis à jour avec succès',
+        ]);
+    }
+
     public function destroy(User $user)
     {
         $user->delete();

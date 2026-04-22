@@ -80,4 +80,31 @@ class MaterialController extends Controller
             'message' => 'Matériau créé avec succès',
         ], 201);
     }
+
+    public function update(Request $request, Material $material)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:255',
+            'quantity_in_stock' => 'required|numeric|min:0',
+            'unit' => 'required|string|max:255',
+            'category' => 'nullable|string|max:255',
+        ]);
+
+        $material->update($validated);
+
+        return response()->json([
+            'material' => $material,
+            'message' => 'Matériau mis à jour avec succès',
+        ]);
+    }
+
+    public function destroy(Material $material)
+    {
+        $material->delete();
+
+        return response()->json([
+            'message' => 'Matériau supprimé avec succès',
+        ]);
+    }
 }
