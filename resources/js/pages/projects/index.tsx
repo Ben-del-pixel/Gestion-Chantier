@@ -8,6 +8,8 @@ import {
   Search,
   Trash2,
   Users,
+  TrendingUp,
+  Coins,
 } from 'lucide-react';
 import React from 'react';
 
@@ -268,18 +270,17 @@ export default function ProjectsIndex({ projects, engineers }: { projects: Proje
     <>
       <Head title="Chantiers" />
 
-      <div className="space-y-5">
-        <Card className="rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between gap-4 pb-4">
+      <div className="space-y-6">
+        <div className="flex flex-row items-center justify-between pb-2">
             <div>
-              <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">Gestion des Chantiers</h1>
-              <p className="text-lg text-slate-500">Suivi de tous vos chantiers à Lubumbashi</p>
+              <h1 className="text-4xl font-black tracking-tight text-slate-900">Chantiers</h1>
+              <p className="mt-1 text-slate-500 font-medium">Suivi de tous vos projets à Lubumbashi</p>
             </div>
 
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
-                <Button className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700">
-                  <Plus className="mr-2 h-4 w-4" />
+                <Button className="h-12 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all hover:scale-105 active:scale-95">
+                  <Plus className="mr-2 h-5 w-5" />
                   Nouveau Chantier
                 </Button>
               </DialogTrigger>
@@ -446,133 +447,152 @@ export default function ProjectsIndex({ projects, engineers }: { projects: Proje
                 </form>
               </DialogContent>
             </Dialog>
-          </CardHeader>
+        </div>
 
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-              <div className="rounded-xl bg-blue-100/70 px-4 py-3">
-                <p className="text-sm font-medium text-blue-700">Total Chantiers</p>
-                <p className="mt-1 text-4xl font-semibold text-blue-700">{stats.total}</p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+              <div className="rounded-3xl bg-blue-500 p-6 text-white shadow-xl shadow-blue-500/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Total Chantiers</p>
+                    <TrendingUp className="h-5 w-5" />
+                </div>
+                <p className="text-4xl font-black">{stats.total}</p>
               </div>
-              <div className="rounded-xl bg-emerald-100/70 px-4 py-3">
-                <p className="text-sm font-medium text-emerald-700">En Cours</p>
-                <p className="mt-1 text-4xl font-semibold text-emerald-700">{stats.inProgress}</p>
+              <div className="rounded-3xl bg-emerald-500 p-6 text-white shadow-xl shadow-emerald-500/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">En Cours</p>
+                    <Circle className="h-5 w-5 fill-white/30" />
+                </div>
+                <p className="text-4xl font-black">{stats.inProgress}</p>
               </div>
-              <div className="rounded-xl bg-violet-100/70 px-4 py-3">
-                <p className="text-sm font-medium text-violet-700">Terminés</p>
-                <p className="mt-1 text-4xl font-semibold text-violet-700">{stats.completed}</p>
+              <div className="rounded-3xl bg-violet-600 p-6 text-white shadow-xl shadow-violet-600/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Terminés</p>
+                    <Calendar className="h-5 w-5" />
+                </div>
+                <p className="text-4xl font-black">{stats.completed}</p>
               </div>
-              <div className="rounded-xl bg-amber-100/70 px-4 py-3">
-                <p className="text-sm font-medium text-amber-700">Budget Total</p>
-                <p className="mt-1 text-4xl font-semibold text-amber-700">{formatCurrency(stats.totalBudget)}</p>
+              <div className="rounded-3xl bg-amber-500 p-6 text-white shadow-xl shadow-amber-500/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Budget Global</p>
+                    <Coins className="h-5 w-5" />
+                </div>
+                <p className="text-3xl font-black">{formatCurrency(stats.totalBudget)}</p>
               </div>
-              <div className="rounded-xl bg-rose-100/70 px-4 py-3">
-                <p className="text-sm font-medium text-rose-700">Dépensé</p>
-                <p className="mt-1 text-4xl font-semibold text-rose-700">{formatCurrency(stats.totalSpent)}</p>
+              <div className="rounded-3xl bg-rose-600 p-6 text-white shadow-xl shadow-rose-600/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Dépensé</p>
+                    <TrendingUp className="h-5 w-5" />
+                </div>
+                <p className="text-3xl font-black">{formatCurrency(stats.totalSpent)}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+        </div>
 
-        <Card className="rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm">
-          <CardContent className="flex flex-col gap-3 py-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="relative flex-1 group">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
               <Input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Rechercher par nom, localisation, responsable..."
-                className="h-11 rounded-xl border-slate-300 bg-white pl-10"
+                className="h-14 w-full rounded-2xl border-slate-200 bg-white pl-12 text-lg shadow-sm focus:ring-4 focus:ring-blue-500/10 transition-all"
               />
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-11 w-full rounded-xl border-slate-300 bg-white md:w-[200px]">
+              <SelectTrigger className="h-14 w-full rounded-2xl border-slate-200 bg-white font-bold text-slate-700 md:w-[240px] shadow-sm">
                 <SelectValue placeholder="Tous les statuts" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-2xl">
                 <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="en_cours">En cours</SelectItem>
-                <SelectItem value="termine">Terminé</SelectItem>
-                <SelectItem value="initialisation">Planification</SelectItem>
-                <SelectItem value="suspendu">Suspendu</SelectItem>
+                <SelectItem value="en_cours">🚀 En cours</SelectItem>
+                <SelectItem value="termine">✅ Terminé</SelectItem>
+                <SelectItem value="initialisation">📅 Planification</SelectItem>
+                <SelectItem value="suspendu">⏸️ Suspendu</SelectItem>
               </SelectContent>
             </Select>
-          </CardContent>
-        </Card>
+        </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredProjects.map((project) => (
-            <Card key={project.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm">
-              <CardHeader className="space-y-3 pb-4">
-                <CardTitle className="text-[28px] font-semibold leading-tight text-slate-900">{project.name}</CardTitle>
-
-                <Badge className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE_CLASS[project.status] || STATUS_BADGE_CLASS.initialisation}`}>
-                  {STATUS_LABELS[project.status] || STATUS_LABELS.initialisation}
-                </Badge>
-
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <MapPin className="h-4 w-4" />
-                  <span>{project.description || 'Lubumbashi'}</span>
+            <Card key={project.id} className="group relative rounded-[32px] border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 overflow-hidden">
+              <CardHeader className="space-y-4 p-6">
+                <div className="flex items-start justify-between">
+                    <Badge className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${STATUS_BADGE_CLASS[project.status] || STATUS_BADGE_CLASS.initialisation}`}>
+                      {STATUS_LABELS[project.status] || STATUS_LABELS.initialisation}
+                    </Badge>
+                    <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-slate-400">
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span>{project.description || 'Lubumbashi'}</span>
+                    </div>
                 </div>
+
+                <CardTitle className="text-2xl font-black leading-tight text-slate-900 group-hover:text-blue-600 transition-colors">{project.name}</CardTitle>
               </CardHeader>
 
-              <CardContent className="space-y-3 text-sm">
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="font-medium text-slate-600">Progression</span>
-                    <span className="font-semibold text-slate-700">{project.progress}%</span>
+              <CardContent className="space-y-6 p-6 pt-0">
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-black uppercase text-slate-400">
+                        <span>Progression Chantier</span>
+                        <span className="text-slate-900">{project.progress}%</span>
+                      </div>
+                      <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-1000 group-hover:scale-x-105 origin-left"
+                          style={{ width: `${project.progress}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-black uppercase text-slate-400">
+                        <span>Consommation Budget</span>
+                        <span className="text-slate-900">{project.spent > 0 ? ((project.spent / project.budget) * 100).toFixed(0) : 0}%</span>
+                      </div>
+                      <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-1000"
+                          style={{ width: `${project.progress}%` }}
+                        />
+                      </div>
+                      <div className="mt-2 flex items-center justify-between font-black text-[10px] uppercase tracking-tighter">
+                        <span className="text-emerald-600">{formatCurrency(project.spent)}</span>
+                        <span className="text-slate-300">/</span>
+                        <span className="text-slate-400">{formatCurrency(project.budget)}</span>
+                      </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-black uppercase tracking-tight">Timeline</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700">{formatDateRange(project.start_date, project.deadline)}</span>
                   </div>
-                  <div className="h-2 w-full rounded-full bg-slate-200">
-                    <div
-                      className="h-2 rounded-full bg-blue-600"
-                      style={{ width: `${project.progress}%` }}
-                    />
+                  <div className="h-8 w-px bg-slate-200" />
+                  <div className="flex flex-col gap-1 items-end">
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <Users className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-black uppercase tracking-tight">Staff</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700">{project.workerCount} Ouvriers</span>
                   </div>
                 </div>
 
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="font-medium text-slate-600">Budget utilisé</span>
-                    <span className="font-semibold text-slate-700">{project.progress.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-slate-200">
-                    <div
-                      className="h-2 rounded-full bg-emerald-500"
-                      style={{ width: `${project.progress}%` }}
-                    />
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                    <span>{formatCurrency(project.spent)} dépensé</span>
-                    <span>{formatCurrency(project.budget)} budget</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1 border-t border-slate-200 pt-3 text-[13px] text-slate-600">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>{formatDateRange(project.start_date, project.deadline)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span>
-                      {project.workerCount} travailleur(s) • {project.engineer?.name ?? project.manager?.name ?? 'Non assigné'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3">
-                  <Button asChild variant="outline" className="h-10 rounded-xl border-blue-200 bg-blue-50 font-semibold text-blue-600 hover:bg-blue-100">
+                <div className="grid grid-cols-2 gap-3">
+                  <Button asChild variant="outline" className="h-11 rounded-xl border-blue-100 bg-blue-50/50 font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">
                     <Link href={show.url({ project: project.id })}>
                       <Pencil className="mr-2 h-4 w-4" />
-                      Modifier
+                      Gérer
                     </Link>
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => handleDeleteProject(project)}
-                    className="h-10 rounded-xl border-rose-200 bg-rose-50 font-semibold text-rose-600 hover:bg-rose-100"
+                    className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Supprimer
