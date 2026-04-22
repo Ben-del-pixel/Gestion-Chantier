@@ -10,7 +10,8 @@ import {
     Settings,
     HelpCircle,
     BarChart3,
-    Clock
+    Clock,
+    LogOut
 } from 'lucide-react';
 import { index as activityLogsIndex } from '@/actions/App/Http/Controllers/ActivityLogController';
 import { index as materialsIndex } from '@/actions/App/Http/Controllers/Api/MaterialController';
@@ -91,8 +92,21 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
                 <NavMain items={systemNavItems} label="Système" />
             </SidebarContent>
 
-            <SidebarFooter className="border-t border-white/10 px-3 py-4">
+            <SidebarFooter className="border-t border-white/10 px-3 py-4 space-y-2">
                 <NavUser />
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton 
+                            asChild 
+                            className="h-11 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-colors"
+                        >
+                            <Link href="/logout" method="post" as="button" className="flex items-center gap-3 w-full">
+                                <LogOut className="size-4" />
+                                <span className="text-sm font-bold">Déconnexion</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>
