@@ -153,7 +153,15 @@ const StatCard = ({
     );
 };
 
-export const ManagerDashboard = () => {
+export const ManagerDashboard = ({ projects = [], stats = {}, recentActivities = [], materialDistribution = [] }: any) => {
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('fr-FR', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 0,
+        }).format(value);
+    };
+
     const lineData = {
         labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
         datasets: [{
@@ -184,10 +192,10 @@ export const ManagerDashboard = () => {
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500 text-white shadow-lg shadow-blue-500/20">
                             <ClipboardCheck className="h-5 w-5" />
                         </div>
-                        <span className="text-[11px] font-semibold text-emerald-500">+12%</span>
+                        <span className="text-[11px] font-semibold text-emerald-500">Stock</span>
                     </div>
                     <div className="mt-6 space-y-1">
-                        <div className="text-2xl font-semibold tracking-tight text-slate-950">1,247</div>
+                        <div className="text-2xl font-semibold tracking-tight text-slate-950">{stats.total_materials || 0}</div>
                         <div className="text-sm text-slate-500">Matériaux en stock</div>
                     </div>
                 </div>
@@ -197,10 +205,10 @@ export const ManagerDashboard = () => {
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
                             <Users className="h-5 w-5" />
                         </div>
-                        <span className="text-[11px] font-semibold text-emerald-500">+5%</span>
+                        <span className="text-[11px] font-semibold text-emerald-500">Employés</span>
                     </div>
                     <div className="mt-6 space-y-1">
-                        <div className="text-2xl font-semibold tracking-tight text-slate-950">89</div>
+                        <div className="text-2xl font-semibold tracking-tight text-slate-950">{stats.total_workers || 0}</div>
                         <div className="text-sm text-slate-500">Ouvriers actifs</div>
                     </div>
                 </div>
@@ -210,11 +218,11 @@ export const ManagerDashboard = () => {
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-500/20">
                             <MapPin className="h-5 w-5" />
                         </div>
-                        <span className="text-[11px] font-semibold text-rose-500">-2%</span>
+                        <span className="text-[11px] font-semibold text-blue-500">Chantiers</span>
                     </div>
                     <div className="mt-6 space-y-1">
-                        <div className="text-2xl font-semibold tracking-tight text-slate-950">34</div>
-                        <div className="text-sm text-slate-500">Équipements</div>
+                        <div className="text-2xl font-semibold tracking-tight text-slate-950">{stats.active_projects || 0}</div>
+                        <div className="text-sm text-slate-500">Projets en cours</div>
                     </div>
                 </div>
 
@@ -223,11 +231,11 @@ export const ManagerDashboard = () => {
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500 text-white shadow-lg shadow-violet-500/20">
                             <TrendingUp className="h-5 w-5" />
                         </div>
-                        <span className="text-[11px] font-semibold text-emerald-500">+8%</span>
+                        <span className="text-[11px] font-semibold text-emerald-500">Budget</span>
                     </div>
                     <div className="mt-6 space-y-1">
-                        <div className="text-2xl font-semibold tracking-tight text-slate-950">524K$</div>
-                        <div className="text-sm text-slate-500">Coût total</div>
+                        <div className="text-2xl font-semibold tracking-tight text-slate-950">{formatCurrency(stats.total_budget || 0)}</div>
+                        <div className="text-sm text-slate-500">Coût total projets</div>
                     </div>
                 </div>
             </div>
@@ -284,29 +292,44 @@ export const ManagerDashboard = () => {
                         <CardTitle className="text-[18px] font-bold tracking-tight text-slate-900">Distribution matériaux</CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col items-center justify-center gap-4 px-6 pb-6 pt-4">
-                        <div className="relative h-52 w-52">
-                            <Doughnut
-                                data={{
-                                    labels: ['Ciment', 'Acier', 'Bois', 'Briques', 'Autres'],
-                                    datasets: [{
-                                        data: [29, 22, 15, 20, 14],
-                                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
-                                        borderWidth: 0,
-                                    }],
-                                }}
-                                options={{
-                                    plugins: { legend: { display: false } },
-                                    cutout: '62%',
-                                }}
-                            />
-                        </div>
-                            <div className="grid w-full grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                            <div className="flex items-center justify-between gap-2 text-blue-500"><span>Ciment</span><span>29%</span></div>
-                            <div className="flex items-center justify-between gap-2 text-emerald-500"><span>Acier</span><span>22%</span></div>
-                            <div className="flex items-center justify-between gap-2 text-orange-500"><span>Bois</span><span>15%</span></div>
-                            <div className="flex items-center justify-between gap-2 text-red-500"><span>Briques</span><span>20%</span></div>
-                            <div className="flex items-center justify-between gap-2 text-violet-500"><span>Autres</span><span>14%</span></div>
-                        </div>
+                        {materialDistribution.length > 0 ? (
+                            <>
+                                <div className="relative h-52 w-52">
+                                    <Doughnut
+                                        data={{
+                                            labels: materialDistribution.map((m: any) => m.label),
+                                            datasets: [{
+                                                data: materialDistribution.map((m: any) => m.total),
+                                                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'],
+                                                borderWidth: 0,
+                                            }],
+                                        }}
+                                        options={{
+                                            plugins: { legend: { display: false } },
+                                            cutout: '62%',
+                                        }}
+                                    />
+                                </div>
+                                <div className="grid w-full grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                    {materialDistribution.map((m: any, idx: number) => {
+                                        const colors = ['text-blue-500', 'text-emerald-500', 'text-orange-500', 'text-red-500', 'text-violet-500', 'text-indigo-500', 'text-pink-500'];
+                                        const total = materialDistribution.reduce((sum: number, item: any) => sum + item.total, 0);
+                                        const percentage = total > 0 ? Math.round((m.total / total) * 100) : 0;
+                                        
+                                        return (
+                                            <div key={idx} className={cn("flex items-center justify-between gap-2", colors[idx % colors.length])}>
+                                                <span className="truncate max-w-[80px]">{m.label}</span>
+                                                <span>{percentage}%</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-52 text-slate-400 text-sm italic">
+                                Aucune donnée de stock
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -316,16 +339,26 @@ export const ManagerDashboard = () => {
                     <CardTitle className="text-[18px] font-bold tracking-tight text-slate-900">Activités récentes</CardTitle>
                 </CardHeader>
                 <CardContent className="px-6 pb-6 pt-4">
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                        <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                                <CheckCircle2 className="h-4 w-4" />
+                    <div className="space-y-4">
+                        {recentActivities.length > 0 ? recentActivities.map((activity: any) => (
+                            <div key={activity.id} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
+                                <div className="flex items-start gap-3">
+                                    <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                                        <TrendingUp className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{activity.description}</div>
+                                        <div className="text-xs text-slate-500 flex items-center gap-2">
+                                            <span>{activity.user?.name}</span>
+                                            <span>•</span>
+                                            <span>{new Date(activity.created_at).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-slate-900">Livraison de 50 sacs de ciment</div>
-                                <div className="text-xs text-slate-500">Il y a 2h</div>
-                            </div>
-                        </div>
+                        )) : (
+                            <div className="text-center py-6 text-slate-500 text-sm italic">Aucune activité récente</div>
+                        )}
                     </div>
                 </CardContent>
             </Card>

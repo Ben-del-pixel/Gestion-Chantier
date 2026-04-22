@@ -2,9 +2,18 @@ import { Head } from '@inertiajs/react';
 import { AlertTriangle, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import React from 'react';
 
+import { store } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type MaterialItem = {
     id: number;
@@ -61,6 +70,15 @@ function isLowStock(quantity: number, unit: string): boolean {
 
 export default function MaterialsIndex({ materials }: { materials: MaterialItem[] }) {
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [openDialog, setOpenDialog] = React.useState(false);
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const [formData, setFormData] = React.useState({
+        name: '',
+        description: '',
+        quantity_in_stock: '',
+        unit: 'sacs',
+        category: '',
+    });
 
     const normalizedMaterials = React.useMemo(() => {
         return materials.map((material) => {
@@ -91,6 +109,44 @@ export default function MaterialsIndex({ materials }: { materials: MaterialItem[
         });
     }, [normalizedMaterials, searchTerm]);
 
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        setFormData({
+            ...formData,
+            [e.target.name]: e.target.value,
+        });
+    };
+
+    const handleSubmitMaterial = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+
+        try {
+            const response = await fetch(store.url(), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify(formData),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                alert('Erreur : ' + (error.message || 'Impossible de créer le matériau'));
+                return;
+            }
+
+            setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', category: '' });
+            setOpenDialog(false);
+            window.location.reload();
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Erreur lors de la création du matériau');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     return (
         <>
             <Head title="Matériaux" />
@@ -102,10 +158,95 @@ export default function MaterialsIndex({ materials }: { materials: MaterialItem[
                         <p className="text-lg text-slate-500">Gestion du stock de matériaux de construction</p>
                     </div>
 
-                    <Button className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Ajouter matériau
-                    </Button>
+                    <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+                        <DialogTrigger asChild>
+                            <Button className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Ajouter matériau
+                            </Button>
+                        </DialogTrigger>
+
+                        <DialogContent>
+                            <DialogTitle>Ajouter un matériau</DialogTitle>
+
+                            <form className="mt-4 space-y-4" onSubmit={handleSubmitMaterial}>
+                                <div>
+                                    <Label htmlFor="name">Nom du matériau *</Label>
+                                    <Input
+                                        id="name"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleFormChange}
+                                        placeholder="Ex: Ciment Portland"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="description">Fournisseur / Description</Label>
+                                    <Input
+                                        id="description"
+                                        name="description"
+                                        value={formData.description}
+                                        onChange={handleFormChange}
+                                        placeholder="Ex: Fournisseur A"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label htmlFor="quantity_in_stock">Quantité *</Label>
+                                        <Input
+                                            id="quantity_in_stock"
+                                            name="quantity_in_stock"
+                                            type="number"
+                                            value={formData.quantity_in_stock}
+                                            onChange={handleFormChange}
+                                            placeholder="100"
+                                            required
+                                            step="0.01"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label htmlFor="unit">Unité *</Label>
+                                        <select
+                                            id="unit"
+                                            name="unit"
+                                            value={formData.unit}
+                                            onChange={handleFormChange}
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                            required
+                                        >
+                                            <option value="sacs">Sacs</option>
+                                            <option value="tonnes">Tonnes</option>
+                                            <option value="milliers">Milliers</option>
+                                            <option value="m3">m³</option>
+                                            <option value="unite">Unité</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="category">Catégorie</Label>
+                                    <Input
+                                        id="category"
+                                        name="category"
+                                        value={formData.category}
+                                        onChange={handleFormChange}
+                                        placeholder="Ex: Cimenterie"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline">Annuler</Button>
+                                    </DialogClose>
+                                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Création...' : 'Créer'}</Button>
+                                </div>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </div>
 
                 <Card className="rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm">

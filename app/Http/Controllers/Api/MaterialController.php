@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Material;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,5 +61,23 @@ class MaterialController extends Controller
         return Inertia::render('materials/index', [
             'materials' => $materials,
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:255',
+            'quantity_in_stock' => 'required|numeric|min:0',
+            'unit' => 'required|string|max:255',
+            'category' => 'nullable|string|max:255',
+        ]);
+
+        $material = Material::create($validated);
+
+        return response()->json([
+            'material' => $material,
+            'message' => 'Matériau créé avec succès',
+        ], 201);
     }
 }

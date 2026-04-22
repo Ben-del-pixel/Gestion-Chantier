@@ -31,6 +31,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Material routes
     Route::get('materials', [MaterialController::class, 'index'])->name('materials.index');
+    Route::post('materials', [MaterialController::class, 'store'])->name('materials.store');
 
     // Activity Log routes
     Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');

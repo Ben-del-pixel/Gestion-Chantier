@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,9 +16,11 @@ class ProjectController extends Controller
     public function index(): Response
     {
         $projects = Project::with('engineer', 'manager', 'tasks.workers')->latest()->get();
+        $engineers = User::where('role', UserRole::Engineer)->get();
 
         return Inertia::render('projects/index', [
             'projects' => $projects,
+            'engineers' => $engineers,
         ]);
     }
 
@@ -26,50 +30,46 @@ class ProjectController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'nullable|date',
-            'deadline' => 'required|date|after:today',
-            'steps' => 'required|array|min:1',
-            'steps.*.name' => 'required|string|max:255',
-            'steps.*.budget' => 'required|numeric|min:0',
+            'deadline' => 'required|date',
             'budget' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:initialisation,planifie,en_cours,termine,suspendu',
             'engineer_id' => 'nullable|exists:users,id',
+            'steps' => 'nullable|array',
+            'steps.*.name' => 'nullable|string|max:255',
+            'steps.*.budget' => 'nullable|numeric|min:0',
         ]);
-
-        $steps = $validated['steps'];
-
-        // Calculate total budget from steps
-        $totalBudget = collect($steps)->sum('budget');
-
-        // Allow manager to override the auto-calculated budget
-        $finalBudget = $validated['budget'] ?? $totalBudget;
 
         $project = Project::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'start_date' => $validated['start_date'] ?? null,
-            'budget' => $finalBudget,
+            'budget' => $validated['budget'] ?? 0,
             'deadline' => $validated['deadline'],
             'engineer_id' => $validated['engineer_id'] ?? null,
             'manager_id' => auth()->id(),
-            'status' => 'initialisation',
+            'status' => $validated['status'] ?? 'initialisation',
         ]);
 
-        // Create project steps
-        foreach ($steps as $index => $step) {
-            $project->steps()->create([
-                'name' => $step['name'],
-                'budget' => $step['budget'],
-                'order' => $index + 1,
-            ]);
+        // Create project steps if provided
+        if (! empty($validated['steps'])) {
+            foreach ($validated['steps'] as $index => $step) {
+                $project->steps()->create([
+                    'name' => $step['name'],
+                    'budget' => $step['budget'] ?? 0,
+                    'order' => $index + 1,
+                ]);
+            }
+
+            // Sync total budget from steps
+            $project->syncBudgetFromSteps();
         }
 
         ActivityLog::create([
             'user_id' => auth()->id(),
             'action' => 'create_project',
-            'description' => "Création du projet : {$project->name} avec ".count($steps).' étape(s)',
+            'description' => "Création du projet : {$project->name}",
             'properties' => [
                 'project_id' => $project->id,
-                'steps_count' => count($steps),
-                'total_budget' => $finalBudget,
             ],
         ]);
 

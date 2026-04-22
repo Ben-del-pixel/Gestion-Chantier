@@ -6,17 +6,16 @@ import {
     Package,
     ClipboardCheck,
     TrendingUp,
-    ShieldAlert,
-    HardHat,
     History,
     Settings,
     HelpCircle,
-    FileText,
     BarChart3,
     Clock
 } from 'lucide-react';
 import { index as activityLogsIndex } from '@/actions/App/Http/Controllers/ActivityLogController';
+import { index as materialsIndex } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import { index as attendanceIndex } from '@/actions/App/Http/Controllers/AttendanceController';
 import { index as reportsIndex } from '@/actions/App/Http/Controllers/ReportController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import AppLogo from '@/components/app-logo';
@@ -38,28 +37,27 @@ import type { NavItem } from '@/types';
 
 const roleNavItems: Record<string, NavItem[]> = {
     [UserRole.Manager.value]: [
-        { title: 'Vue d\'ensemble', href: dashboard(), icon: LayoutGrid },
+        { title: "Vue d'ensemble", href: dashboard(), icon: LayoutGrid },
         { title: 'Chantiers', href: projectsIndex(), icon: TrendingUp },
-        { title: 'Matériaux', href: '/materials', icon: Package },
-        { title: 'Ressources Humaines', href: usersIndex(), icon: Users },
-        { title: 'Présence', href: '/attendance', icon: Clock },
+        { title: 'Matériaux', href: materialsIndex(), icon: Package },
+        { title: "Main-d'oeuvre", href: usersIndex(), icon: Users },
+        { title: 'Présence', href: attendanceIndex(), icon: Clock },
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
         { title: 'Audit & Logs', href: activityLogsIndex(), icon: History },
     ],
     [UserRole.Engineer.value]: [
         { title: 'Mes Projets', href: dashboard(), icon: LayoutGrid },
-        { title: 'Planification', href: '#', icon: CalendarDays },
-        { title: 'Contrôle Équipes', href: '#', icon: HardHat },
-        { title: 'Rapports Terrain', href: '#', icon: ClipboardCheck },
+        { title: 'Chantiers', href: projectsIndex(), icon: TrendingUp },
+        { title: 'Matériaux', href: materialsIndex(), icon: Package },
+        { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
     ],
     [UserRole.Worker.value]: [
         { title: 'Ma Mission', href: dashboard(), icon: CalendarDays },
-        { title: 'Pointages', href: '#', icon: ShieldAlert },
-        { title: 'Historique', href: '#', icon: History },
+        { title: 'Présence', href: attendanceIndex(), icon: Clock },
+        { title: 'Historique', href: activityLogsIndex(), icon: History },
     ],
     [UserRole.Magasinier.value]: [
-        { title: 'Stock Matériaux', href: '/materials', icon: Package },
-        { title: 'Bons de Sortie', href: '#', icon: FileText },
+        { title: 'Stock Matériaux', href: materialsIndex(), icon: Package },
         { title: 'Inventaire', href: '#', icon: ClipboardCheck },
     ],
 };

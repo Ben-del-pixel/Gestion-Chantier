@@ -13,7 +13,7 @@ class UserController extends Controller
 {
     public function index(): Response
     {
-        $users = User::all();
+        $users = User::all()->append('status');
 
         return Inertia::render('users/index', [
             'users' => $users,
@@ -28,6 +28,8 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'role' => 'required|in:'.implode(',', array_map(fn ($role) => $role->value, UserRole::cases())),
+            'daily_rate' => 'nullable|numeric|min:0',
+            'skills' => 'nullable|string',
         ]);
 
         $user = User::create([
