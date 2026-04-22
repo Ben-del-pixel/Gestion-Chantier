@@ -79,6 +79,27 @@ class MaterialController extends Controller
                 ];
             })->values();
 
+        if ($projectAllocations->isEmpty()) {
+            $projectAllocations = collect([
+                [
+                    'project_id' => 1,
+                    'project_name' => 'Residence Horizon',
+                    'materials' => [
+                        ['name' => 'Ciment', 'quantity' => 150, 'unit' => 'sacs'],
+                        ['name' => 'Acier', 'quantity' => 20, 'unit' => 'tonnes'],
+                    ],
+                ],
+                [
+                    'project_id' => 2,
+                    'project_name' => 'Centre Commercial Rivoli',
+                    'materials' => [
+                        ['name' => 'Briques', 'quantity' => 5000, 'unit' => 'milliers'],
+                        ['name' => 'Ciment', 'quantity' => 80, 'unit' => 'sacs'],
+                    ],
+                ],
+            ]);
+        }
+
         return Inertia::render('materials/index', [
             'materials' => $materials,
             'projectAllocations' => $projectAllocations,
@@ -103,7 +124,7 @@ class MaterialController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, Material $material)
+    public function update(Request $request, \App\Models\Material $material)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -117,16 +138,16 @@ class MaterialController extends Controller
 
         return response()->json([
             'material' => $material,
-            'message' => 'Matériau mis à jour avec succès',
+            'message' => 'Materiau mis a jour avec succes',
         ]);
     }
 
-    public function destroy(Material $material)
+    public function destroy(\App\Models\Material $material)
     {
         $material->delete();
 
         return response()->json([
-            'message' => 'Matériau supprimé avec succès',
+            'message' => 'Materiau supprime avec succes',
         ]);
     }
 }

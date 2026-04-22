@@ -59,7 +59,7 @@ const roleNavItems: Record<string, NavItem[]> = {
     ],
     [UserRole.Magasinier.value]: [
         { title: 'Stock Matériaux', href: materialsIndex(), icon: Package },
-        { title: 'Inventaire', href: '#', icon: ClipboardCheck },
+        { title: 'Inventaire', href: materialsIndex(), icon: ClipboardCheck },
     ],
 };
 

@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { AlertTriangle, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, Coins, LayoutGrid, List } from 'lucide-react';
 import React from 'react';
 
 import { destroy, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 type MaterialItem = {
     id: number;
@@ -89,6 +90,7 @@ export default function MaterialsIndex({
     const [openDialog, setOpenDialog] = React.useState(false);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [editingMaterial, setEditingMaterial] = React.useState<MaterialItem | null>(null);
+    const [activeTab, setActiveTab] = React.useState('stock');
     const [formData, setFormData] = React.useState({
         name: '',
         description: '',
@@ -207,20 +209,20 @@ export default function MaterialsIndex({
         <>
             <Head title="Matériaux" />
 
-            <div className="space-y-5">
-                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-5 shadow-sm md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">Matériaux</h1>
-                        <p className="text-lg text-slate-500">Gestion du stock de matériaux de construction</p>
-                    </div>
+      <div className="space-y-6">
+        <div className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <h1 className="text-4xl font-black tracking-tight text-slate-900">Magasin & Stock</h1>
+              <p className="mt-1 text-slate-500 font-medium">Gestion des matériaux et inventaire Lubumbashi</p>
+            </div>
 
-                    <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-                        <DialogTrigger asChild>
-                            <Button className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Ajouter matériau
-                            </Button>
-                        </DialogTrigger>
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger asChild>
+                <Button className="h-12 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all hover:scale-105 active:scale-95">
+                  <Plus className="mr-2 h-5 w-5" />
+                  Nouveau Matériau
+                </Button>
+              </DialogTrigger>
 
                         <DialogContent>
                             <DialogTitle>{editingMaterial ? 'Modifier le matériau' : 'Ajouter un matériau'}</DialogTitle>
@@ -305,124 +307,165 @@ export default function MaterialsIndex({
                     </Dialog>
                 </div>
 
-                <Card className="rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm">
-                    <CardContent className="py-4">
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <Input
-                                value={searchTerm}
-                                onChange={(event) => setSearchTerm(event.target.value)}
-                                placeholder="Rechercher un matériau..."
-                                className="h-11 rounded-xl border-slate-300 bg-white pl-10"
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
+        {/* Premium Stats Row */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <div className="rounded-3xl bg-blue-500 p-6 text-white shadow-xl shadow-blue-500/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Total Articles</p>
+                    <Package className="h-6 w-6" />
+                </div>
+                <p className="text-4xl font-black">{normalizedMaterials.length}</p>
+              </div>
+              <div className="rounded-3xl bg-emerald-500 p-6 text-white shadow-xl shadow-emerald-500/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Valeur Stock</p>
+                    <Coins className="h-6 w-6" />
+                </div>
+                <p className="text-3xl font-black">{formatAmount(normalizedMaterials.reduce((acc, m) => acc + m.total, 0))}</p>
+              </div>
+              <div className="rounded-3xl bg-amber-500 p-6 text-white shadow-xl shadow-amber-500/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Alertes Stock</p>
+                    <AlertTriangle className="h-6 w-6" />
+                </div>
+                <p className="text-4xl font-black">{normalizedMaterials.filter(m => m.lowStock).length}</p>
+              </div>
+              <div className="rounded-3xl bg-indigo-600 p-6 text-white shadow-xl shadow-indigo-600/20 group transition-transform hover:-translate-y-1">
+                <div className="flex items-center justify-between opacity-80 mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider">Affectations</p>
+                    <TrendingUp className="h-6 w-6" />
+                </div>
+                <p className="text-4xl font-black">{projectAllocations.length}</p>
+              </div>
+        </div>
 
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                    {filteredMaterials.map((material) => (
-                        <Card key={material.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 shadow-sm">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
-                                            <Package className="h-5 w-5" />
-                                        </div>
-                                        <div>
-                                            <CardTitle className="text-[30px] font-semibold tracking-tight text-slate-900">{material.name}</CardTitle>
-                                            <p className="text-sm text-slate-500">{material.supplier}</p>
-                                        </div>
+        <div className="flex flex-col gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex rounded-2xl bg-slate-100 p-1.5 shadow-inner">
+                    <button 
+                        onClick={() => setActiveTab('stock')}
+                        className={`rounded-xl px-8 py-3 font-bold transition-all ${activeTab === 'stock' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <LayoutGrid className="mr-2 h-4 w-4 inline-block" />
+                        Inventaire Stock
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('allocations')}
+                        className={`rounded-xl px-8 py-3 font-bold transition-all ${activeTab === 'allocations' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <TrendingUp className="mr-2 h-4 w-4 inline-block" />
+                        Affectations Chantiers
+                    </button>
+                </div>
+
+                <div className="relative group w-full max-w-md">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                    <Input
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Rechercher un matériau..."
+                        className="h-14 w-full rounded-2xl border-slate-200 bg-white pl-12 text-lg shadow-sm focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
+                    />
+                </div>
+            </div>
+
+            {activeTab === 'stock' && (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredMaterials.length > 0 ? filteredMaterials.map((material) => (
+                        <Card key={material.id} className="group relative rounded-[32px] border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 overflow-hidden">
+                            <CardHeader className="space-y-4 p-6">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-500">
+                                        <Package className="h-6 w-6" />
                                     </div>
-
-                                    <span
-                                        className={`rounded-full px-3 py-1 text-xs font-semibold ${material.lowStock ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}
-                                    >
-                                        {material.lowStock ? 'Stock faible' : 'En stock'}
-                                    </span>
+                                    <Badge className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${material.lowStock ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                        {material.lowStock ? 'Alerte Stock' : 'Disponible'}
+                                    </Badge>
+                                </div>
+                                <div className="space-y-1">
+                                    <CardTitle className="text-2xl font-black leading-tight text-slate-900">{material.name}</CardTitle>
+                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{material.supplier}</p>
                                 </div>
                             </CardHeader>
 
-                            <CardContent className="space-y-2 text-sm">
-                                <div className="flex justify-between text-slate-700">
-                                    <span className="text-slate-500">Quantité:</span>
-                                    <span className="font-semibold">{formatQuantity(material.quantity, material.unit)}</span>
-                                </div>
-                                <div className="flex justify-between text-slate-700">
-                                    <span className="text-slate-500">Prix unitaire:</span>
-                                    <span className="font-semibold">{formatAmount(material.unitPrice)}</span>
-                                </div>
-                                <div className="flex justify-between text-slate-700">
-                                    <span className="text-slate-500">Total:</span>
-                                    <span className="font-semibold text-blue-600">{formatAmount(material.total)}</span>
-                                </div>
-                                <div className="flex justify-between text-slate-700">
-                                    <span className="text-slate-500">Dernière MAJ:</span>
-                                    <span className="text-slate-500">{new Date(material.updated_at).toISOString().slice(0, 10)}</span>
-                                </div>
-
-                                {material.lowStock && (
-                                    <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                                        <AlertTriangle className="h-3.5 w-3.5" />
-                                        Réapprovisionnement recommandé
+                            <CardContent className="space-y-6 p-6 pt-0">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 text-center">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Quantité</p>
+                                        <p className="text-xl font-black text-slate-900">{formatQuantity(material.quantity, material.unit)}</p>
                                     </div>
-                                )}
-
-                                <div className="grid grid-cols-[1fr_auto] gap-2 pt-2">
-                                    <Button type="button" variant="outline" className="h-10 rounded-xl border-slate-200 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200">
-                                        <Pencil className="mr-2 h-4 w-4" />
-                                        Modifier
-                                    </Button>
-                                    <Button type="button" variant="outline" className="h-10 rounded-xl border-rose-200 bg-rose-50 px-3 text-rose-600 hover:bg-rose-100">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 text-center">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Stock Valeur</p>
+                                        <p className="text-xl font-black text-blue-600 tracking-tighter">{formatAmount(material.total)}</p>
+                                    </div>
                                 </div>
-                             </CardContent>
-                         </Card>
-                     ))}
-                 </div>
 
-                {projectAllocations.length > 0 && (
-                    <div className="space-y-4 pt-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-2xl font-black text-slate-900">Affectations par Projet</h2>
-                            <div className="h-px flex-1 bg-slate-200 mx-6 opacity-50" />
+                                <div className="space-y-3">
+                                    <Button onClick={() => handleEdit(material)} className="h-11 w-full rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition-all">
+                                        <ClipboardCheck className="mr-2 h-4 w-4" />
+                                        Faire l'Inventaire
+                                    </Button>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Button onClick={() => handleEdit(material)} variant="outline" className="h-11 rounded-xl border-blue-100 bg-blue-50/50 font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">
+                                            <Pencil className="mr-2 h-4 w-4" />
+                                            Modifier
+                                        </Button>
+                                        <Button
+                                            onClick={() => handleDelete(material.id)}
+                                            variant="outline"
+                                            className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )) : (
+                        <div className="col-span-full py-20 text-center">
+                            <p className="text-xl font-black text-slate-900">Aucun matériau trouvé</p>
+                            <p className="text-slate-500 font-medium">Réinitialisez les filtres pour voir tout le stock.</p>
                         </div>
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {projectAllocations.map((allocation) => (
-                                <Card key={allocation.project_id} className="rounded-[32px] border border-blue-100 bg-blue-50/30 p-2 shadow-xl shadow-blue-500/5 transition-all hover:shadow-2xl hover:shadow-blue-500/10">
-                                    <CardHeader className="pb-4 p-6 pt-6">
-                                        <CardTitle className="text-xl font-black text-blue-900 flex items-center gap-3">
-                                            <div className="h-3 w-3 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50" />
-                                            {allocation.project_name}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="px-6 pb-6">
-                                        <div className="space-y-3">
-                                            {allocation.materials.map((m, idx) => (
-                                                <div key={idx} className="flex justify-between items-center bg-white p-4 rounded-2xl border border-blue-100/50 shadow-sm transition-transform hover:scale-[1.02]">
-                                                    <span className="font-bold text-slate-700">{m.name}</span>
-                                                    <span className="bg-blue-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight">
-                                                        {m.quantity} {m.unit}
-                                                    </span>
-                                                </div>
-                                            ))}
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'allocations' && (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {projectAllocations.length > 0 ? projectAllocations.map((allocation) => (
+                        <Card key={allocation.project_id} className="group relative rounded-[32px] border border-blue-100 bg-blue-50/30 p-2 shadow-xl shadow-blue-500/5 transition-all hover:shadow-2xl hover:shadow-blue-500/10">
+                            <CardHeader className="pb-4 p-6 pt-6">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-blue-500 text-white shadow-lg shadow-blue-500/30">
+                                        <TrendingUp className="h-5 w-5" />
+                                    </div>
+                                    <p className="text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">Affectation Chantier</p>
+                                </div>
+                                <CardTitle className="text-2xl font-black text-blue-900 leading-tight">{allocation.project_name}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="px-6 pb-6">
+                                <div className="space-y-3">
+                                    {allocation.materials.map((m, idx) => (
+                                        <div key={idx} className="flex justify-between items-center bg-white p-4 rounded-2xl border border-blue-100/50 shadow-sm transition-transform hover:scale-[1.02]">
+                                            <span className="font-bold text-slate-700">{m.name}</span>
+                                            <span className="bg-blue-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight">
+                                                {m.quantity} {m.unit}
+                                            </span>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )) : (
+                        <div className="col-span-full py-20 text-center">
+                            <p className="text-xl font-black text-slate-900">Aucune affectation enregistrée</p>
+                            <p className="text-slate-500 font-medium">Les matériaux livrés aux chantiers apparaîtront ici.</p>
                         </div>
-                    </div>
-                )}
-
-                {filteredMaterials.length === 0 && (
-                    <Card className="rounded-2xl border border-slate-200 bg-slate-50/60 py-10 text-center shadow-sm">
-                        <CardContent>
-                            <p className="text-base font-medium text-slate-600">Aucun matériau trouvé</p>
-                            <p className="text-sm text-slate-500">Ajuste la recherche pour voir les stocks.</p>
-                        </CardContent>
-                    </Card>
-                )}
-             </div>
-         </>
-     );
- }
+                    )}
+                </div>
+            )}
+        </div>
+      </div>
+    </>
+  );
+}
