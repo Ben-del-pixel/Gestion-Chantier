@@ -1,8 +1,8 @@
-import { Head } from '@inertiajs/react';
-import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, Coins, LayoutGrid, List } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, Coins, LayoutGrid, List, Link as LinkIcon } from 'lucide-react';
 import React from 'react';
 
-import { destroy, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
+import { allocate, destroy, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -24,6 +24,11 @@ type MaterialItem = {
     unit: string;
     category: string | null;
     updated_at: string;
+};
+
+type ProjectItem = {
+    id: number;
+    name: string;
 };
 
 type ProjectAllocation = {
@@ -81,15 +86,19 @@ function isLowStock(quantity: number, unit: string): boolean {
 
 export default function MaterialsIndex({ 
     materials, 
-    projectAllocations = [] 
+    projectAllocations = [],
+    projects = [],
 }: { 
     materials: MaterialItem[]; 
     projectAllocations?: ProjectAllocation[];
+    projects?: ProjectItem[];
 }) {
     const [searchTerm, setSearchTerm] = React.useState('');
     const [openDialog, setOpenDialog] = React.useState(false);
+    const [openAllocationDialog, setOpenAllocationDialog] = React.useState(false);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [editingMaterial, setEditingMaterial] = React.useState<MaterialItem | null>(null);
+    const [selectedMaterialForAllocation, setSelectedMaterialForAllocation] = React.useState<MaterialItem | null>(null);
     const [activeTab, setActiveTab] = React.useState('stock');
     const [formData, setFormData] = React.useState({
         name: '',
@@ -97,6 +106,12 @@ export default function MaterialsIndex({
         quantity_in_stock: '',
         unit: 'sacs',
         category: '',
+    });
+    const [allocationFormData, setAllocationFormData] = React.useState({
+        material_id: '',
+        project_id: '',
+        quantity_requested: '',
+        comment: '',
     });
 
     const normalizedMaterials = React.useMemo(() => {
@@ -135,37 +150,39 @@ export default function MaterialsIndex({
         });
     };
 
+    const handleAllocationFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        setAllocationFormData({
+            ...allocationFormData,
+            [e.target.name]: e.target.value,
+        });
+    };
+
     const handleSubmitMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         try {
             const url = editingMaterial ? update.url({ material: editingMaterial.id }) : store.url();
-            const method = editingMaterial ? 'PUT' : 'POST';
+            const method = editingMaterial ? 'put' : 'post';
 
-            const response = await fetch(url, {
+            router.visit(url, {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                data: formData,
+                onSuccess: () => {
+                    setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', category: '' });
+                    setEditingMaterial(null);
+                    setOpenDialog(false);
                 },
-                body: JSON.stringify(formData),
+                onError: () => {
+                    alert('Erreur lors de l\'enregistrement du matériau');
+                },
+                onFinish: () => {
+                    setIsSubmitting(false);
+                },
             });
-
-            if (!response.ok) {
-                const error = await response.json();
-                alert('Erreur : ' + (error.message || 'Impossible d\'enregistrer le matériau'));
-                return;
-            }
-
-            setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', category: '' });
-            setEditingMaterial(null);
-            setOpenDialog(false);
-            window.location.reload();
         } catch (error) {
             console.error('Error:', error);
             alert('Erreur lors de l\'enregistrement du matériau');
-        } finally {
             setIsSubmitting(false);
         }
     };
@@ -182,27 +199,56 @@ export default function MaterialsIndex({
         setOpenDialog(true);
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = (id: number) => {
         if (!window.confirm('Supprimer ce matériau ?')) return;
 
-        try {
-            const response = await fetch(destroy.url({ material: id }), {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (!response.ok) {
+        router.delete(destroy.url({ material: id }), {
+            onSuccess: () => {
+                // Page will be refreshed automatically by Inertia
+            },
+            onError: () => {
                 alert('Erreur lors de la suppression');
-                return;
-            }
+            },
+        });
+    };
 
-            window.location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Erreur lors de la suppression');
-        }
+    const handleOpenAllocationDialog = (material: MaterialItem) => {
+        setSelectedMaterialForAllocation(material);
+        setAllocationFormData({
+            material_id: material.id.toString(),
+            project_id: '',
+            quantity_requested: '',
+            comment: '',
+        });
+        setOpenAllocationDialog(true);
+    };
+
+    const handleSubmitAllocation = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+
+        const data = {
+            material_id: parseInt(allocationFormData.material_id),
+            project_id: parseInt(allocationFormData.project_id),
+            quantity_requested: parseFloat(allocationFormData.quantity_requested),
+            comment: allocationFormData.comment || null,
+        };
+
+        router.visit(allocate.url(), {
+            method: 'post',
+            data,
+            onSuccess: () => {
+                setAllocationFormData({ material_id: '', project_id: '', quantity_requested: '', comment: '' });
+                setSelectedMaterialForAllocation(null);
+                setOpenAllocationDialog(false);
+            },
+            onError: () => {
+                alert('Erreur lors de l\'affectation du matériau');
+            },
+            onFinish: () => {
+                setIsSubmitting(false);
+            },
+        });
     };
 
     return (
@@ -305,6 +351,90 @@ export default function MaterialsIndex({
                             </form>
                         </DialogContent>
                     </Dialog>
+
+                    <Dialog open={openAllocationDialog} onOpenChange={setOpenAllocationDialog}>
+                        <DialogContent>
+                            <DialogTitle>Affecter un matériau à un chantier</DialogTitle>
+
+                            <form className="mt-4 space-y-4" onSubmit={handleSubmitAllocation}>
+                                <div>
+                                    <Label htmlFor="material-allocation">Matériau</Label>
+                                    <Input
+                                        id="material-allocation"
+                                        type="text"
+                                        value={selectedMaterialForAllocation?.name || ''}
+                                        disabled
+                                        className="bg-slate-100 text-slate-600"
+                                    />
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="project">Chantier/Projet *</Label>
+                                    <select
+                                        id="project"
+                                        name="project_id"
+                                        value={allocationFormData.project_id}
+                                        onChange={handleAllocationFormChange}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                        required
+                                    >
+                                        <option value="">-- Sélectionner un chantier --</option>
+                                        {projects.map((project) => (
+                                            <option key={project.id} value={project.id.toString()}>
+                                                {project.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="quantity">Quantité à affecter *</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="quantity"
+                                            name="quantity_requested"
+                                            type="number"
+                                            value={allocationFormData.quantity_requested}
+                                            onChange={handleAllocationFormChange}
+                                            placeholder="0"
+                                            required
+                                            step="0.01"
+                                            min="0.01"
+                                            className="flex-1"
+                                        />
+                                        <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 flex items-center whitespace-nowrap">
+                                            {selectedMaterialForAllocation?.unit}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="comment">Commentaire (optionnel)</Label>
+                                    <textarea
+                                        id="comment"
+                                        name="comment"
+                                        value={allocationFormData.comment}
+                                        onChange={handleAllocationFormChange}
+                                        placeholder="Ex: Livraison le 25/04, sur site A..."
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        rows={3}
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline" onClick={() => {
+                                            setSelectedMaterialForAllocation(null);
+                                            setAllocationFormData({ material_id: '', project_id: '', quantity_requested: '', comment: '' });
+                                        }}>Annuler</Button>
+                                    </DialogClose>
+                                    <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700">
+                                        {isSubmitting ? 'Affectation en cours...' : 'Affecter le matériau'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </div>
 
         {/* Premium Stats Row */}
@@ -401,9 +531,9 @@ export default function MaterialsIndex({
                                 </div>
 
                                 <div className="space-y-3">
-                                    <Button onClick={() => handleEdit(material)} className="h-11 w-full rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition-all">
-                                        <ClipboardCheck className="mr-2 h-4 w-4" />
-                                        Faire l'Inventaire
+                                    <Button onClick={() => handleOpenAllocationDialog(material)} className="h-11 w-full rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all">
+                                        <LinkIcon className="mr-2 h-4 w-4" />
+                                        Affecter au Chantier
                                     </Button>
                                     <div className="grid grid-cols-2 gap-3">
                                         <Button onClick={() => handleEdit(material)} variant="outline" className="h-11 rounded-xl border-blue-100 bg-blue-50/50 font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">

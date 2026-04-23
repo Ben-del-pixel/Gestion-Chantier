@@ -474,7 +474,7 @@ export const EngineerDashboard = ({
         }
 
         if (selectedWorkers.length === 0) {
-            alert('Selectionnez au moins un ouvrier');
+            alert('Selectionnez au moins un membre du personnel');
 
             return;
         }
@@ -499,9 +499,9 @@ export const EngineerDashboard = ({
             }
 
             setShowAssignDialog(false);
-            alert('Affectation des ouvriers effectuee');
+            alert('Affectation du personnel effectuee');
         } catch {
-            alert('Erreur reseau lors de l\'affectation des ouvriers');
+            alert('Erreur reseau lors de l\'affectation du personnel');
         } finally {
             setIsSavingAssignment(false);
         }
@@ -565,13 +565,13 @@ export const EngineerDashboard = ({
                     <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm">
-                                Assigner Ouvriers
+                                Assigner Personnel
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-h-[85vh] overflow-y-auto">
-                            <DialogTitle>Affectation des ouvriers</DialogTitle>
+                            <DialogTitle>Affectation du personnel chantier</DialogTitle>
                             <div className="mt-4 space-y-4">
-                                <p className="text-sm text-muted-foreground">Selectionnez les ouvriers a affecter au projet.</p>
+                                <p className="text-sm text-muted-foreground">Selectionnez les ouvriers et magasiniers a affecter au projet.</p>
                                 <div className="grid grid-cols-1 gap-2 rounded-lg border p-3">
                                     {attendanceWorkers.length > 0 ? (
                                         attendanceWorkers.map((worker: any) => (
@@ -585,7 +585,7 @@ export const EngineerDashboard = ({
                                             </label>
                                         ))
                                     ) : (
-                                        <p className="text-sm text-muted-foreground">Aucun ouvrier disponible.</p>
+                                        <p className="text-sm text-muted-foreground">Aucun personnel disponible.</p>
                                     )}
                                 </div>
                                 <div className="flex justify-end gap-2">

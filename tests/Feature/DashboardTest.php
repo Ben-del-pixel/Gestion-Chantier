@@ -20,6 +20,7 @@ test('authenticated users can visit the dashboard', function () {
 
 test('engineer dashboard includes attendance management props', function () {
     $engineer = User::factory()->create(['role' => 'engineer']);
+    $magasinier = User::factory()->create(['role' => 'magasinier']);
     Project::factory()->create(['engineer_id' => $engineer->id]);
 
     $this->actingAs($engineer);
@@ -30,6 +31,7 @@ test('engineer dashboard includes attendance management props', function () {
             ->component('dashboard')
             ->has('attendanceProjects')
             ->has('attendanceWorkers')
+            ->where('attendanceWorkers.0.id', $magasinier->id)
             ->has('attendanceStatuses')
             ->has('attendanceShifts')
             ->has('attendanceDate')

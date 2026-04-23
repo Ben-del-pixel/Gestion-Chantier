@@ -4,7 +4,6 @@ import {
     CalendarDays,
     Users,
     Package,
-    ClipboardCheck,
     TrendingUp,
     History,
     Settings,
@@ -48,8 +47,8 @@ const roleNavItems: Record<string, NavItem[]> = {
     ],
     [UserRole.Engineer.value]: [
         { title: 'Mes Projets', href: dashboard(), icon: LayoutGrid },
-        { title: 'Chantiers', href: projectsIndex(), icon: TrendingUp },
-        { title: 'Matériaux', href: materialsIndex(), icon: Package },
+        { title: 'Affectation Chantier', href: projectsIndex(), icon: TrendingUp },
+        { title: 'Présence', href: attendanceIndex(), icon: Clock },
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
     ],
     [UserRole.Worker.value]: [
@@ -58,8 +57,7 @@ const roleNavItems: Record<string, NavItem[]> = {
         { title: 'Historique', href: activityLogsIndex(), icon: History },
     ],
     [UserRole.Magasinier.value]: [
-        { title: 'Stock Matériaux', href: materialsIndex(), icon: Package },
-        { title: 'Inventaire', href: materialsIndex(), icon: ClipboardCheck },
+        { title: 'Inventaire', href: materialsIndex(), icon: Package },
     ],
 };
 

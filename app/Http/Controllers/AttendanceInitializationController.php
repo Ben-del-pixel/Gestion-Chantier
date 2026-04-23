@@ -101,14 +101,14 @@ class AttendanceInitializationController extends Controller
             'worker_ids.*' => 'required|integer|exists:users,id',
         ]);
 
-        // Verify that all workers exist and are workers
+        // Verify that all selected users are assignable chantier staff (worker or magasinier)
         $workers = User::whereIn('id', $validated['worker_ids'])
-            ->where('role', 'worker')
+            ->whereIn('role', [UserRole::Worker, UserRole::Magasinier])
             ->get();
 
         if ($workers->count() !== count($validated['worker_ids'])) {
             return response()->json([
-                'error' => 'Some workers do not exist or are not workers',
+                'error' => 'Certaines personnes selectionnees ne sont pas assignables (ouvrier/magasinier).',
             ], 422);
         }
 
@@ -116,7 +116,7 @@ class AttendanceInitializationController extends Controller
         $project->workers()->sync($validated['worker_ids']);
 
         return response()->json([
-            'message' => 'Workers assigned successfully',
+            'message' => 'Personnel assigne avec succes',
             'assigned_count' => $workers->count(),
         ]);
     }
@@ -133,7 +133,7 @@ class AttendanceInitializationController extends Controller
             ], 403);
         }
 
-        $workers = User::where('role', 'worker')
+        $workers = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier])
             ->select('id', 'name', 'email')
             ->orderBy('name')
             ->get();

@@ -60,6 +60,18 @@ it('assigns workers to a project', function () {
     }
 });
 
+it('allows engineer to assign magasinier to a project', function () {
+    $magasinier = User::factory()->create(['role' => 'magasinier']);
+
+    $response = $this->postJson(
+        "/api/projects/{$this->project->id}/workers",
+        ['worker_ids' => [$magasinier->id]]
+    );
+
+    $response->assertSuccessful();
+    $this->assertTrue($this->project->workers()->where('users.id', $magasinier->id)->exists());
+});
+
 it('forbids worker assignment by non engineer users', function () {
     $this->actingAs($this->manager);
 

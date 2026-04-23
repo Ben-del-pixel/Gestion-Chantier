@@ -35,6 +35,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('materials', [MaterialController::class, 'store'])->name('materials.store');
     Route::put('materials/{material}', [MaterialController::class, 'update'])->name('materials.update');
     Route::delete('materials/{material}', [MaterialController::class, 'destroy'])->name('materials.destroy');
+    Route::post('materials/allocate', [MaterialController::class, 'allocate'])->name('materials.allocate');
 
     // Activity Log routes
     Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
@@ -58,7 +59,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Attendance Initialization routes (API)
     Route::post('api/attendance/initialize', [AttendanceInitializationController::class, 'initializeForProject']);
     Route::get('api/attendance/list', [AttendanceController::class, 'apiList']);
-    Route::post('api/projects/{project}/workers', [ProjectController::class, 'assignWorkers']);
+    Route::post('api/projects/{project}/workers', [AttendanceInitializationController::class, 'assignWorkers']);
     Route::get('api/workers/available', [AttendanceInitializationController::class, 'getAvailableWorkers']);
     Route::get('api/projects/{project}/workers', [AttendanceInitializationController::class, 'getProjectWorkers']);
 
