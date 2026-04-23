@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceInitializationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Activity Log routes
     Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
+    Route::post('incidents', [IncidentController::class, 'store'])->name('incidents.store');
 
     // Report routes
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');

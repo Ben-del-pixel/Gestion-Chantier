@@ -823,8 +823,15 @@ export const EngineerDashboard = ({
     );
 };
 
-export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanceSummary }: any) => {
+export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanceSummary, workerIncidents = [] }: any) => {
     const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().slice(0, 10));
+    const [showIncidentDialog, setShowIncidentDialog] = React.useState(false);
+    const [isSubmittingIncident, setIsSubmittingIncident] = React.useState(false);
+    const [incidentForm, setIncidentForm] = React.useState({
+        title: '',
+        details: '',
+        severity: 'moyen',
+    });
 
     const attendanceStatusLabels: Record<string, string> = {
         present: 'Present',
@@ -847,50 +854,184 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
     });
 
     const recentAttendances = workerAttendances.slice(0, 12);
+    const formControlClass =
+        'h-11 w-full rounded-xl border border-border/60 bg-background/90 px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+    const formTextareaClass =
+        'min-h-[120px] w-full rounded-xl border border-border/60 bg-background/90 px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+
+    const submitIncident = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmittingIncident(true);
+
+        try {
+            const response = await fetch('/incidents', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    ...incidentForm,
+                    project_id: tasks?.[0]?.project?.id ?? null,
+                }),
+            });
+
+            if (!response.ok) {
+                let errorMessage = 'Impossible de declarer l\'incident.';
+
+                try {
+                    const payload = await response.json();
+
+                    if (payload?.errors) {
+                        const firstFieldErrors = Object.values(payload.errors)[0] as string[] | undefined;
+                        errorMessage = firstFieldErrors?.[0] ?? errorMessage;
+                    } else if (payload?.message) {
+                        errorMessage = payload.message;
+                    }
+                } catch {
+                    // Keep generic message if the response is not JSON.
+                }
+
+                alert(errorMessage);
+
+                return;
+            }
+
+            setIncidentForm({ title: '', details: '', severity: 'moyen' });
+            setShowIncidentDialog(false);
+            window.location.reload();
+        } catch {
+            alert('Erreur reseau pendant la declaration d\'incident.');
+        } finally {
+            setIsSubmittingIncident(false);
+        }
+    };
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in zoom-in duration-500">
-            <div className="bg-primary p-12 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/10 relative overflow-hidden group">
-                <div className="relative z-10 space-y-8">
-                    <div className="flex items-center gap-2 bg-white/10 w-fit px-4 py-1.5 rounded-full border border-white/20">
+            <div className="border border-sky-200/70 bg-linear-to-br from-sky-50 via-blue-50/70 to-cyan-50 p-7 sm:p-8 rounded-[1.6rem] text-slate-900 shadow-[0_18px_50px_-36px_rgba(14,116,144,0.45)] relative overflow-hidden group dark:border-sky-900/50 dark:from-slate-900 dark:via-slate-900 dark:to-cyan-950/20 dark:text-slate-100">
+                <div className="relative z-10 space-y-6">
+                    <div className="flex items-center gap-2 bg-white/75 dark:bg-slate-900/60 w-fit px-3 py-1.5 rounded-full border border-sky-200/70 dark:border-sky-800/50">
                         <div className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-50">Actuellement en service</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Actuellement en service</span>
                     </div>
 
                     {tasks && tasks[0] ? (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                             <div className="space-y-2">
-                                <p className="text-xs font-bold text-primary-foreground/60 uppercase tracking-[0.2em]">Affectation Principale</p>
-                                <h1 className="text-4xl font-black uppercase tracking-tight leading-tight">{tasks[0].name}</h1>
+                                <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-[0.18em]">Affectation Principale</p>
+                                <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight leading-tight">{tasks[0].name}</h1>
                             </div>
-                            <div className="flex flex-wrap items-center gap-8 pt-4">
+                            <div className="flex flex-wrap items-center gap-6 pt-2">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-bold uppercase opacity-60">Emplacement SITE</p>
-                                    <p className="text-lg font-bold flex items-center gap-2 underline underline-offset-4 decoration-white/20"><MapPin size={18} />{tasks[0].project?.name}</p>
+                                    <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Emplacement site</p>
+                                    <p className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-800 dark:text-slate-100"><MapPin size={17} />{tasks[0].project?.name}</p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-bold uppercase opacity-60">Plage de Travail</p>
-                                    <div className="flex items-center gap-2 text-lg font-bold"><Clock size={18} />08:00 — 17:00</div>
+                                    <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Plage de Travail</p>
+                                    <div className="flex items-center gap-2 text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100"><Clock size={17} />08:00 — 17:00</div>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <h2 className="text-3xl font-bold italic">En attente de mission</h2>
+                        <h2 className="text-2xl font-bold italic text-slate-800 dark:text-slate-100">En attente de mission</h2>
                     )}
                 </div>
-                <MapPin className="absolute -right-16 -bottom-16 w-64 h-64 opacity-10 rotate-12" strokeWidth={1} />
+                <MapPin className="absolute -right-12 -bottom-12 w-52 h-52 opacity-12 text-sky-500/60 dark:text-sky-400/40 rotate-12" strokeWidth={1} />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <Button className="h-28 rounded-3xl text-2xl font-black uppercase tracking-tighter shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                <Button className="h-18 rounded-2xl text-base font-extrabold uppercase tracking-wide shadow-md shadow-primary/15 hover:scale-[1.01] active:scale-[0.99] transition-all">
                     Pointer Début
-                    <CheckCircle2 className="ml-4 h-8 w-8" />
+                    <CheckCircle2 className="ml-2 h-5 w-5" />
                 </Button>
-                <Button variant="outline" className="h-28 rounded-3xl text-2xl font-black uppercase tracking-tighter border-2 border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all text-slate-400">
-                    Déclarer Incident
-                    <AlertCircle className="ml-4 h-8 w-8" strokeWidth={3} />
-                </Button>
+                <Dialog open={showIncidentDialog} onOpenChange={setShowIncidentDialog}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" className="h-18 rounded-2xl text-base font-extrabold uppercase tracking-wide border-sky-200/70 bg-sky-50/70 text-slate-800 hover:bg-sky-100/70 dark:border-sky-900/60 dark:bg-slate-900/50 dark:text-slate-100 dark:hover:bg-slate-800 transition-all">
+                            Declarer Incident
+                            <AlertCircle className="ml-2 h-5 w-5" strokeWidth={2.6} />
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-lg border-border/60 bg-card/95 backdrop-blur">
+                        <DialogTitle className="text-lg font-semibold tracking-tight">Declaration d'incident</DialogTitle>
+                        <form className="mt-4 space-y-4" onSubmit={submitIncident}>
+                            <div className="space-y-2">
+                                <Label htmlFor="incident-title" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Titre</Label>
+                                <Input
+                                    id="incident-title"
+                                    value={incidentForm.title}
+                                    onChange={(event) => setIncidentForm((prev) => ({ ...prev, title: event.target.value }))}
+                                    placeholder="Ex: Chute de materiel"
+                                    className={formControlClass}
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="incident-severity" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Niveau</Label>
+                                <select
+                                    id="incident-severity"
+                                    value={incidentForm.severity}
+                                    onChange={(event) => setIncidentForm((prev) => ({ ...prev, severity: event.target.value }))}
+                                    className={formControlClass}
+                                >
+                                    <option value="faible">Faible</option>
+                                    <option value="moyen">Moyen</option>
+                                    <option value="eleve">Eleve</option>
+                                    <option value="critique">Critique</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="incident-details" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details</Label>
+                                <textarea
+                                    id="incident-details"
+                                    value={incidentForm.details}
+                                    onChange={(event) => setIncidentForm((prev) => ({ ...prev, details: event.target.value }))}
+                                    className={formTextareaClass}
+                                    rows={4}
+                                    placeholder="Explique ce qui s'est passe..."
+                                    required
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                                <DialogClose asChild>
+                                    <Button type="button" variant="outline">Annuler</Button>
+                                </DialogClose>
+                                <Button type="submit" disabled={isSubmittingIncident}>
+                                    {isSubmittingIncident ? 'Envoi...' : 'Soumettre'}
+                                </Button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </div>
+
+            <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm rounded-[1.5rem] overflow-hidden">
+                <CardHeader className="p-6 border-b border-border/50">
+                    <CardTitle className="text-base font-bold">Incidents recents declares</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-2">
+                    {workerIncidents.length > 0 ? (
+                        workerIncidents.map((incident: any) => (
+                            <div key={incident.id} className="rounded-lg border px-3 py-2 flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold">{incident.description}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {new Date(incident.created_at).toLocaleDateString('fr-FR')} - {incident.properties?.severity ?? 'moyen'}
+                                    </p>
+                                </div>
+                                <Badge variant="outline" className="uppercase text-[10px]">Incident</Badge>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-sm text-muted-foreground">Aucun incident declare pour le moment.</p>
+                    )}
+                </CardContent>
+            </Card>
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm rounded-[2rem] overflow-hidden">
                 <CardHeader className="p-8 border-b border-border/50">
@@ -924,7 +1065,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                             type="date"
                             value={selectedDate}
                             onChange={(event) => setSelectedDate(event.target.value)}
-                            className="max-w-xs"
+                            className={`max-w-xs ${formControlClass}`}
                         />
                     </div>
 
@@ -994,19 +1135,19 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                 </CardContent>
             </Card>
 
-            <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm rounded-[2rem] overflow-hidden">
-                <CardHeader className="p-8 border-b border-border/50">
-                    <CardTitle className="text-lg font-bold">Feuille de Route Hebdomadaire</CardTitle>
+            <Card className="shadow-none border border-sky-200/60 bg-linear-to-br from-sky-50/70 via-background to-emerald-50/60 backdrop-blur-sm rounded-[2rem] overflow-hidden dark:border-sky-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/20">
+                <CardHeader className="p-8 border-b border-sky-200/60 dark:border-sky-900/40">
+                    <CardTitle className="text-lg font-bold text-slate-900 dark:text-slate-100">Feuille de Route Hebdomadaire</CardTitle>
                 </CardHeader>
                 <div className="divide-y divide-border/50">
                     {tasks.map((t: any, i: number) => (
-                        <div key={t.id} className="p-8 flex items-center gap-6 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
-                            <div className="h-16 w-16 rounded-2xl bg-slate-950 flex flex-col items-center justify-center text-white shrink-0 group-hover:bg-primary transition-colors">
-                                <span className="text-[10px] font-bold uppercase opacity-40 leading-none mb-0.5">MARS</span>
+                        <div key={t.id} className="p-8 flex items-center gap-6 hover:bg-white/60 dark:hover:bg-slate-800/30 transition-all group">
+                            <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-sky-500 to-indigo-600 flex flex-col items-center justify-center text-white shrink-0 shadow-lg shadow-sky-500/25 group-hover:from-emerald-500 group-hover:to-cyan-600 transition-all duration-300">
+                                <span className="text-[10px] font-bold uppercase opacity-70 leading-none mb-0.5">MARS</span>
                                 <span className="text-2xl font-black tracking-tight leading-none">{15 + i}</span>
                             </div>
                             <div className="flex-1">
-                                <h4 className="text-lg font-bold tracking-tight uppercase">{t.name}</h4>
+                                <h4 className="text-lg font-bold tracking-tight uppercase text-slate-900 dark:text-slate-100">{t.name}</h4>
                                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mt-1 group-hover:text-primary transition-colors">
                                     <MapPin size={12} /> {t.project?.name}
                                 </div>

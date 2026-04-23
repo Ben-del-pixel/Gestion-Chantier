@@ -6,6 +6,8 @@ import { generate, submit } from '@/actions/App/Http/Controllers/ReportControlle
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function ReportsIndex({
     reportTypes,
@@ -15,6 +17,11 @@ export default function ReportsIndex({
     receivedReports,
     sentReports,
 }: any) {
+    const formControlClass =
+        'h-11 w-full rounded-xl border border-border/60 bg-background/90 px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+    const formTextareaClass =
+        'min-h-[140px] w-full rounded-xl border border-border/60 bg-background/90 px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+
     const [selectedReport, setSelectedReport] = useState('global');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -227,22 +234,22 @@ export default function ReportsIndex({
                             <form onSubmit={handleSubmitReport} className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2 md:col-span-2">
-                                        <label className="text-sm font-semibold">Titre</label>
-                                        <input
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Titre</Label>
+                                        <Input
                                             value={submissionForm.title}
                                             onChange={(event) => setSubmissionForm((prev) => ({ ...prev, title: event.target.value }))}
-                                            className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                            className={formControlClass}
                                             placeholder="Ex: Rapport journalier du chantier"
                                             required
                                         />
                                     </div>
 
                                     <div className="space-y-2 md:col-span-2">
-                                        <label className="text-sm font-semibold">Contenu</label>
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contenu</Label>
                                         <textarea
                                             value={submissionForm.content}
                                             onChange={(event) => setSubmissionForm((prev) => ({ ...prev, content: event.target.value }))}
-                                            className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                            className={formTextareaClass}
                                             rows={6}
                                             placeholder="Detaillez les points importants du jour..."
                                             required
@@ -250,11 +257,11 @@ export default function ReportsIndex({
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-sm font-semibold">Projet (optionnel)</label>
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Projet (optionnel)</Label>
                                         <select
                                             value={submissionForm.project_id}
                                             onChange={(event) => setSubmissionForm((prev) => ({ ...prev, project_id: event.target.value }))}
-                                            className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                            className={formControlClass}
                                         >
                                             <option value="">-- Aucun projet --</option>
                                             {projects.map((project: any) => (
@@ -338,11 +345,11 @@ export default function ReportsIndex({
                         <form onSubmit={handleGenerateReport} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-semibold">Type de rapport</label>
+                                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type de rapport</Label>
                                     <select
                                         value={selectedReport}
                                         onChange={(event) => setSelectedReport(event.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                        className={formControlClass}
                                     >
                                         {reportTypes.map((type: any) => (
                                             <option key={type.value} value={type.value}>{type.label}</option>
@@ -352,11 +359,11 @@ export default function ReportsIndex({
 
                                 {selectedReport === 'project' && (
                                     <div className="space-y-2">
-                                        <label className="text-sm font-semibold">Projet</label>
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Projet</Label>
                                         <select
                                             value={projectId}
                                             onChange={(event) => setProjectId(event.target.value)}
-                                            className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                            className={formControlClass}
                                         >
                                             <option value="">-- Tous les projets --</option>
                                             {projects.map((project: any) => (
@@ -367,38 +374,38 @@ export default function ReportsIndex({
                                 )}
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-semibold flex items-center gap-2">
+                                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                                         <Calendar className="h-4 w-4" />
                                         Date debut
-                                    </label>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type="date"
                                         value={startDate}
                                         onChange={(event) => setStartDate(event.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                        className={formControlClass}
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-semibold flex items-center gap-2">
+                                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                                         <Calendar className="h-4 w-4" />
                                         Date fin
-                                    </label>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type="date"
                                         value={endDate}
                                         onChange={(event) => setEndDate(event.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                        className={formControlClass}
                                     />
                                 </div>
 
                                 {selectedReport === 'worker' && (
                                     <div className="space-y-2">
-                                        <label className="text-sm font-semibold">Ouvrier</label>
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ouvrier</Label>
                                         <select
                                             value={workerId}
                                             onChange={(event) => setWorkerId(event.target.value)}
-                                            className="w-full px-3 py-2 border rounded-lg bg-background text-foreground"
+                                            className={formControlClass}
                                         >
                                             <option value="">-- Tous --</option>
                                             {workers.map((worker: any) => (

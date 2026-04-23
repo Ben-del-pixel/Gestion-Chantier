@@ -38,6 +38,7 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         tasks={tasks}
                         workerAttendances={pageProps.workerAttendances}
                         workerAttendanceSummary={pageProps.workerAttendanceSummary}
+                        workerIncidents={pageProps.workerIncidents}
                     />
                 )}
 

@@ -42,6 +42,7 @@ class DashboardController extends Controller
                 'retard' => 0,
                 'malade' => 0,
             ],
+            'workerIncidents' => [],
         ];
 
         if ($user->role === UserRole::Manager) {
@@ -122,6 +123,13 @@ class DashboardController extends Controller
                 'retard' => $attendances->where('status', AttendanceStatus::Late->value)->count(),
                 'malade' => $attendances->where('status', AttendanceStatus::Sick->value)->count(),
             ];
+
+            $data['workerIncidents'] = ActivityLog::query()
+                ->where('user_id', $user->id)
+                ->where('action', 'incident_declared')
+                ->latest()
+                ->take(8)
+                ->get();
         }
 
         return Inertia::render('dashboard', $data);
