@@ -13,9 +13,9 @@ use Inertia\Response;
 
 class MaterialController extends Controller
 {
-    private function isMagasinier(): bool
+    private function canManageMaterials(): bool
     {
-        return auth()->user()?->role === UserRole::Magasinier;
+        return in_array(auth()->user()?->role, [UserRole::Magasinier, UserRole::Manager], true);
     }
 
     public function index(): Response
@@ -118,8 +118,8 @@ class MaterialController extends Controller
 
     public function store(Request $request)
     {
-        if (! $this->isMagasinier()) {
-            abort(403, 'Seul un magasinier peut créer des matériaux');
+        if (! $this->canManageMaterials()) {
+            abort(403, 'Seul un magasinier ou manager peut créer des matériaux');
         }
 
         $validated = $request->validate([
@@ -137,8 +137,8 @@ class MaterialController extends Controller
 
     public function update(Request $request, Material $material)
     {
-        if (! $this->isMagasinier()) {
-            abort(403, 'Seul un magasinier peut modifier des matériaux');
+        if (! $this->canManageMaterials()) {
+            abort(403, 'Seul un magasinier ou manager peut modifier des matériaux');
         }
 
         $validated = $request->validate([
@@ -156,8 +156,8 @@ class MaterialController extends Controller
 
     public function destroy(Material $material)
     {
-        if (! $this->isMagasinier()) {
-            abort(403, 'Seul un magasinier peut supprimer des matériaux');
+        if (! $this->canManageMaterials()) {
+            abort(403, 'Seul un magasinier ou manager peut supprimer des matériaux');
         }
 
         $material->delete();
@@ -167,8 +167,8 @@ class MaterialController extends Controller
 
     public function allocate(Request $request)
     {
-        if (! $this->isMagasinier()) {
-            abort(403, 'Seul un magasinier peut affecter des matériaux');
+        if (! $this->canManageMaterials()) {
+            abort(403, 'Seul un magasinier ou manager peut affecter des matériaux');
         }
 
         $validated = $request->validate([

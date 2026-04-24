@@ -48,6 +48,26 @@ test('magasinier can create a material', function () {
     ]);
 });
 
+test('manager can create a material', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+
+    $this->actingAs($manager)
+        ->post(route('materials.store'), [
+            'name' => 'Gravier premium',
+            'description' => 'Fournisseur M',
+            'quantity_in_stock' => 65,
+            'unit' => 'tonnes',
+            'category' => 'construction',
+        ])
+        ->assertRedirect(route('materials.index'));
+
+    $this->assertDatabaseHas('materials', [
+        'name' => 'Gravier premium',
+        'quantity_in_stock' => 65,
+        'unit' => 'tonnes',
+    ]);
+});
+
 test('non magasinier cannot create a material', function () {
     $worker = User::factory()->create(['role' => UserRole::Worker]);
 

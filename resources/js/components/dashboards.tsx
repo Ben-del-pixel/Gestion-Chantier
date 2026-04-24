@@ -25,8 +25,10 @@ import {
     HardHat,
     AlertCircle,
 } from 'lucide-react';
+import { router } from '@inertiajs/react';
 import React from 'react';
 import { Doughnut, Line } from 'react-chartjs-2';
+import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { apiList, updateStatus } from '@/actions/App/Http/Controllers/AttendanceController';
 import {
     assignWorkers,
@@ -214,7 +216,11 @@ export const ManagerDashboard = ({ projects = [], stats = {}, recentActivities =
                     </div>
                 </div>
 
-                <div className="rounded-[18px] border border-white/60 bg-white p-6 shadow-[0_14px_35px_-24px_rgba(15,23,42,0.35)]">
+                <button
+                    type="button"
+                    onClick={() => router.visit(projectsIndex.url())}
+                    className="rounded-[18px] border border-white/60 bg-white p-6 text-left shadow-[0_14px_35px_-24px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_45px_-26px_rgba(15,23,42,0.38)]"
+                >
                     <div className="flex items-start justify-between">
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-500/20">
                             <MapPin className="h-5 w-5" />
@@ -224,8 +230,9 @@ export const ManagerDashboard = ({ projects = [], stats = {}, recentActivities =
                     <div className="mt-6 space-y-1">
                         <div className="text-2xl font-semibold tracking-tight text-slate-950">{stats.active_projects || 0}</div>
                         <div className="text-sm text-slate-500">Projets en cours</div>
+                        <div className="pt-1 text-xs font-semibold text-blue-600">Voir tous les projets</div>
                     </div>
-                </div>
+                </button>
 
                 <div className="rounded-[18px] border border-white/60 bg-white p-6 shadow-[0_14px_35px_-24px_rgba(15,23,42,0.35)]">
                     <div className="flex items-start justify-between">
