@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/sidebar';
 import { UserRole } from '@/Enums/UserRole';
 import { dashboard } from '@/routes';
+import { edit as profileEdit } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
 const roleNavItems: Record<string, NavItem[]> = {
@@ -64,7 +65,7 @@ const roleNavItems: Record<string, NavItem[]> = {
 };
 
 const systemNavItems: NavItem[] = [
-    { title: 'Paramètres', href: '#', icon: Settings },
+    { title: 'Paramètres', href: profileEdit(), icon: Settings },
     { title: 'Centre d\'Aide', href: '#', icon: HelpCircle },
 ];
 

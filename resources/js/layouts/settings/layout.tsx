@@ -1,8 +1,12 @@
 import { Link } from '@inertiajs/react';
+import {
+    Bell,
+    CircleGauge,
+    Database,
+    Shield,
+    User,
+} from 'lucide-react';
 import type { PropsWithChildren } from 'react';
-import Heading from '@/components/heading';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
@@ -12,66 +16,66 @@ import type { NavItem } from '@/types';
 
 const sidebarNavItems: NavItem[] = [
     {
-        title: 'Profile',
+        title: 'Profil',
         href: edit(),
-        icon: null,
+        icon: User,
     },
     {
-        title: 'Security',
-        href: editSecurity(),
-        icon: null,
+        title: 'Notifications',
+        href: '/settings/notifications',
+        icon: Bell,
     },
     {
-        title: 'Appearance',
+        title: 'Affichage',
         href: editAppearance(),
-        icon: null,
+        icon: CircleGauge,
+    },
+    {
+        title: 'Sécurité',
+        href: editSecurity(),
+        icon: Shield,
+    },
+    {
+        title: 'Données',
+        href: '/settings/data',
+        icon: Database,
     },
 ];
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
-    const { isCurrentOrParentUrl } = useCurrentUrl();
+    const { isCurrentUrl } = useCurrentUrl();
 
     return (
-        <div className="px-4 py-6">
-            <Heading
-                title="Settings"
-                description="Manage your profile and account settings"
-            />
+        <div className="space-y-5 px-3 py-5 sm:px-5 sm:py-6">
+            <div className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Paramètres</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Gérez vos préférences et paramètres de l'application</p>
+            </div>
 
-            <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
-                    <nav
-                        className="flex flex-col space-y-1 space-x-0"
-                        aria-label="Settings"
-                    >
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+                <aside className="rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm">
+                    <nav className="space-y-1" aria-label="Settings">
                         {sidebarNavItems.map((item, index) => (
-                            <Button
+                            <Link
                                 key={`${toUrl(item.href)}-${index}`}
-                                size="sm"
-                                variant="ghost"
-                                asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
-                                })}
+                                href={item.href}
+                                className={cn(
+                                    'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors',
+                                    isCurrentUrl(item.href)
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'text-slate-700 hover:bg-muted/70 dark:text-slate-200'
+                                )}
                             >
-                                <Link href={item.href}>
-                                    {item.icon && (
-                                        <item.icon className="h-4 w-4" />
-                                    )}
-                                    {item.title}
-                                </Link>
-                            </Button>
+                                {item.icon && <item.icon className="h-4 w-4" />}
+                                {item.title}
+                            </Link>
                         ))}
                     </nav>
                 </aside>
 
-                <Separator className="my-6 lg:hidden" />
-
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
-                        {children}
-                    </section>
-                </div>
+                <section className="rounded-2xl border border-border/60 bg-card/80 p-4 sm:p-5 shadow-sm">
+                    {children}
+                </section>
             </div>
         </div>
     );

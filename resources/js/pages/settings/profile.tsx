@@ -28,15 +28,15 @@ export default function Profile({
 
     return (
         <>
-            <Head title="Profile settings" />
+            <Head title="Paramètres - Profil" />
 
-            <h1 className="sr-only">Profile settings</h1>
+            <h1 className="sr-only">Paramètres du profil</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Profile information"
-                    description="Update your name and email address"
+                    title="Informations du profil"
+                    description="Gérez vos informations personnelles"
                 />
 
                 <Form
@@ -49,7 +49,7 @@ export default function Profile({
                     {({ processing, recentlySuccessful, errors }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="name">Nom complet</Label>
 
                                 <Input
                                     id="name"
@@ -58,7 +58,7 @@ export default function Profile({
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    placeholder="Full name"
+                                    placeholder="Nom complet"
                                 />
 
                                 <InputError
@@ -68,7 +68,7 @@ export default function Profile({
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                                <Label htmlFor="email">Email</Label>
 
                                 <Input
                                     id="email"
@@ -78,7 +78,7 @@ export default function Profile({
                                     name="email"
                                     required
                                     autoComplete="username"
-                                    placeholder="Email address"
+                                    placeholder="Adresse email"
                                 />
 
                                 <InputError
@@ -91,22 +91,20 @@ export default function Profile({
                                 auth.user.email_verified_at === null && (
                                     <div>
                                         <p className="-mt-4 text-sm text-muted-foreground">
-                                            Your email address is unverified.{' '}
+                                            Votre adresse email n'est pas encore vérifiée.{' '}
                                             <Link
                                                 href={send()}
                                                 as="button"
                                                 className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                                             >
-                                                Click here to resend the
-                                                verification email.
+                                                Cliquez ici pour renvoyer l'email de vérification.
                                             </Link>
                                         </p>
 
                                         {status ===
                                             'verification-link-sent' && (
                                             <div className="mt-2 text-sm font-medium text-green-600">
-                                                A new verification link has been
-                                                sent to your email address.
+                                                Un nouveau lien de vérification a été envoyé.
                                             </div>
                                         )}
                                     </div>
@@ -117,7 +115,7 @@ export default function Profile({
                                     disabled={processing}
                                     data-test="update-profile-button"
                                 >
-                                    Save
+                                    Sauvegarder
                                 </Button>
 
                                 <Transition
@@ -128,7 +126,7 @@ export default function Profile({
                                     leaveTo="opacity-0"
                                 >
                                     <p className="text-sm text-neutral-600">
-                                        Saved
+                                        Sauvegardé
                                     </p>
                                 </Transition>
                             </div>
@@ -140,8 +138,8 @@ export default function Profile({
                     <div className="space-y-6 rounded-2xl border border-border/60 bg-card/70 p-6 shadow-sm backdrop-blur-sm">
                         <Heading
                             variant="small"
-                            title="Account security"
-                            description="Update your password from the same settings screen"
+                            title="Mot de passe"
+                            description="Mettez à jour votre mot de passe"
                         />
 
                         <Form
@@ -167,7 +165,7 @@ export default function Profile({
                             {({ errors, processing, recentlySuccessful }) => (
                                 <>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="current_password">Current password</Label>
+                                        <Label htmlFor="current_password">Mot de passe actuel</Label>
 
                                         <PasswordInput
                                             id="current_password"
@@ -175,14 +173,14 @@ export default function Profile({
                                             name="current_password"
                                             className="mt-1 block w-full"
                                             autoComplete="current-password"
-                                            placeholder="Current password"
+                                            placeholder="Mot de passe actuel"
                                         />
 
                                         <InputError message={errors.current_password} />
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="password">New password</Label>
+                                        <Label htmlFor="password">Nouveau mot de passe</Label>
 
                                         <PasswordInput
                                             id="password"
@@ -190,21 +188,21 @@ export default function Profile({
                                             name="password"
                                             className="mt-1 block w-full"
                                             autoComplete="new-password"
-                                            placeholder="New password"
+                                            placeholder="Nouveau mot de passe"
                                         />
 
                                         <InputError message={errors.password} />
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="password_confirmation">Confirm password</Label>
+                                        <Label htmlFor="password_confirmation">Confirmer le mot de passe</Label>
 
                                         <PasswordInput
                                             id="password_confirmation"
                                             name="password_confirmation"
                                             className="mt-1 block w-full"
                                             autoComplete="new-password"
-                                            placeholder="Confirm password"
+                                            placeholder="Confirmer le mot de passe"
                                         />
 
                                         <InputError message={errors.password_confirmation} />
@@ -212,7 +210,7 @@ export default function Profile({
 
                                     <div className="flex items-center gap-4">
                                         <Button disabled={processing} data-test="update-password-button">
-                                            Save password
+                                            Sauvegarder le mot de passe
                                         </Button>
 
                                         <Transition
@@ -222,7 +220,7 @@ export default function Profile({
                                             leave="transition ease-in-out"
                                             leaveTo="opacity-0"
                                         >
-                                            <p className="text-sm text-neutral-600">Saved</p>
+                                            <p className="text-sm text-neutral-600">Sauvegardé</p>
                                         </Transition>
                                     </div>
                                 </>
@@ -240,7 +238,7 @@ export default function Profile({
 Profile.layout = {
     breadcrumbs: [
         {
-            title: 'Profile settings',
+            title: 'Paramètres profil',
             href: edit(),
         },
     ],
