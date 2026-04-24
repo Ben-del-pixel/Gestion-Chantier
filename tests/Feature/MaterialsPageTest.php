@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Models\Material;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -25,4 +26,38 @@ test('authenticated users can view materials page', function () {
             ->has('materials', 1)
             ->where('materials.0.name', 'Ciment')
         );
+});
+
+test('magasinier can create a material', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+
+    $this->actingAs($magasinier)
+        ->post(route('materials.store'), [
+            'name' => 'Ciment rapide',
+            'description' => 'Fournisseur X',
+            'quantity_in_stock' => 42,
+            'unit' => 'sacs',
+            'category' => 'construction',
+        ])
+        ->assertRedirect(route('materials.index'));
+
+    $this->assertDatabaseHas('materials', [
+        'name' => 'Ciment rapide',
+        'quantity_in_stock' => 42,
+        'unit' => 'sacs',
+    ]);
+});
+
+test('non magasinier cannot create a material', function () {
+    $worker = User::factory()->create(['role' => UserRole::Worker]);
+
+    $this->actingAs($worker)
+        ->post(route('materials.store'), [
+            'name' => 'Acier test',
+            'description' => 'Fournisseur Y',
+            'quantity_in_stock' => 10,
+            'unit' => 'tonnes',
+            'category' => 'metaux',
+        ])
+        ->assertForbidden();
 });

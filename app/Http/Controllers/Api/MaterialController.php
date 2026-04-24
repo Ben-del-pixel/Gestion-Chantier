@@ -15,7 +15,7 @@ class MaterialController extends Controller
 {
     private function isMagasinier(): bool
     {
-        return auth()->user()->role === UserRole::Magasinier->value;
+        return auth()->user()?->role === UserRole::Magasinier;
     }
 
     public function index(): Response
