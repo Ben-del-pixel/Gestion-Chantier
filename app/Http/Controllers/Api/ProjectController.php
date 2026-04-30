@@ -86,7 +86,7 @@ class ProjectController extends Controller
         $project->load(['engineer', 'manager', 'storekeeper', 'steps', 'tasks.workers', 'workers']);
 
         $engineers = User::where('role', UserRole::Engineer)->get();
-        $storekeepers = User::where('role', UserRole::Storekeeper)->get();
+        $storekeepers = User::where('role', UserRole::Magasinier)->get();
         $allWorkers = User::where('role', UserRole::Worker)->get();
 
         // Calculate total unique workers for the project (from workers relation or tasks)

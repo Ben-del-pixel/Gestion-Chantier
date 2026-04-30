@@ -127,14 +127,14 @@ class AttendanceInitializationController extends Controller
     public function getAvailableWorkers(): JsonResponse
     {
         $user = request()->user();
-        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier], true)) {
+        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier, UserRole::Manager], true)) {
             return response()->json([
-                'error' => 'Seuls les ingenieurs peuvent consulter cette ressource.',
+                'error' => 'Vous n\'avez pas les droits pour consulter cette ressource.',
             ], 403);
         }
 
         $workers = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier])
-            ->select('id', 'name', 'email')
+            ->select('id', 'name', 'email', 'role')
             ->orderBy('name')
             ->get();
 
@@ -155,7 +155,7 @@ class AttendanceInitializationController extends Controller
         }
 
         $workers = $project->workers()
-            ->select('users.id', 'users.name', 'users.email')
+            ->select('users.id', 'users.name', 'users.email', 'users.role')
             ->get();
 
         return response()->json([
@@ -167,10 +167,15 @@ class AttendanceInitializationController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier], true)) {
+        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier, UserRole::Manager], true)) {
             return response()->json([
-                'error' => 'Seuls les ingenieurs peuvent gerer l\'affectation et la presence.',
+                'error' => 'Seuls les ingenieurs ou managers peuvent gerer l\'affectation et la presence.',
             ], 403);
+        }
+
+        // Si le user est manager, Bypass la vérification de l'ID ingénieur
+        if ($user->role === UserRole::Manager) {
+            return null;
         }
 
         if ((int) $project->engineer_id !== (int) $user->id) {

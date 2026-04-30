@@ -18,14 +18,15 @@ Cette application permet de gérer un chantier de construction de bout en bout. 
 
 - création, modification et suppression des utilisateurs
 - attribution d’un rôle métier à chaque utilisateur
-- gestion des informations de base du personnel
+- gestion des informations de base du personnel (nom, email, numéro de téléphone, compétences, etc.)
 
 ### Gestion des projets
 
-- création d’un projet avec nom, description, budget et dates
+- création d’un projet avec nom, description, budget et dates (validation des dates pour éviter une incohérence entre la date de début et de fin)
 - affectation d’un ingénieur ou d’un responsable
 - consultation de la liste et du détail des projets
-- suivi de l’état d’avancement d’un projet
+- définition et suivi de l'état d’avancement manuel (en %)
+- affectation d'un statut, avec notamment le statut "terminé" pour clôturer un projet
 
 ### Gestion du matériel
 
@@ -36,22 +37,25 @@ Cette application permet de gérer un chantier de construction de bout en bout. 
 
 ### Présences et absences
 
-- pointage d’entrée et de sortie
-- mise à jour du statut de présence
+- pointage d’entrée et de sortie sur le lieu de travail
+- restriction du pointage à une seule fois par 24 heures par utilisateur pour assurer l'intégrité des données
+- restriction des projets pour la saisie : un magasinier ou un ouvrier ne peut interagir que sur son chantier assigné
+- mise à jour du statut de présence (ex: En congé, Malade, etc.)
 - consultation des présences par ouvrier ou par période
-- suivi des absences détectées et de leur traitement
+- historique et traçabilité des pointages de présence enregistrés dans un journal central (logs)
 
 ### Rapports et incidents
 
-- génération de rapports
-- soumission de rapports
+- génération de rapports sur-mesure (globaux, par projet ou par ouvrier)
+- soumission et routage précis des rapports (ex: l'ingénieur soumet un rapport qui atterrit directement chez le manager principal, et les ouvriers/magasiniers vers leur ingénieur référent)
 - déclaration d’incidents sur le chantier
 
 ### Pilotage et suivi
 
 - affichage d’un tableau de bord adapté au rôle connecté
 - vision des indicateurs utiles au suivi du chantier
-- journalisation des actions importantes pour garder un historique
+- gestion locale du type de devise (CDF ou USD) avec un contrôle manuel du taux de change intégré dans les tableaux de bord
+- journalisation (Audit & Historique) accessible depuis les paramètres : enregistrement de la traçabilité des modifications (créations de chantiers, éditions de tâches, actions de présence, etc.) avec filtres par types d'action.
 
 ## Parcours utilisateur
 
