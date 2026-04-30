@@ -87,7 +87,7 @@ class ProjectController extends Controller
 
         $engineers = User::where('role', UserRole::Engineer)->get();
         $storekeepers = User::where('role', UserRole::Magasinier)->get();
-        $allWorkers = User::where('role', UserRole::Worker)->get();
+        $allWorkers = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier])->get();
 
         // Calculate total unique workers for the project (from workers relation or tasks)
         $totalWorkersCount = $project->workers->count();
@@ -123,17 +123,34 @@ class ProjectController extends Controller
         $resolvedDeadline = $validated['deadline'] ?? $project->deadline;
 
         if ($resolvedStartDate && $resolvedDeadline && $resolvedDeadline < $resolvedStartDate) {
-            return response()->json([
-                'message' => 'Erreur de validation',
-                'errors' => [
-                    'deadline' => ['La date de fin doit être postérieure ou égale à la date de début.'],
-                ],
-            ], 422);
+            return back()->withErrors(['deadline' => 'La date de fin doit être postérieure ou égale à la date de début.']);
         }
 
-        $project->update($request->only([
+        $projectData = $request->only([
             'name', 'description', 'start_date', 'deadline', 'budget', 'status', 'progress', 'engineer_id', 'storekeeper_id',
-        ]));
+        ]);
+
+        // Convert empty strings to null for IDs
+        if (isset($projectData['engineer_id']) && $projectData['engineer_id'] === '') {
+            $projectData['engineer_id'] = null;
+        }
+        if (isset($projectData['storekeeper_id']) && $projectData['storekeeper_id'] === '') {
+            $projectData['storekeeper_id'] = null;
+        }
+
+        // Restriction: Only one magasinier per project (Storekeeper or in Workers)
+        if (!empty($projectData['storekeeper_id'])) {
+            $otherMagasinierInTeam = $project->workers()
+                ->where('role', UserRole::Magasinier->value)
+                ->where('users.id', '!=', $projectData['storekeeper_id'])
+                ->exists();
+            
+            if ($otherMagasinierInTeam) {
+                return back()->withErrors(['storekeeper_id' => 'Un autre magasinier est déjà présent dans l\'équipe terrain. Un projet ne peut avoir qu\'un seul magasinier.']);
+            }
+        }
+
+        $project->update($projectData);
 
         if ($request->has('steps')) {
             $existingStepIds = [];
@@ -171,10 +188,7 @@ class ProjectController extends Controller
             ],
         ]);
 
-        return response()->json([
-            'project' => $project->load('steps', 'engineer', 'storekeeper'),
-            'message' => 'Projet mis à jour avec succès',
-        ]);
+        return back()->with('success', 'Projet mis à jour avec succès');
     }
 
     public function assignWorkers(Request $request, Project $project)
@@ -217,8 +231,6 @@ class ProjectController extends Controller
 
         $project->delete();
 
-        return response()->json([
-            'message' => 'Projet supprimé avec succès',
-        ]);
+        return redirect()->route('projects.index')->with('success', 'Projet supprimé avec succès');
     }
 }

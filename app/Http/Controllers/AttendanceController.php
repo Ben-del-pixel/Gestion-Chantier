@@ -132,10 +132,7 @@ class AttendanceController extends Controller
             ->first();
 
         if ($last24Hours && $last24Hours->check_in) {
-            return response()->json([
-                'message' => 'Vous avez déjà été pointé(e) dans les dernières 24 heures.',
-                'error' => true,
-            ], 422);
+            return back()->with('error', 'Vous avez déjà été pointé(e) dans les dernières 24 heures.');
         }
 
         $attendance = Attendance::create([
@@ -158,19 +155,13 @@ class AttendanceController extends Controller
             'properties' => $attendance->toArray(),
         ]);
 
-        return response()->json([
-            'message' => 'Arrivée enregistrée',
-            'attendance' => $attendance,
-        ], 201);
+        return back()->with('success', 'Arrivée enregistrée pour ' . $attendance->user->name);
     }
 
     public function checkOut(Request $request, Attendance $attendance)
     {
         if ($attendance->check_out) {
-            return response()->json([
-                'message' => 'Déjà enregistré',
-                'error' => true,
-            ], 422);
+            return back()->with('error', 'Départ déjà enregistré pour cet ouvrier.');
         }
 
         $attendance->update([
@@ -186,10 +177,7 @@ class AttendanceController extends Controller
             'properties' => $attendance->toArray(),
         ]);
 
-        return response()->json([
-            'message' => 'Départ enregistré',
-            'attendance' => $attendance,
-        ]);
+        return back()->with('success', 'Départ enregistré pour ' . $attendance->user->name);
     }
 
     public function updateStatus(Request $request, Attendance $attendance)
@@ -204,10 +192,7 @@ class AttendanceController extends Controller
 
         $attendance->load('user', 'project');
 
-        return response()->json([
-            'message' => 'Statut mis à jour',
-            'attendance' => $attendance,
-        ]);
+        return back()->with('success', 'Statut mis à jour avec succès');
     }
 
     public function workerOverview(Request $request): Response

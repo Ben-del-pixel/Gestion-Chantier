@@ -1,11 +1,11 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { 
   Calendar, DollarSign, MapPin, User, Save, Users, 
   Trash2, Edit, ChevronRight, Activity, Clock, 
   HardHat, Wallet, FileText, Plus, CheckCircle,
-  LayoutGrid, ListChecks, Settings2, Info
+  LayoutGrid, ListChecks, Settings2, Info, AlertCircle
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { update, destroy } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription, 
   DialogHeader, DialogTitle, DialogTrigger 
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency';
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils';
 
 export default function ProjectDetail({ project, totalWorkersCount, engineers, storekeepers, allWorkers }: any) {
     const { currency, setCurrency, formatCurrency } = useCurrency();
+    const { errors }: any = usePage().props;
   const [isEditing, setIsEditing] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,74 +74,49 @@ return 'Non défini';
     });
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      const resp = await fetch(`/api/projects/${project.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (resp.ok) {
+    router.put(`/projects/${project.id}`, formData, {
+      onSuccess: () => {
         setIsEditing(false);
-        router.reload();
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+        setIsLoading(false);
+      },
+      onError: (errs) => {
+        console.error(errs);
+        setIsLoading(false);
+      },
+      onFinish: () => setIsLoading(false)
+    });
   };
 
-  const handleAssignWorkers = async () => {
+  const handleAssignWorkers = () => {
     setIsLoading(true);
 
-    try {
-      const resp = await fetch(`/api/projects/${project.id}/workers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-        body: JSON.stringify({ worker_ids: selectedWorkerIds }),
-      });
-
-      if (resp.ok) {
+    router.post(`/api/projects/${project.id}/workers`, { worker_ids: selectedWorkerIds }, {
+      onSuccess: () => {
         setIsAssigning(false);
-        router.reload();
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+        setIsLoading(false);
+      },
+      onError: (err) => {
+        console.error(err);
+        setIsLoading(false);
+      },
+      onFinish: () => setIsLoading(false)
+    });
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!confirm('Toutes les données associées seront perdues. Confirmer?')) {
-return;
-}
+      return;
+    }
 
-    try {
-      const resp = await fetch(`/api/projects/${project.id}`, {
-        method: 'DELETE',
-        headers: {
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-      });
-
-      if (resp.ok) {
-router.visit('/projects');
-}
-    } catch (err) {
- console.error(err); 
-}
+    router.delete(`/projects/${project.id}`, {
+      onError: (err) => {
+        console.error(err);
+      }
+    });
   };
 
   const addStep = () => {
@@ -264,9 +241,22 @@ router.visit('/projects');
                         {project.workers?.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {project.workers.map((w: any) => (
-                                    <div key={w.id} className="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-3 py-1.5 transition-all hover:border-blue-200 hover:bg-white group">
-                                        <div className="h-2 w-2 rounded-full bg-blue-400 group-hover:scale-125 transition-transform" />
-                                        <span className="text-xs font-bold text-slate-700">{w.name}</span>
+                                    <div key={w.id} className={cn(
+                                        "flex items-center gap-2 rounded-xl border px-3 py-1.5 transition-all group",
+                                        w.role === 'magasinier' 
+                                            ? "bg-purple-50 border-purple-100 hover:border-purple-300 hover:bg-white" 
+                                            : "bg-slate-50 border-slate-100 hover:border-blue-200 hover:bg-white"
+                                    )}>
+                                        <div className={cn(
+                                            "h-2 w-2 rounded-full group-hover:scale-125 transition-transform",
+                                            w.role === 'magasinier' ? "bg-purple-400" : "bg-blue-400"
+                                        )} />
+                                        <span className={cn(
+                                            "text-xs font-bold",
+                                            w.role === 'magasinier' ? "text-purple-700" : "text-slate-700"
+                                        )}>
+                                            {w.name} {w.role === 'magasinier' && <span className="opacity-60 font-normal ml-1">(Magasinier)</span>}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
@@ -386,13 +376,24 @@ router.visit('/projects');
         {/* EDIT PROJECT MODAL */}
         <Dialog open={isEditing} onOpenChange={setIsEditing}>
             <DialogContent className="max-w-4xl p-0 border-0 rounded-3xl overflow-hidden bg-white max-h-[90vh] flex flex-col">
-                <div className="bg-slate-900 p-8 text-white flex-shrink-0">
+                <div className="bg-slate-900 p-8 text-white relative">
                     <DialogTitle className="text-2xl font-black italic tracking-tight">Configuration Chantier</DialogTitle>
                     <DialogDescription className="text-slate-400 mt-1">Mise à jour des paramètres structurels du projet</DialogDescription>
                 </div>
                 
-                <form onSubmit={handleUpdate} className="flex-1 overflow-y-auto px-8 py-8 space-y-8 scrollbar-hide">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <form onSubmit={handleUpdate} className="flex-1 overflow-y-auto px-8 py-4 space-y-4 scrollbar-hide">
+                    {Object.keys(errors).length > 0 && (
+                        <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-900 rounded-2xl mb-4">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle className="font-black uppercase text-xs">Erreur de validation</AlertTitle>
+                            <AlertDescription className="text-xs font-bold">
+                                {Object.values(errors).map((err: any, i) => (
+                                    <div key={i}>{Array.isArray(err) ? err[0] : err}</div>
+                                ))}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
                         <div className="space-y-6">
                             <h3 className="text-xs font-black uppercase tracking-widest text-blue-600 flex items-center gap-2">
                                 <FileText className="h-3 w-3" /> Informations de base
@@ -457,7 +458,7 @@ router.visit('/projects');
                     </div>
 
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                             <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
                                 <LayoutGrid className="h-3 w-3" /> Étapes & Budgets
                             </h3>
@@ -503,6 +504,16 @@ router.visit('/projects');
                     <DialogDescription className="text-blue-100 opacity-80">Sélectionnez les ouvriers affectés à ce chantier</DialogDescription>
                 </div>
                 <div className="p-8 space-y-6">
+                    {Object.keys(errors).length > 0 && (
+                        <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-900 rounded-2xl">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription className="text-xs font-bold">
+                                {Object.values(errors).map((err: any, i) => (
+                                    <div key={i}>{Array.isArray(err) ? err[0] : err}</div>
+                                ))}
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     <div className="max-h-60 overflow-y-auto space-y-2 pr-2 scrollbar-thin">
                         {allWorkers.map((worker: any) => (
                             <label key={worker.id} className={cn(
@@ -529,7 +540,12 @@ setSelectedWorkerIds(selectedWorkerIds.filter(id => id !== worker.id));
                                 />
                                 <div className="flex-1">
                                     <div className="text-sm font-bold text-slate-800">{worker.name}</div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{worker.skills || 'Ouvrier Polyvalent'}</div>
+                                    <div className={cn(
+                                        "text-[10px] font-bold uppercase tracking-widest",
+                                        worker.role === 'magasinier' ? "text-purple-500" : "text-slate-400"
+                                    )}>
+                                        {worker.role === 'magasinier' ? 'Magasinier' : (worker.skills || 'Ouvrier Polyvalent')}
+                                    </div>
                                 </div>
                             </label>
                         ))}

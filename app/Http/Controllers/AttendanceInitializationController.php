@@ -39,9 +39,7 @@ class AttendanceInitializationController extends Controller
         // Presence initialization must target assigned project workers only.
         $workers = $project->workers()->get();
         if ($workers->isEmpty()) {
-            return response()->json([
-                'error' => 'Aucun ouvrier affecte a ce projet. Veuillez affecter des ouvriers d\'abord.',
-            ], 422);
+            return back()->withErrors(['workers' => 'Aucun ouvrier affecté à ce projet. Veuillez affecter des ouvriers d\'abord.']);
         }
 
         $created = 0;
@@ -76,19 +74,13 @@ class AttendanceInitializationController extends Controller
             }
         }
 
-        return response()->json([
-            'message' => "Initialized {$created} attendance records",
-            'created' => $created,
-            'total_workers' => $workers->count(),
-            'shifts' => count($shifts),
-            'errors' => $errors,
-        ]);
+        return back()->with('success', "Présence initialisée : {$created} entrées créées.");
     }
 
     /**
      * Assign workers to a project.
      */
-    public function assignWorkers(Request $request, Project $project): JsonResponse
+    public function assignWorkers(Request $request, Project $project): mixed
     {
         $authorizationError = $this->authorizeEngineerForProject($request, $project);
 
@@ -103,22 +95,33 @@ class AttendanceInitializationController extends Controller
 
         // Verify that all selected users are assignable chantier staff (worker or magasinier)
         $workers = User::whereIn('id', $validated['worker_ids'])
-            ->whereIn('role', [UserRole::Worker, UserRole::Magasinier])
+            ->whereIn('role', [UserRole::Worker->value, UserRole::Magasinier->value])
             ->get();
 
         if ($workers->count() !== count($validated['worker_ids'])) {
-            return response()->json([
-                'error' => 'Certaines personnes selectionnees ne sont pas assignables (ouvrier/magasinier).',
-            ], 422);
+            return back()->withErrors(['workers' => 'Certaines personnes sélectionnées ne sont pas assignables (ouvrier/magasinier).']);
+        }
+
+        // Restriction: Only one magasinier per project team
+        $magasiniers = $workers->filter(fn($w) => $w->role->value === UserRole::Magasinier->value);
+        
+        if ($magasiniers->count() > 1) {
+            return back()->withErrors(['workers' => 'Un projet ne peut avoir qu\'un seul magasinier dans l\'équipe.']);
+        }
+
+        // If there's already a storekeeper assigned to the project, 
+        // the only magasinier allowed in the team is that storekeeper itself.
+        if ($project->storekeeper_id && $magasiniers->count() > 0) {
+            $assignedMagasinierId = $magasiniers->first()->id;
+            if ((int)$assignedMagasinierId !== (int)$project->storekeeper_id) {
+                return back()->withErrors(['workers' => 'Ce projet a déjà un magasinier responsable assigné. Vous ne pouvez pas en ajouter un autre dans l\'équipe.']);
+            }
         }
 
         // Sync the workers (replace existing)
         $project->workers()->sync($validated['worker_ids']);
 
-        return response()->json([
-            'message' => 'Personnel assigne avec succes',
-            'assigned_count' => $workers->count(),
-        ]);
+        return back()->with('success', 'Personnel assigné avec succès');
     }
 
     /**
@@ -127,13 +130,13 @@ class AttendanceInitializationController extends Controller
     public function getAvailableWorkers(): JsonResponse
     {
         $user = request()->user();
-        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier, UserRole::Manager], true)) {
+        if (! $user || ! in_array($user->role->value, [UserRole::Engineer->value, UserRole::ChefChantier->value, UserRole::Manager->value], true)) {
             return response()->json([
                 'error' => 'Vous n\'avez pas les droits pour consulter cette ressource.',
             ], 403);
         }
 
-        $workers = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier])
+        $workers = User::whereIn('role', [UserRole::Worker->value, UserRole::Magasinier->value])
             ->select('id', 'name', 'email', 'role')
             ->orderBy('name')
             ->get();
@@ -167,14 +170,14 @@ class AttendanceInitializationController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, [UserRole::Engineer, UserRole::ChefChantier, UserRole::Manager], true)) {
+        if (! $user || ! in_array($user->role->value, [UserRole::Engineer->value, UserRole::ChefChantier->value, UserRole::Manager->value], true)) {
             return response()->json([
                 'error' => 'Seuls les ingenieurs ou managers peuvent gerer l\'affectation et la presence.',
             ], 403);
         }
 
         // Si le user est manager, Bypass la vérification de l'ID ingénieur
-        if ($user->role === UserRole::Manager) {
+        if ($user->role->value === UserRole::Manager->value) {
             return null;
         }
 

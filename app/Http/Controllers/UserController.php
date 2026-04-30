@@ -37,10 +37,7 @@ class UserController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        return response()->json([
-            'user' => $user,
-            'message' => 'Utilisateur créé avec succès',
-        ], 201);
+        return back()->with('success', 'Utilisateur créé avec succès');
     }
 
     public function update(Request $request, User $user)
@@ -62,18 +59,13 @@ class UserController extends Controller
 
         $user->update($validated);
 
-        return response()->json([
-            'user' => $user,
-            'message' => 'Utilisateur mis à jour avec succès',
-        ]);
+        return back()->with('success', 'Utilisateur mis à jour avec succès');
     }
 
     public function destroy(User $user)
     {
         $user->delete();
 
-        return response()->json([
-            'message' => 'Utilisateur supprimé avec succès',
-        ]);
+        return back()->with('success', 'Utilisateur supprimé avec succès');
     }
 }
