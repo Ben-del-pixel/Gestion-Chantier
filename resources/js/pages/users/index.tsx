@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, History as ActivityIcon, Coins } from 'lucide-react';
+import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, History as ActivityIcon } from 'lucide-react';
 import React from 'react';
 
 import { destroy, index, store, update } from '@/actions/App/Http/Controllers/UserController';
@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { UserRoleValue } from '@/Enums/UserRole';
 import { UserRole } from '@/Enums/UserRole';
-import { useCurrency } from '@/lib/currency';
 
 type UserItem = {
   id: number;
@@ -80,7 +79,6 @@ function resolveStatus(userId: number): WorkforceRow['status'] {
 }
 
 export default function UsersIndex({ users }: { users: UserItem[] }) {
-  const { currency, setCurrency, formatCurrency } = useCurrency();
   const [open, setOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
@@ -136,13 +134,11 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
   const stats = React.useMemo(() => {
     const active = workforce.filter((row) => row.status === 'Actif').length;
     const onLeave = workforce.filter((row) => row.status === 'Congé').length;
-    const payroll = workforce.reduce((sum, row) => sum + row.salary, 0);
 
     return {
       total: workforce.length,
       active,
       onLeave,
-      payroll,
     };
   }, [workforce]);
 
@@ -241,14 +237,6 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
             </div>
 
             <div className="flex items-center gap-2">
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as 'USD' | 'CDF')}
-                className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
-              >
-                <option value="USD">USD ($)</option>
-                <option value="CDF">FC (CDF)</option>
-              </select>
             </div>
 
             <Dialog open={open} onOpenChange={setOpen}>
@@ -356,7 +344,7 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
             </Dialog>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="rounded-3xl bg-blue-500 p-6 text-white shadow-xl shadow-blue-500/20 group transition-transform hover:-translate-y-1">
                 <div className="flex items-center justify-between opacity-80 mb-4">
                     <p className="text-sm font-black uppercase tracking-wider">Total ouvriers</p>
@@ -378,13 +366,6 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
                 </div>
                 <p className="text-5xl font-black">{stats.onLeave}</p>
               </div>
-              <div className="rounded-3xl bg-purple-600 p-6 text-white shadow-xl shadow-purple-600/20 group transition-transform hover:-translate-y-1">
-                <div className="flex items-center justify-between opacity-80 mb-4">
-                    <p className="text-sm font-black uppercase tracking-wider">Masse salariale</p>
-                    <Coins className="h-6 w-6" />
-                </div>
-                <p className="text-5xl font-black">{formatCurrency(stats.payroll)}</p>
-              </div>
         </div>
 
         <div className="relative group">
@@ -405,7 +386,6 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Nom</th>
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Rôle</th>
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Téléphone</th>
-                  <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Salaire</th>
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Statut</th>
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Compétences</th>
                   <th className="px-6 py-5 text-right font-black uppercase tracking-wider text-slate-400 text-[10px]">Actions</th>
@@ -435,7 +415,6 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
                       </td>
                       <td className="px-6 py-4 font-medium text-slate-600">{row.roleLabel}</td>
                       <td className="px-6 py-4 font-medium text-slate-600">{row.phone}</td>
-                      <td className="px-6 py-4 font-bold text-slate-900">{row.salary}<span className="text-slate-400">$/mois</span></td>
                       <td className="px-6 py-4">
                         <span
                           className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-black uppercase tracking-tight ${

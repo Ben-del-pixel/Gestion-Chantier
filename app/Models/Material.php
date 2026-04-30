@@ -17,6 +17,7 @@ class Material extends Model
         'description',
         'quantity_in_stock',
         'unit',
+        'type',
         'category',
     ];
 

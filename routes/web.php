@@ -39,6 +39,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('materials/allocate', [MaterialController::class, 'allocate'])->name('materials.allocate');
     Route::post('materials/stock-in', [MaterialController::class, 'stockIn'])->name('materials.stock-in');
     Route::post('materials/stock-out', [MaterialController::class, 'stockOut'])->name('materials.stock-out');
+    Route::post('materials/return/{resourceRequest}', [MaterialController::class, 'returnMaterial'])->name('materials.return');
 
     // Activity Log routes
     Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');

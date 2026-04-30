@@ -33,50 +33,27 @@ class MaterialController extends Controller
     public function index(): Response
     {
         $materials = Material::query()
-            ->select(['id', 'name', 'description', 'quantity_in_stock', 'unit', 'category', 'updated_at'])
+            ->select(['id', 'name', 'description', 'quantity_in_stock', 'unit', 'type', 'category', 'updated_at'])
             ->latest('updated_at')
-            ->get();
+            ->get()
+            ->map(function ($material) {
+                $allocations = ResourceRequest::where('material_id', $material->id)
+                    ->where('status', 'livre')
+                    ->with('project:id,name')
+                    ->get()
+                    ->map(function ($req) {
+                        return [
+                            'id' => $req->id,
+                            'project_name' => $req->project?->name,
+                            'quantity' => (float) $req->quantity_requested,
+                        ];
+                    });
 
-        if ($materials->isEmpty()) {
-            $materials = collect([
-                [
-                    'id' => 1,
-                    'name' => 'Ciment',
-                    'description' => 'Fournisseur A',
-                    'quantity_in_stock' => 500,
-                    'unit' => 'sacs',
-                    'category' => 'construction',
-                    'updated_at' => now()->subDays(1)->toDateString(),
-                ],
-                [
-                    'id' => 2,
-                    'name' => 'Acier',
-                    'description' => 'Fournisseur B',
-                    'quantity_in_stock' => 150,
-                    'unit' => 'tonnes',
-                    'category' => 'metaux',
-                    'updated_at' => now()->subDays(2)->toDateString(),
-                ],
-                [
-                    'id' => 3,
-                    'name' => 'Briques',
-                    'description' => 'Fournisseur C',
-                    'quantity_in_stock' => 50,
-                    'unit' => 'milliers',
-                    'category' => 'maconnerie',
-                    'updated_at' => now()->subDays(3)->toDateString(),
-                ],
-                [
-                    'id' => 4,
-                    'name' => 'Bois',
-                    'description' => 'Fournisseur A',
-                    'quantity_in_stock' => 200,
-                    'unit' => 'm3',
-                    'category' => 'charpente',
-                    'updated_at' => now()->subDays(4)->toDateString(),
-                ],
-            ]);
-        }
+                $material->on_site_quantity = $allocations->sum('quantity');
+                $material->allocations = $allocations;
+
+                return $material;
+            });
 
         $projectAllocations = ResourceRequest::where('status', 'livre')
             ->with(['project:id,name', 'material:id,name,unit'])
@@ -88,36 +65,18 @@ class MaterialController extends Controller
                 return [
                     'project_id' => $project->id,
                     'project_name' => $project->name,
-                    'materials' => $items->groupBy('material_id')->map(function ($group) {
+                    'materials' => $items->map(function ($item) {
                         return [
-                            'name' => $group->first()->material->name,
-                            'quantity' => $group->sum('quantity_requested'),
-                            'unit' => $group->first()->material->unit,
+                            'id' => $item->id,
+                            'material_id' => $item->material_id,
+                            'name' => $item->material?->name,
+                            'quantity' => (float) $item->quantity_requested,
+                            'unit' => $item->material?->unit,
+                            'type' => $item->material?->type,
                         ];
                     })->values(),
                 ];
             })->values();
-
-        if ($projectAllocations->isEmpty()) {
-            $projectAllocations = collect([
-                [
-                    'project_id' => 1,
-                    'project_name' => 'Residence Horizon',
-                    'materials' => [
-                        ['name' => 'Ciment', 'quantity' => 150, 'unit' => 'sacs'],
-                        ['name' => 'Acier', 'quantity' => 20, 'unit' => 'tonnes'],
-                    ],
-                ],
-                [
-                    'project_id' => 2,
-                    'project_name' => 'Centre Commercial Rivoli',
-                    'materials' => [
-                        ['name' => 'Briques', 'quantity' => 5000, 'unit' => 'milliers'],
-                        ['name' => 'Ciment', 'quantity' => 80, 'unit' => 'sacs'],
-                    ],
-                ],
-            ]);
-        }
 
         $projects = Project::select('id', 'name')->latest()->get();
 
@@ -161,6 +120,7 @@ class MaterialController extends Controller
             'description' => 'nullable|string|max:255',
             'quantity_in_stock' => 'required|numeric|min:0',
             'unit' => 'required|string|max:255',
+            'type' => 'required|in:materiel,materiaux',
             'category' => 'nullable|string|max:255',
         ]);
 
@@ -180,6 +140,7 @@ class MaterialController extends Controller
             'description' => 'nullable|string|max:255',
             'quantity_in_stock' => 'required|numeric|min:0',
             'unit' => 'required|string|max:255',
+            'type' => 'required|in:materiel,materiaux',
             'category' => 'nullable|string|max:255',
         ]);
 
@@ -254,6 +215,13 @@ class MaterialController extends Controller
         ]);
 
         $material = Material::findOrFail($validated['material_id']);
+
+        if (($validated['reason'] ?? '') === 'retour_chantier' && $material->type !== 'materiel') {
+            return back()->withErrors([
+                'reason' => 'Seul le matériel (équipement) peut faire l\'objet d\'un retour de chantier.',
+            ]);
+        }
+
         $material->increment('quantity_in_stock', $validated['quantity']);
 
         MaterialMovement::create([
@@ -303,5 +271,37 @@ class MaterialController extends Controller
         ]);
 
         return redirect()->route('materials.index')->with('success', 'Sortie de stock enregistrée avec succès');
+    }
+
+    public function returnMaterial(Request $request, ResourceRequest $resourceRequest)
+    {
+        if (! $this->canManageMaterials()) {
+            abort(403, 'Seul un magasinier ou manager peut enregistrer un retour de matériel');
+        }
+
+        $material = $resourceRequest->material;
+
+        if ($material->type !== 'materiel') {
+            abort(403, 'Seul le matériel (équipement) peut être remis en stock après utilisation.');
+        }
+
+        // Increment stock
+        $material->increment('quantity_in_stock', (float) $resourceRequest->quantity_requested);
+
+        // Track movement
+        MaterialMovement::create([
+            'material_id' => $material->id,
+            'user_id' => auth()->id(),
+            'movement_type' => 'entry',
+            'quantity' => (float) $resourceRequest->quantity_requested,
+            'reason' => 'retour_chantier',
+            'comment' => 'Retour du chantier : '.($resourceRequest->project->name ?? 'Inconnu'),
+            'occurred_at' => now(),
+        ]);
+
+        // Mark as returned
+        $resourceRequest->update(['status' => 'rendu']);
+
+        return redirect()->route('materials.index')->with('success', 'Matériel remis en stock avec succès');
     }
 }
