@@ -32,9 +32,7 @@ class MaterialController extends Controller
 
     public function index(): Response
     {
-        $materials = Material::query()
-            ->select(['id', 'name', 'description', 'quantity_in_stock', 'unit', 'type', 'category', 'updated_at'])
-            ->latest('updated_at')
+        $materials = Material::latest('updated_at')
             ->get()
             ->map(function ($material) {
                 $allocations = ResourceRequest::where('material_id', $material->id)

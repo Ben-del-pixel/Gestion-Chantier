@@ -149,41 +149,28 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      const url = editingUser ? update.url({ user: editingUser.id }) : store.url();
-      const method = editingUser ? 'PUT' : 'POST';
+    const url = editingUser ? update.url({ user: editingUser.id }) : store.url();
+    const method = editingUser ? 'put' : 'post';
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Error:', error);
+    router.visit(url, {
+      method,
+      data: formData,
+      onSuccess: () => {
+        setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '' });
+        setEditingUser(null);
+        setOpen(false);
+      },
+      onError: () => {
         alert('Erreur lors de l\'enregistrement');
-
-        return;
-      }
-
-      setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '' });
-      setEditingUser(null);
-      setOpen(false);
-      router.visit(index.url());
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Erreur lors de l\'enregistrement');
-    } finally {
-      setIsLoading(false);
-    }
+      },
+      onFinish: () => {
+        setIsLoading(false);
+      },
+    });
   };
 
   const handleEdit = (user: UserItem) => {
@@ -204,25 +191,11 @@ export default function UsersIndex({ users }: { users: UserItem[] }) {
       return;
     }
 
-    try {
-      const response = await fetch(destroy.url({ user: userId }), {
-        method: 'DELETE',
-        headers: {
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-      });
-
-      if (!response.ok) {
+    router.delete(destroy.url({ user: userId }), {
+      onError: () => {
         alert('Erreur lors de la suppression');
-
-        return;
-      }
-
-      router.visit(index.url());
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Erreur lors de la suppression');
-    }
+      },
+    });
   };
 
   return (

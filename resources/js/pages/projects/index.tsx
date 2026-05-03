@@ -40,6 +40,7 @@ type ProjectItem = {
   name: string;
   description: string | null;
   budget: number | string;
+  budget_consumed?: number;
   start_date: string | null;
   deadline: string | null;
   status: string;
@@ -111,7 +112,7 @@ export default function ProjectsIndex({ projects, engineers }: { projects: Proje
       projects.map((project) => {
         const budget = Number(project.budget || 0);
         const progress = getProgress(project);
-        const spent = Math.round((budget * progress) / 100);
+        const spent = Number(project.budget_consumed || 0);
 
         return {
           ...project,
@@ -201,7 +202,7 @@ return;
     }));
   };
 
-  const handleSubmitProject = async (e: React.FormEvent) => {
+  const handleSubmitProject = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (formData.start_date && formData.deadline && formData.deadline < formData.start_date) {
@@ -212,41 +213,27 @@ return;
 
     setIsSubmitting(true);
 
-    try {
-      const response = await fetch(store.url(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        alert('Erreur : ' + (error.message || 'Impossible de créer le chantier'));
-
-        return;
-      }
-
-      setFormData({ 
-        name: '', 
-        description: '', 
-        start_date: '', 
-        budget: '', 
-        deadline: '', 
-        status: 'initialisation', 
-        engineer_id: '',
-        steps: [{ name: '', budget: '' }]
-      });
-      setOpenDialog(false);
-      router.visit(`/projects`);
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Erreur lors de la création du chantier');
-    } finally {
-      setIsSubmitting(false);
-    }
+    router.post(store.url(), formData, {
+      onSuccess: () => {
+        setFormData({ 
+          name: '', 
+          description: '', 
+          start_date: '', 
+          budget: '', 
+          deadline: '', 
+          status: 'initialisation', 
+          engineer_id: '',
+          steps: [{ name: '', budget: '' }]
+        });
+        setOpenDialog(false);
+      },
+      onError: () => {
+        alert('Erreur lors de la création du chantier');
+      },
+      onFinish: () => {
+        setIsSubmitting(false);
+      },
+    });
   };
 
   return (

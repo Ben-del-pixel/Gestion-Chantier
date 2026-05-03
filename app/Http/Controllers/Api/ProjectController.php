@@ -110,6 +110,7 @@ class ProjectController extends Controller
             'deadline' => 'nullable|date',
             'budget' => 'nullable|numeric|min:0',
             'progress' => 'nullable|integer|min:0|max:100',
+            'budget_consumed' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:initialisation,planifie,en_cours,termine,suspendu',
             'engineer_id' => 'nullable|exists:users,id',
             'storekeeper_id' => 'nullable|exists:users,id',
@@ -127,7 +128,7 @@ class ProjectController extends Controller
         }
 
         $projectData = $request->only([
-            'name', 'description', 'start_date', 'deadline', 'budget', 'status', 'progress', 'engineer_id', 'storekeeper_id',
+            'name', 'description', 'start_date', 'deadline', 'budget', 'status', 'progress', 'budget_consumed', 'engineer_id', 'storekeeper_id',
         ]);
 
         // Convert empty strings to null for IDs
@@ -188,7 +189,7 @@ class ProjectController extends Controller
             ],
         ]);
 
-        return back()->with('success', 'Projet mis à jour avec succès');
+        return redirect()->route('projects.show', $project)->with('success', 'Projet mis à jour avec succès');
     }
 
     public function assignWorkers(Request $request, Project $project)

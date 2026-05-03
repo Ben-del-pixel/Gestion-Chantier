@@ -18,6 +18,7 @@ class Project extends Model
         'deadline',
         'status',
         'progress',
+        'budget_consumed',
         'manager_id',
         'engineer_id',
         'storekeeper_id',
@@ -28,6 +29,7 @@ class Project extends Model
         'deadline' => 'date',
         'budget' => 'decimal:2',
         'progress' => 'integer',
+        'budget_consumed' => 'decimal:2',
     ];
 
     public function manager()

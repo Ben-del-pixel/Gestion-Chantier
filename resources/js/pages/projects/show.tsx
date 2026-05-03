@@ -32,6 +32,7 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, s
     description: project.description || '',
     budget: project.budget,
     progress: project.progress || 0,
+    budget_consumed: project.budget_consumed || 0,
     start_date: project.start_date ? project.start_date.split('T')[0] : '',
     deadline: project.deadline ? project.deadline.split('T')[0] : '',
     status: project.status,
@@ -185,11 +186,12 @@ return 'Non défini';
         </div>
 
         {/* Top Grid: Major Stats */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <DetailStatCard title="Budget Total" value={formatCurrency(Number(project.budget || 0))} icon={Wallet} color="emerald" sub="Financement alloué" />
+          <DetailStatCard title="Budget Consommé" value={formatCurrency(Number(project.budget_consumed || 0))} icon={DollarSign} color="amber" sub={`${project.progress || 0}% du budget`} />
           <DetailStatCard title="Main d'œuvre" value={totalWorkersCount} icon={Users} color="blue" sub="Ouvriers actifs" />
-          <DetailStatCard title="Date Butoir" value={formatDate(project.deadline)} icon={Clock} color="amber" sub="Échéance prévue" />
-          <DetailStatCard title="Localisation" value="Site Central" icon={MapPin} color="rose" sub="Lieu du chantier" />
+          <DetailStatCard title="Date Butoir" value={formatDate(project.deadline)} icon={Clock} color="rose" sub="Échéance prévue" />
+          <DetailStatCard title="Localisation" value="Site Central" icon={MapPin} color="slate" sub="Lieu du chantier" />
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
@@ -453,6 +455,10 @@ return 'Non défini';
                                     <Label className="text-xs font-black uppercase text-slate-400">Progression globale (%)</Label>
                                     <Input type="number" min="0" max="100" value={formData.progress} onChange={e => setFormData({...formData, progress: parseInt(e.target.value) || 0})} className="h-12 rounded-xl focus:ring-blue-500/20" />
                                 </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-black uppercase text-slate-400">Budget Consommé ({currency})</Label>
+                                <Input type="number" min="0" value={formData.budget_consumed} onChange={e => setFormData({...formData, budget_consumed: parseFloat(e.target.value) || 0})} className="h-12 rounded-xl focus:ring-blue-500/20" />
                             </div>
                         </div>
                     </div>

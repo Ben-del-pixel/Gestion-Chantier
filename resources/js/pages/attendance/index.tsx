@@ -82,76 +82,40 @@ params.append('project_id', displayProject);
     }, { preserveState: true, preserveScroll: true });
   };
 
-  const handleCheckIn = async (e: React.FormEvent) => {
+  const handleCheckIn = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      const response = await fetch('/attendance/check-in', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-        body: JSON.stringify(checkInData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        alert(error.message || 'Erreur lors de l\'enregistrement');
-
-        return;
-      }
-
-      await refreshAttendances();
-      setShowCheckIn(false);
-      setCheckInData({ user_id: '', project_id: '', shift: defaultShift, status: defaultStatus });
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
+    router.post('/attendance/check-in', checkInData, {
+      onSuccess: () => {
+        setShowCheckIn(false);
+        setCheckInData({ user_id: '', project_id: '', shift: defaultShift, status: defaultStatus });
+      },
+      onError: (err) => {
+        alert('Erreur lors de l\'enregistrement');
+      },
+      onFinish: () => {
+        setLoading(false);
+      },
+    });
   };
 
-  const handleCheckOut = async (attendanceId: number) => {
+  const handleCheckOut = (attendanceId: number) => {
     if (!window.confirm('Confirmer le départ?')) {
-return;
-}
-
-    try {
-      const response = await fetch(`/attendance/${attendanceId}/check-out`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-      });
-
-      if (response.ok) {
-        await refreshAttendances();
-      }
-    } catch (error) {
-      console.error('Error:', error);
+      return;
     }
+
+    router.put(`/attendance/${attendanceId}/check-out`, {}, {
+      preserveState: true,
+      preserveScroll: true,
+    });
   };
 
-  const handleStatusChange = async (attendanceId: number, newStatus: string) => {
-    try {
-      const response = await fetch(`/attendance/${attendanceId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (response.ok) {
-        setAttendances((prev: any[]) => prev.map((a: any) => a.id === attendanceId ? { ...a, status: newStatus } : a));
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
+  const handleStatusChange = (attendanceId: number, newStatus: string) => {
+    router.put(`/attendance/${attendanceId}/status`, { status: newStatus }, {
+      preserveState: true,
+      preserveScroll: true,
+    });
   };
 
   const formatTime = (time: string | null) => {
