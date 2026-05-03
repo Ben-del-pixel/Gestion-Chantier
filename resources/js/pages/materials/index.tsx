@@ -781,27 +781,29 @@ export default function MaterialsIndex({
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <Button
-                                            onClick={() => {
-                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
-                                                setOpenStockInDialog(true);
-                                            }}
-                                            className="h-11 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
-                                        >
-                                            + Entrée
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
-                                                setOpenStockOutDialog(true);
-                                            }}
-                                            variant="outline"
-                                            className="h-11 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50"
-                                        >
-                                            - Sortie
-                                        </Button>
-                                    </div>
+                                    {material.type === 'materiaux' && (
+                                        <div className="grid grid-cols-2 gap-3 pt-2">
+                                            <Button
+                                                onClick={() => {
+                                                    setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
+                                                    setOpenStockInDialog(true);
+                                                }}
+                                                className="h-11 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
+                                            >
+                                                + Entrée
+                                            </Button>
+                                            <Button
+                                                onClick={() => {
+                                                    setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
+                                                    setOpenStockOutDialog(true);
+                                                }}
+                                                variant="outline"
+                                                className="h-11 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50"
+                                            >
+                                                - Sortie
+                                            </Button>
+                                        </div>
+                                    )}
 
                                     {material.type === 'materiel' && material.allocations?.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-slate-100">
