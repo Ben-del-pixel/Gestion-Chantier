@@ -260,10 +260,21 @@ export default function MaterialsIndex({
         e.preventDefault();
         setIsSubmitting(true);
 
+        const materialId = parseInt(allocationFormData.material_id);
+        const quantityRequested = parseFloat(allocationFormData.quantity_requested);
+
+        // Validation instantanée du stock
+        const selectedMaterial = materials.find(m => m.id === materialId);
+        if (selectedMaterial && quantityRequested > selectedMaterial.quantity_in_stock) {
+            alert(`Stock insuffisant !\n\nQuantité demandée: ${quantityRequested} ${selectedMaterial.unit}\nStock disponible: ${selectedMaterial.quantity_in_stock} ${selectedMaterial.unit}\n\nVous ne pouvez pas affecter plus que le stock disponible.`);
+            setIsSubmitting(false);
+            return;
+        }
+
         const data = {
-            material_id: parseInt(allocationFormData.material_id),
+            material_id: materialId,
             project_id: parseInt(allocationFormData.project_id),
-            quantity_requested: parseFloat(allocationFormData.quantity_requested),
+            quantity_requested: quantityRequested,
             comment: allocationFormData.comment || null,
         };
 

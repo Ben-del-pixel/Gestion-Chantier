@@ -171,6 +171,14 @@ class MaterialController extends Controller
             'comment' => 'nullable|string|max:500',
         ]);
 
+        // Check stock availability
+        $material = Material::findOrFail($validated['material_id']);
+        if ((float) $material->quantity_in_stock < (float) $validated['quantity_requested']) {
+            return back()->withErrors([
+                'quantity_requested' => 'La quantité demandée ('.$validated['quantity_requested'].') dépasse le stock disponible ('.$material->quantity_in_stock.').',
+            ]);
+        }
+
         $allocation = ResourceRequest::create([
             'material_id' => $validated['material_id'],
             'project_id' => $validated['project_id'],
