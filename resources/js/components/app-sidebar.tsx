@@ -44,7 +44,7 @@ const roleNavItems: Record<string, NavItem[]> = {
         { title: "Main-d'oeuvre", href: usersIndex(), icon: Users },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
-        { title: 'Paramètres', href: activityLogsIndex(), icon: History },
+        { title: 'Historique', href: activityLogsIndex(), icon: History },
     ],
     [UserRole.Engineer.value]: [
         { title: 'Mes Projets', href: dashboard(), icon: LayoutGrid },
