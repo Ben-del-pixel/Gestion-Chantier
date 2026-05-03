@@ -493,24 +493,19 @@ export default function MaterialsIndex({
                                 </div>
 
                                 <div>
-                                    <Label htmlFor="quantity">Quantité à affecter *</Label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            id="quantity"
-                                            name="quantity_requested"
-                                            type="number"
-                                            value={allocationFormData.quantity_requested}
-                                            onChange={handleAllocationFormChange}
-                                            placeholder="0"
-                                            required
-                                            step="0.01"
-                                            min="0.01"
-                                            className="flex-1"
-                                        />
-                                        <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 flex items-center whitespace-nowrap">
-                                            {selectedMaterialForAllocation?.unit}
-                                        </div>
-                                    </div>
+                                    <Label htmlFor="quantity">Quantité *</Label>
+                                    <Input
+                                        id="quantity"
+                                        name="quantity_requested"
+                                        type="number"
+                                        value={allocationFormData.quantity_requested}
+                                        onChange={handleAllocationFormChange}
+                                        placeholder="0"
+                                        required
+                                        step="0.01"
+                                        min="0.01"
+                                        className="flex-1"
+                                    />
                                 </div>
 
                                 <div>
