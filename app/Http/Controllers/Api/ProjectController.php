@@ -75,10 +75,7 @@ class ProjectController extends Controller
             ],
         ]);
 
-        return response()->json([
-            'project' => $project->load('steps'),
-            'message' => 'Projet créé avec succès',
-        ], 201);
+        return redirect()->route('projects.show', $project)->with('success', 'Projet créé avec succès');
     }
 
     public function show(Project $project): Response
