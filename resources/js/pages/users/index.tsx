@@ -85,6 +85,7 @@ function resolveStatus(userId: number): WorkforceRow['status'] {
 export default function UsersIndex({ users, engineers, chefChantiers }: { users: UserItem[]; engineers: { id: number; name: string }[]; chefChantiers: { id: number; name: string }[] }) {
   const [open, setOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [selectedRole, setSelectedRole] = React.useState<UserRoleValue | 'all'>('all');
   const [isLoading, setIsLoading] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<UserItem | null>(null);
   const [formData, setFormData] = React.useState<{
@@ -128,16 +129,21 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
   const filteredWorkforce = React.useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
 
-    if (!term) {
-      return workforce;
-    }
-
     return workforce.filter((row) => {
-      const haystack = `${row.name} ${row.email} ${row.roleLabel} ${row.phone} ${row.skillsList.join(' ')}`.toLowerCase();
+      // Filter by role
+      if (selectedRole !== 'all' && row.role !== selectedRole) {
+        return false;
+      }
 
+      // Filter by search term
+      if (!term) {
+        return true;
+      }
+
+      const haystack = `${row.name} ${row.email} ${row.roleLabel} ${row.phone} ${row.skillsList.join(' ')}`.toLowerCase();
       return haystack.includes(term);
     });
-  }, [workforce, searchTerm]);
+  }, [workforce, searchTerm, selectedRole]);
 
   const stats = React.useMemo(() => {
     const active = workforce.filter((row) => row.status === 'Actif').length;
@@ -389,6 +395,70 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
                 </div>
                 <p className="text-5xl font-black">{stats.onLeave}</p>
               </div>
+        </div>
+
+        {/* Filtres par rôle */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedRole('all')}
+            className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+              selectedRole === 'all'
+                ? 'bg-slate-800 text-white shadow-lg'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            Tous
+          </button>
+          <button
+            onClick={() => setSelectedRole(UserRole.Worker.value)}
+            className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+              selectedRole === UserRole.Worker.value
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-blue-50'
+            }`}
+          >
+            Ouvriers
+          </button>
+          <button
+            onClick={() => setSelectedRole(UserRole.Engineer.value)}
+            className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+              selectedRole === UserRole.Engineer.value
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-purple-50'
+            }`}
+          >
+            Ingénieurs
+          </button>
+          <button
+            onClick={() => setSelectedRole(UserRole.ChefChantier.value)}
+            className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+              selectedRole === UserRole.ChefChantier.value
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-indigo-50'
+            }`}
+          >
+            Chefs de chantier
+          </button>
+          <button
+            onClick={() => setSelectedRole(UserRole.Magasinier.value)}
+            className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+              selectedRole === UserRole.Magasinier.value
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-emerald-50'
+            }`}
+          >
+            Magasiniers
+          </button>
+          <button
+            onClick={() => setSelectedRole(UserRole.Manager.value)}
+            className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
+              selectedRole === UserRole.Manager.value
+                ? 'bg-slate-900 text-white shadow-lg'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            Directeurs
+          </button>
         </div>
 
         <div className="relative group">
