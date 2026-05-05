@@ -46,6 +46,13 @@ const roleNavItems: Record<string, NavItem[]> = {
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
         { title: 'Historique', href: activityLogsIndex(), icon: History },
     ],
+    [UserRole.ChefChantier.value]: [
+        { title: 'Mes Chantiers', href: dashboard(), icon: LayoutGrid },
+        { title: 'Gestion Chantiers', href: projectsIndex(), icon: TrendingUp },
+        { title: "Main-d'oeuvre", href: usersIndex(), icon: Users },
+        { title: 'Présence', href: attendanceIndex(), icon: Clock },
+        { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
+    ],
     [UserRole.Engineer.value]: [
         { title: 'Mes Projets', href: dashboard(), icon: LayoutGrid },
         { title: 'Affectation Chantier', href: projectsIndex(), icon: TrendingUp },

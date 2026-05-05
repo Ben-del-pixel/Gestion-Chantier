@@ -16,8 +16,25 @@ class ProjectController extends Controller
 {
     public function index(): Response
     {
-        $projects = Project::with('engineer', 'manager', 'workers', 'steps')->latest()->get();
-        $engineers = User::where('role', UserRole::Engineer)->get();
+        $user = auth()->user();
+
+        // Filter projects based on user role
+        if ($user->role === UserRole::ChefChantier) {
+            // Chef de Chantier sees only projects assigned to his engineers
+            $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
+            $projects = Project::with('engineer', 'manager', 'workers', 'steps')
+                ->whereIn('engineer_id', $engineerIds)
+                ->latest()
+                ->get();
+            // Only show his engineers in the filter
+            $engineers = User::where('role', UserRole::Engineer)
+                ->where('chef_chantier_id', $user->id)
+                ->get();
+        } else {
+            // Manager sees all projects
+            $projects = Project::with('engineer', 'manager', 'workers', 'steps')->latest()->get();
+            $engineers = User::where('role', UserRole::Engineer)->get();
+        }
 
         return Inertia::render('projects/index', [
             'projects' => $projects,

@@ -13,9 +13,32 @@ class UserController extends Controller
 {
     public function index(): Response
     {
-        $users = User::with(['engineer', 'chefChantier'])->get()->append('status');
-        $engineers = User::where('role', UserRole::Engineer->value)->get();
-        $chefChantiers = User::where('role', UserRole::ChefChantier->value)->get();
+        $user = auth()->user();
+
+        if ($user->role === UserRole::ChefChantier->value) {
+            // Chef de Chantier sees only his team
+            $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
+
+            $users = User::with(['engineer', 'chefChantier'])
+                ->where(function ($query) use ($user, $engineerIds) {
+                    $query->where('id', $user->id) // Himself
+                        ->orWhere('chef_chantier_id', $user->id) // His engineers
+                        ->orWhereIn('engineer_id', $engineerIds); // Workers under his engineers
+                })
+                ->get()
+                ->append('status');
+
+            // Only his engineers for the dropdown
+            $engineers = User::where('role', UserRole::Engineer->value)
+                ->where('chef_chantier_id', $user->id)
+                ->get();
+            $chefChantiers = collect(); // Empty - he doesn't need to see other chefs
+        } else {
+            // Manager sees all users
+            $users = User::with(['engineer', 'chefChantier'])->get()->append('status');
+            $engineers = User::where('role', UserRole::Engineer->value)->get();
+            $chefChantiers = User::where('role', UserRole::ChefChantier->value)->get();
+        }
 
         return Inertia::render('users/index', [
             'users' => $users,
