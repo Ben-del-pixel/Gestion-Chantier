@@ -16,7 +16,7 @@ class ProjectController extends Controller
 {
     public function index(): Response
     {
-        $projects = Project::with('engineer', 'manager', 'tasks.workers', 'steps')->latest()->get();
+        $projects = Project::with('engineer', 'manager', 'workers', 'steps')->latest()->get();
         $engineers = User::where('role', UserRole::Engineer)->get();
 
         return Inertia::render('projects/index', [

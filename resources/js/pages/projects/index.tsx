@@ -57,7 +57,7 @@ type ProjectItem = {
   progress: number;
   engineer?: { id: number; name: string } | null;
   manager?: { id: number; name: string } | null;
-  tasks?: Array<{ workers?: Array<{ id: number }> }>;
+  workers?: Array<{ id: number; name: string }>;
   steps?: ProjectStepItem[];
 };
 
@@ -84,17 +84,7 @@ function formatDateRange(startDate: string | null, deadline: string | null): str
 }
 
 function getUniqueWorkerCount(project: ProjectItem): number {
-  if (!project.tasks || project.tasks.length === 0) {
-    return 0;
-  }
-
-  const workers = new Set<number>();
-
-  project.tasks.forEach((task) => {
-    task.workers?.forEach((worker) => workers.add(worker.id));
-  });
-
-  return workers.size;
+  return project.workers?.length || 0;
 }
 
 function getProgress(project: ProjectItem): number {
