@@ -10,10 +10,11 @@ import {
   Users,
   TrendingUp,
   Coins,
+  CheckCircle,
 } from 'lucide-react';
 import React from 'react';
 
-import { destroy, show, store } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import { destroy, show, store, toggleStep } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,15 @@ import {
 } from '@/components/ui/select';
 import { useCurrency } from '@/lib/currency';
 
+type ProjectStepItem = {
+  id: number;
+  name: string;
+  budget: number;
+  order: number;
+  is_completed: boolean;
+  completed_at: string | null;
+};
+
 type ProjectItem = {
   id: number;
   name: string;
@@ -48,6 +58,7 @@ type ProjectItem = {
   engineer?: { id: number; name: string } | null;
   manager?: { id: number; name: string } | null;
   tasks?: Array<{ workers?: Array<{ id: number }> }>;
+  steps?: ProjectStepItem[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -156,6 +167,12 @@ export default function ProjectsIndex({ projects, engineers }: { projects: Proje
     }
 
     router.delete(destroy.url({ project: project.id }));
+  };
+
+  const handleToggleStep = (projectId: number, stepId: number) => {
+    router.post(`/projects/${projectId}/steps/${stepId}/toggle`, {}, {
+      preserveScroll: true,
+    });
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -555,6 +572,43 @@ return;
                       </div>
                     </div>
                 </div>
+
+                {/* Étapes avec validation */}
+                {project.steps && project.steps.length > 0 && (
+                  <div className="space-y-2 border-t border-slate-100 pt-4">
+                    <div className="text-[10px] font-black uppercase tracking-tight text-slate-400 flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Étapes ({project.steps.filter(s => s.is_completed).length}/{project.steps.length})
+                    </div>
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                      {project.steps.map((step, idx) => (
+                        <button
+                          key={step.id}
+                          onClick={() => handleToggleStep(project.id, step.id)}
+                          className={`w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs transition-all ${
+                            step.is_completed
+                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                            step.is_completed
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {step.is_completed ? '✓' : idx + 1}
+                          </div>
+                          <span className={`flex-1 truncate ${step.is_completed ? 'line-through opacity-60' : ''}`}>
+                            {step.name}
+                          </span>
+                          <span className="text-[10px] font-bold opacity-70">
+                            {formatCurrency(Number(step.budget))}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100">
                   <div className="flex flex-col gap-1">
