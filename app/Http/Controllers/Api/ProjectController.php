@@ -66,6 +66,17 @@ class ProjectController extends Controller
             $project->syncBudgetFromSteps();
         }
 
+        // Auto-assign engineer's team to project
+        if (! empty($validated['engineer_id'])) {
+            $engineer = User::find($validated['engineer_id']);
+            if ($engineer) {
+                $teamIds = $engineer->team()->pluck('id')->toArray();
+                if (! empty($teamIds)) {
+                    $project->workers()->sync($teamIds);
+                }
+            }
+        }
+
         ActivityLog::create([
             'user_id' => auth()->id(),
             'action' => 'create_project',
@@ -148,7 +159,26 @@ class ProjectController extends Controller
             }
         }
 
+        // Capture original engineer_id before update
+        $originalEngineerId = $project->engineer_id;
+
         $project->update($projectData);
+
+        // Auto-assign new engineer's team if engineer changed
+        if (isset($projectData['engineer_id']) && (int)$projectData['engineer_id'] !== (int)$originalEngineerId) {
+            if (! empty($projectData['engineer_id'])) {
+                $engineer = User::find($projectData['engineer_id']);
+                if ($engineer) {
+                    $teamIds = $engineer->team()->pluck('id')->toArray();
+                    if (! empty($teamIds)) {
+                        $project->workers()->sync($teamIds);
+                    }
+                }
+            } else {
+                // Remove all workers if engineer removed
+                $project->workers()->detach();
+            }
+        }
 
         if ($request->has('steps')) {
             $existingStepIds = [];

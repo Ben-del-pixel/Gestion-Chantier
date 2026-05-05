@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'phone', 'skills'])]
+#[Fillable(['name', 'email', 'password', 'role', 'phone', 'skills', 'engineer_id'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -69,5 +69,15 @@ class User extends Authenticatable
     public function receivedReports()
     {
         return $this->hasMany(ReportSubmission::class, 'recipient_id');
+    }
+
+    public function engineer()
+    {
+        return $this->belongsTo(User::class, 'engineer_id');
+    }
+
+    public function team()
+    {
+        return $this->hasMany(User::class, 'engineer_id');
     }
 }

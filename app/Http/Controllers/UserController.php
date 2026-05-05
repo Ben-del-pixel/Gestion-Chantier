@@ -13,11 +13,13 @@ class UserController extends Controller
 {
     public function index(): Response
     {
-        $users = User::all()->append('status');
+        $users = User::with('engineer')->get()->append('status');
+        $engineers = User::where('role', UserRole::Engineer->value)->get();
 
         return Inertia::render('users/index', [
             'users' => $users,
             'roles' => UserRole::cases(),
+            'engineers' => $engineers,
         ]);
     }
 
@@ -30,6 +32,7 @@ class UserController extends Controller
             'role' => 'required|in:'.implode(',', array_map(fn ($role) => $role->value, UserRole::cases())),
             'phone' => 'nullable|string|max:255',
             'skills' => 'nullable|string',
+            'engineer_id' => 'nullable|exists:users,id',
         ]);
 
         $user = User::create([
@@ -49,6 +52,7 @@ class UserController extends Controller
             'role' => 'required|in:'.implode(',', array_map(fn ($role) => $role->value, UserRole::cases())),
             'phone' => 'nullable|string|max:255',
             'skills' => 'nullable|string',
+            'engineer_id' => 'nullable|exists:users,id',
         ]);
 
         if (! empty($validated['password'])) {
