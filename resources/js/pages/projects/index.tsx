@@ -610,6 +610,25 @@ return;
                   </div>
                 )}
 
+                {/* Équipe - Ingénieur & Ouvriers */}
+                {project.engineer && (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-100">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white">
+                      <span className="text-xs font-black">IN</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black uppercase text-indigo-400 tracking-tight">Ingénieur</p>
+                      <p className="text-xs font-bold text-slate-700 truncate">{project.engineer.name}</p>
+                    </div>
+                    {project.workerCount > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-indigo-200">
+                        <Users className="h-3 w-3 text-indigo-500" />
+                        <span className="text-xs font-black text-indigo-600">{project.workerCount}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 border border-slate-100">
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2 text-slate-400">
@@ -622,9 +641,11 @@ return;
                   <div className="flex flex-col gap-1 items-end">
                     <div className="flex items-center gap-2 text-slate-400">
                         <Users className="h-3.5 w-3.5" />
-                        <span className="text-[10px] font-black uppercase tracking-tight">Staff</span>
+                        <span className="text-[10px] font-black uppercase tracking-tight">Équipe</span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700">{project.workerCount} Ouvriers</span>
+                    <span className="text-[11px] font-bold text-slate-700">
+                      {project.workerCount > 0 ? `${project.workerCount} Ouvriers` : 'Aucun ouvrier'}
+                    </span>
                   </div>
                 </div>
 
