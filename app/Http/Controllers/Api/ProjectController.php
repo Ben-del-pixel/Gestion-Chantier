@@ -19,7 +19,7 @@ class ProjectController extends Controller
         $user = auth()->user();
 
         // Filter projects based on user role
-        if ($user->role === UserRole::ChefChantier->value || $user->role === 'chef_chantier') {
+        if ($user->role === UserRole::ChefChantier) {
             // Chef de Chantier sees only projects assigned to his engineers
             $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
             $projects = Project::with('engineer', 'manager', 'workers', 'steps')
