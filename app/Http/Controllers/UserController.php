@@ -14,8 +14,17 @@ class UserController extends Controller
     public function index(): Response
     {
         $user = auth()->user();
+        
+        // Debug: Log user role info
+        \Log::info('User role debug', [
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'role' => $user->role,
+            'role_value' => $user->role?->value,
+            'is_chef_chantier' => $user->role === UserRole::ChefChantier,
+        ]);
 
-        if ($user->role === UserRole::ChefChantier->value) {
+        if ($user->role === UserRole::ChefChantier) {
             // Chef de Chantier sees only his team
             $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
 
