@@ -1,4 +1,4 @@
-import { usePage, Head } from '@inertiajs/react';
+import { usePage, Head, router } from '@inertiajs/react';
 import React from 'react';
 import { ManagerDashboard, EngineerDashboard, WorkerDashboard } from '@/components/dashboards';
 import { UserRole } from '@/Enums/UserRole';
@@ -7,6 +7,13 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
     const pageProps = usePage().props as any;
     const { auth } = pageProps;
     const roleValue = auth.user?.role;
+
+    // Redirect Magasinier to Materials page
+    React.useEffect(() => {
+        if (roleValue === UserRole.Magasinier.value) {
+            router.visit('/materials');
+        }
+    }, [roleValue]);
 
     return (
         <>
@@ -41,6 +48,8 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         workerIncidents={pageProps.workerIncidents}
                     />
                 )}
+
+                {/* Magasinier is redirected to materials page */}
 
                 {!Object.values(UserRole).some(r => r.value === roleValue) && (
                     <div className="rounded-3xl border border-border/60 bg-background/90 p-12 text-center shadow-[0_24px_80px_-48px_rgba(15,23,42,0.42)] backdrop-blur-xl">
