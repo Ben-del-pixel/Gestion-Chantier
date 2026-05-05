@@ -30,6 +30,14 @@ class ProjectController extends Controller
             $engineers = User::where('role', UserRole::Engineer)
                 ->where('chef_chantier_id', $user->id)
                 ->get();
+        } elseif ($user->role === UserRole::Engineer) {
+            // Engineer sees only his own projects
+            $projects = Project::with('engineer', 'manager', 'workers', 'steps')
+                ->where('engineer_id', $user->id)
+                ->latest()
+                ->get();
+            // Engineers don't see other engineers in filter
+            $engineers = collect();
         } else {
             // Manager sees all projects
             $projects = Project::with('engineer', 'manager', 'workers', 'steps')->latest()->get();

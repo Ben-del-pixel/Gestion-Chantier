@@ -46,6 +46,12 @@ class AttendanceController extends Controller
             $query->where('project_id', $projectId);
         }
 
+        // Filter attendances for Engineer - only see his workers
+        if ($user->role === UserRole::Engineer) {
+            $workerIds = User::where('engineer_id', $user->id)->pluck('id');
+            $query->whereIn('user_id', $workerIds);
+        }
+
         $attendances = $query->orderBy('shift')->orderBy('check_in', 'desc')->get();
 
         // Count statistics

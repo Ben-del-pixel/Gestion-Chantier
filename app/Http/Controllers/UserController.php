@@ -42,6 +42,19 @@ class UserController extends Controller
                 ->where('chef_chantier_id', $user->id)
                 ->get();
             $chefChantiers = collect(); // Empty - he doesn't need to see other chefs
+        } elseif ($user->role === UserRole::Engineer) {
+            // Engineer sees only himself and his workers
+            $users = User::with(['engineer', 'chefChantier'])
+                ->where(function ($query) use ($user) {
+                    $query->where('id', $user->id) // Himself
+                        ->orWhere('engineer_id', $user->id); // His workers
+                })
+                ->get()
+                ->append('status');
+
+            // Engineers don't see other engineers in dropdown
+            $engineers = collect();
+            $chefChantiers = collect();
         } else {
             // Manager sees all users
             $users = User::with(['engineer', 'chefChantier'])->get()->append('status');

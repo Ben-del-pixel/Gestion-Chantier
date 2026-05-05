@@ -20,7 +20,22 @@ class ReportController extends Controller
     {
         $user = request()->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
-        $projects = Project::select('id', 'name')->orderBy('name')->get();
+
+        // Filter projects based on user role
+        if ($user->role === UserRole::ChefChantier) {
+            $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
+            $projects = Project::select('id', 'name')
+                ->whereIn('engineer_id', $engineerIds)
+                ->orderBy('name')
+                ->get();
+        } elseif ($user->role === UserRole::Engineer) {
+            $projects = Project::select('id', 'name')
+                ->where('engineer_id', $user->id)
+                ->orderBy('name')
+                ->get();
+        } else {
+            $projects = Project::select('id', 'name')->orderBy('name')->get();
+        }
 
         $receivedReports = ReportSubmission::with(['sender:id,name,role', 'project:id,name'])
             ->where('recipient_id', $user->id)
@@ -48,6 +63,7 @@ class ReportController extends Controller
                 UserRole::Worker->value,
                 UserRole::Magasinier->value,
                 UserRole::Engineer->value,
+                UserRole::ChefChantier->value,
             ], true),
             'submitTargetLabel' => $this->resolveTargetLabel($userRoleValue),
         ]);
@@ -58,7 +74,7 @@ class ReportController extends Controller
         $user = $request->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
 
-        if (! in_array($userRoleValue, [UserRole::Worker->value, UserRole::Magasinier->value, UserRole::Engineer->value], true)) {
+        if (! in_array($userRoleValue, [UserRole::Worker->value, UserRole::Magasinier->value, UserRole::Engineer->value, UserRole::ChefChantier->value], true)) {
             abort(403, 'Ce role ne peut pas soumettre de rapport.');
         }
 
@@ -99,6 +115,18 @@ class ReportController extends Controller
 
     private function resolveRecipientIdForUser(User $user, string $userRoleValue, ?int $projectId = null): ?int
     {
+        // Chef de Chantier reports go to Manager
+        if ($userRoleValue === UserRole::ChefChantier->value) {
+            if ($projectId) {
+                $projectManagerId = Project::where('id', $projectId)->value('manager_id');
+                if ($projectManagerId) {
+                    return (int) $projectManagerId;
+                }
+            }
+
+            return User::where('role', UserRole::Manager->value)->value('id');
+        }
+
         if ($userRoleValue === UserRole::Engineer->value) {
             if ($projectId) {
                 $projectManagerId = Project::where('id', $projectId)->value('manager_id');
