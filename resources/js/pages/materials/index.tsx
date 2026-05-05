@@ -776,7 +776,7 @@ export default function MaterialsIndex({
                                         )}
                                     </div>
 
-                                    {material.type === 'materiaux' && (
+                                    {material.type === 'materiel' && (
                                         <div className="grid grid-cols-2 gap-3 pt-2">
                                             <Button
                                                 onClick={() => {
