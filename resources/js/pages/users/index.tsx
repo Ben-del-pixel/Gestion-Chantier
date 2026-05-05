@@ -28,6 +28,8 @@ type UserItem = {
   status: 'Actif' | 'Inactif' | 'Congé';
   engineer_id: number | null;
   engineer?: { id: number; name: string } | null;
+  chef_chantier_id: number | null;
+  chefChantier?: { id: number; name: string } | null;
 };
 
 type WorkforceRow = UserItem & {
@@ -80,7 +82,7 @@ function resolveStatus(userId: number): WorkforceRow['status'] {
   return 'Actif';
 }
 
-export default function UsersIndex({ users, engineers }: { users: UserItem[]; engineers: { id: number; name: string }[] }) {
+export default function UsersIndex({ users, engineers, chefChantiers }: { users: UserItem[]; engineers: { id: number; name: string }[]; chefChantiers: { id: number; name: string }[] }) {
   const [open, setOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
@@ -93,6 +95,7 @@ export default function UsersIndex({ users, engineers }: { users: UserItem[]; en
     phone: string;
     skills: string;
     engineer_id: string;
+    chef_chantier_id: string;
   }>({
     name: '',
     email: '',
@@ -101,6 +104,7 @@ export default function UsersIndex({ users, engineers }: { users: UserItem[]; en
     phone: '',
     skills: '',
     engineer_id: '',
+    chef_chantier_id: '',
   });
 
   const workforce = React.useMemo<WorkforceRow[]>(() => {
@@ -164,7 +168,7 @@ export default function UsersIndex({ users, engineers }: { users: UserItem[]; en
       method,
       data: formData,
       onSuccess: () => {
-        setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '', engineer_id: '' });
+        setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '', engineer_id: '', chef_chantier_id: '' });
         setEditingUser(null);
         setOpen(false);
       },
@@ -187,6 +191,7 @@ export default function UsersIndex({ users, engineers }: { users: UserItem[]; en
       phone: user.phone || '',
       skills: user.skills || '',
       engineer_id: user.engineer_id ? user.engineer_id.toString() : '',
+      chef_chantier_id: user.chef_chantier_id ? user.chef_chantier_id.toString() : '',
     });
     setOpen(true);
   };
@@ -329,10 +334,30 @@ export default function UsersIndex({ users, engineers }: { users: UserItem[]; en
                     </div>
                   )}
 
+                  {formData.role === UserRole.Engineer.value && (
+                    <div>
+                      <Label htmlFor="chef_chantier_id">Chef de chantier (Responsable)</Label>
+                      <select
+                        id="chef_chantier_id"
+                        name="chef_chantier_id"
+                        value={formData.chef_chantier_id}
+                        onChange={handleChange}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                      >
+                        <option value="">-- Aucun --</option>
+                        {chefChantiers.map((chef) => (
+                          <option key={chef.id} value={chef.id.toString()}>
+                            {chef.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-2 pt-2">
                     <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => {
- setEditingUser(null); setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '', engineer_id: '' }); 
+ setEditingUser(null); setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '', engineer_id: '', chef_chantier_id: '' }); 
 }}>Annuler</Button>
                     </DialogClose>
                     <Button type="submit" disabled={isLoading}>{isLoading ? 'Enregistrement...' : (editingUser ? 'Modifier' : 'Créer')}</Button>
@@ -428,13 +453,17 @@ export default function UsersIndex({ users, engineers }: { users: UserItem[]; en
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {row.role === UserRole.Engineer.value ? (
-                          <span className="inline-flex items-center rounded-lg bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-600 border border-purple-100">
-                            Chef d'équipe
+                        {row.role === UserRole.ChefChantier.value ? (
+                          <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-600 border border-indigo-100">
+                            Responsable chantier
+                          </span>
+                        ) : row.role === UserRole.Engineer.value ? (
+                          <span className="text-[11px] font-medium text-slate-600">
+                            {row.chefChantier ? `Sous ${row.chefChantier.name}` : 'Indépendant'}
                           </span>
                         ) : row.engineer ? (
                           <span className="text-[11px] font-medium text-slate-600">
-                            Sous {row.engineer.name}
+                            Équipe {row.engineer.name}
                           </span>
                         ) : (
                           <span className="text-[11px] text-slate-400 italic">Non assigné</span>

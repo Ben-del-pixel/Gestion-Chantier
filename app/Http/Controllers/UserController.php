@@ -13,13 +13,15 @@ class UserController extends Controller
 {
     public function index(): Response
     {
-        $users = User::with('engineer')->get()->append('status');
+        $users = User::with(['engineer', 'chefChantier'])->get()->append('status');
         $engineers = User::where('role', UserRole::Engineer->value)->get();
+        $chefChantiers = User::where('role', UserRole::ChefChantier->value)->get();
 
         return Inertia::render('users/index', [
             'users' => $users,
             'roles' => UserRole::cases(),
             'engineers' => $engineers,
+            'chefChantiers' => $chefChantiers,
         ]);
     }
 
@@ -33,6 +35,7 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:255',
             'skills' => 'nullable|string',
             'engineer_id' => 'nullable|exists:users,id',
+            'chef_chantier_id' => 'nullable|exists:users,id',
         ]);
 
         $user = User::create([
@@ -53,6 +56,7 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:255',
             'skills' => 'nullable|string',
             'engineer_id' => 'nullable|exists:users,id',
+            'chef_chantier_id' => 'nullable|exists:users,id',
         ]);
 
         if (! empty($validated['password'])) {
