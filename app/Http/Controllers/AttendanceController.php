@@ -57,10 +57,24 @@ class AttendanceController extends Controller
         // Count statistics
         $present = $attendances->filter(fn ($a) => $a->check_in && ! $a->check_out)->count();
         $checked_out = $attendances->filter(fn ($a) => $a->check_out)->count();
-        $absent = User::where('role', '!=', 'manager')->count() - $attendances->count();
+
+        // Get workers based on user role
+        if ($user->role === UserRole::Engineer) {
+            $workers = User::where('role', UserRole::Worker->value)
+                ->where('engineer_id', $user->id)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+        } else {
+            $workers = User::where('role', UserRole::Worker->value)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+        }
+
+        $absent = $workers->count() - $attendances->count();
 
         $projects = $projectsQuery->get();
-        $workers = User::where('role', 'worker')->select('id', 'name')->orderBy('name')->get();
 
         // Get available statuses
         $statuses = array_map(
@@ -89,7 +103,7 @@ class AttendanceController extends Controller
                 'present' => $present,
                 'checked_out' => $checked_out,
                 'absent' => $absent,
-                'total_workers' => User::where('role', '!=', 'manager')->count(),
+                'total_workers' => $workers->count(),
             ],
             'projects' => $projects,
             'workers' => $workers,
