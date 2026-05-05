@@ -30,6 +30,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
+    Route::post('projects/{project}/steps/{step}/toggle', [ProjectController::class, 'toggleStep'])->name('projects.steps.toggle');
 
     // Material routes
     Route::get('materials', [MaterialController::class, 'index'])->name('materials.index');

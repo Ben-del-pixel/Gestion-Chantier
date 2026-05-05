@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, History as ActivityIcon } from 'lucide-react';
+import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, History as ActivityIcon, UsersRound } from 'lucide-react';
 import React from 'react';
 
 import { destroy, index, store, update } from '@/actions/App/Http/Controllers/UserController';
@@ -88,6 +88,11 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
   const [selectedRole, setSelectedRole] = React.useState<UserRoleValue | 'all'>('all');
   const [isLoading, setIsLoading] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<UserItem | null>(null);
+  
+  // Team management modal state
+  const [teamModalOpen, setTeamModalOpen] = React.useState(false);
+  const [selectedEngineer, setSelectedEngineer] = React.useState<UserItem | null>(null);
+  const [selectedTeamIds, setSelectedTeamIds] = React.useState<number[]>([]);
   const [formData, setFormData] = React.useState<{
     name: string;
     email: string;
@@ -211,6 +216,74 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
       onError: () => {
         alert('Erreur lors de la suppression');
       },
+    });
+  };
+
+  // Open team management modal for an engineer
+  const openTeamModal = (engineer: UserItem) => {
+    setSelectedEngineer(engineer);
+    // Get current team members (workers assigned to this engineer)
+    const currentTeamIds = users
+      .filter(u => u.engineer_id === engineer.id && u.role === UserRole.Worker.value)
+      .map(u => u.id);
+    setSelectedTeamIds(currentTeamIds);
+    setTeamModalOpen(true);
+  };
+
+  // Toggle worker selection in team
+  const toggleWorkerSelection = (workerId: number) => {
+    setSelectedTeamIds(prev => 
+      prev.includes(workerId) 
+        ? prev.filter(id => id !== workerId)
+        : [...prev, workerId]
+    );
+  };
+
+  // Save team assignments
+  const saveTeamAssignments = () => {
+    if (!selectedEngineer) return;
+    
+    setIsLoading(true);
+    
+    // Update all selected workers to have this engineer_id
+    const promises = selectedTeamIds.map(workerId => {
+      const worker = users.find(u => u.id === workerId);
+      if (worker) {
+        return router.put(update.url({ user: workerId }), {
+          ...worker,
+          engineer_id: selectedEngineer.id.toString()
+        }, { preserveScroll: true });
+      }
+      return Promise.resolve();
+    });
+
+    // Remove engineer_id from workers that were deselected
+    const currentTeamIds = users
+      .filter(u => u.engineer_id === selectedEngineer.id && u.role === UserRole.Worker.value)
+      .map(u => u.id);
+    
+    const removedIds = currentTeamIds.filter(id => !selectedTeamIds.includes(id));
+    
+    const removePromises = removedIds.map(workerId => {
+      const worker = users.find(u => u.id === workerId);
+      if (worker) {
+        return router.put(update.url({ user: workerId }), {
+          ...worker,
+          engineer_id: ''
+        }, { preserveScroll: true });
+      }
+      return Promise.resolve();
+    });
+
+    Promise.all([...promises, ...removePromises]).then(() => {
+      setTeamModalOpen(false);
+      setSelectedEngineer(null);
+      setSelectedTeamIds([]);
+      setIsLoading(false);
+      router.reload();
+    }).catch(() => {
+      setIsLoading(false);
+      alert('Erreur lors de la mise à jour de l\'équipe');
     });
   };
 
@@ -550,6 +623,17 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {row.role === UserRole.Engineer.value && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openTeamModal(row)}
+                              className="h-9 rounded-xl text-purple-600 hover:text-purple-700 hover:bg-purple-50 font-bold text-xs"
+                            >
+                              <UsersRound className="h-4 w-4 mr-1" />
+                              Équipe
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -581,6 +665,85 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
             </table>
           </CardContent>
         </Card>
+
+        {/* Team Management Modal */}
+        <Dialog open={teamModalOpen} onOpenChange={setTeamModalOpen}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogTitle className="text-xl font-black">
+              Gérer l'équipe de {selectedEngineer?.name}
+            </DialogTitle>
+            <p className="text-sm text-slate-500 mt-1">
+              Sélectionnez les ouvriers à assigner à cet ingénieur
+            </p>
+
+            <div className="mt-4 space-y-2 max-h-96 overflow-y-auto pr-2">
+              {users.filter(u => u.role === UserRole.Worker.value).length === 0 ? (
+                <p className="text-center text-slate-400 py-4">Aucun ouvrier disponible</p>
+              ) : (
+                users
+                  .filter(u => u.role === UserRole.Worker.value)
+                  .map(worker => {
+                    const isSelected = selectedTeamIds.includes(worker.id);
+                    const isAssignedToOther = worker.engineer_id && worker.engineer_id !== selectedEngineer?.id;
+
+                    return (
+                      <label
+                        key={worker.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-purple-500 bg-purple-50'
+                            : isAssignedToOther
+                            ? 'border-slate-200 bg-slate-100 opacity-60'
+                            : 'border-slate-200 bg-white hover:border-purple-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={isSelected}
+                          onChange={() => toggleWorkerSelection(worker.id)}
+                          disabled={isAssignedToOther}
+                        />
+                        <div className={`h-5 w-5 rounded border-2 flex items-center justify-center ${
+                          isSelected ? 'bg-purple-600 border-purple-600' : 'border-slate-300'
+                        }`}>
+                          {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-800">{worker.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {isAssignedToOther
+                              ? `Assigné à ${users.find(u => u.id === worker.engineer_id)?.name || 'un autre ingénieur'}`
+                              : worker.skills || 'Polyvalent'}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTeamModalOpen(false);
+                  setSelectedEngineer(null);
+                  setSelectedTeamIds([]);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={saveTeamAssignments}
+                disabled={isLoading}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {isLoading ? 'Sauvegarde...' : `Sauvegarder (${selectedTeamIds.length})`}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );

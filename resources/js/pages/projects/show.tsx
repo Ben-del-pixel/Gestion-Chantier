@@ -6,7 +6,7 @@ import {
   LayoutGrid, ListChecks, Settings2, Info, AlertCircle
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
-import { update, destroy } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import { update, destroy, toggleStep } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,6 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, s
     const { currency, setCurrency, formatCurrency } = useCurrency();
     const { errors }: any = usePage().props;
   const [isEditing, setIsEditing] = useState(false);
-  const [isAssigning, setIsAssigning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -45,9 +44,6 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, s
     })) || []
   });
 
-  const [selectedWorkerIds, setSelectedWorkerIds] = useState<number[]>(
-    project.workers?.map((w: any) => w.id) || []
-  );
 
   const statusOptions = [
     { value: 'initialisation', label: 'Initialisation', color: 'slate' },
@@ -92,22 +88,6 @@ return 'Non défini';
     });
   };
 
-  const handleAssignWorkers = () => {
-    setIsLoading(true);
-
-    router.post(`/api/projects/${project.id}/workers`, { worker_ids: selectedWorkerIds }, {
-      onSuccess: () => {
-        setIsAssigning(false);
-        setIsLoading(false);
-      },
-      onError: (err) => {
-        console.error(err);
-        setIsLoading(false);
-      },
-      onFinish: () => setIsLoading(false)
-    });
-  };
-
   const handleDelete = () => {
     if (!confirm('Toutes les données associées seront perdues. Confirmer?')) {
       return;
@@ -124,6 +104,12 @@ return 'Non défini';
     setFormData({
       ...formData,
       steps: [...formData.steps, { name: '', budget: 0 }]
+    });
+  };
+
+  const handleToggleStep = (stepId: number) => {
+    router.post(`/projects/${project.id}/steps/${stepId}/toggle`, {}, {
+      preserveScroll: true,
     });
   };
 
@@ -235,9 +221,6 @@ return 'Non défini';
                 <Card className="border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="text-sm font-black uppercase tracking-widest">Équipe Terrain</CardTitle>
-                        <Button variant="ghost" size="sm" onClick={() => setIsAssigning(true)} className="h-8 text-[11px] font-black text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg">
-                            GÉRER L'ÉQUIPE
-                        </Button>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {project.workers?.length > 0 ? (
@@ -290,21 +273,34 @@ return 'Non défini';
                         {project.steps?.length > 0 ? (
                             <div className="divide-y divide-slate-50">
                                 {project.steps.map((step: any, idx: number) => (
-                                    <div key={step.id} className="flex items-center justify-between px-8 py-6 transition-all hover:bg-slate-50/50 group">
+                                    <div key={step.id} className={`flex items-center justify-between px-8 py-6 transition-all hover:bg-slate-50/50 group ${step.is_completed ? 'bg-emerald-50/50' : ''}`}>
                                         <div className="flex items-center gap-6">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-400 font-black text-sm shadow-sm group-hover:border-emerald-200 group-hover:text-emerald-500 transition-all">
-                                                {idx + 1}
-                                            </div>
+                                            <button
+                                                onClick={() => handleToggleStep(step.id)}
+                                                className={`flex h-10 w-10 items-center justify-center rounded-2xl border-2 font-black text-sm shadow-sm transition-all ${
+                                                    step.is_completed
+                                                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                                                        : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-500'
+                                                }`}
+                                            >
+                                                {step.is_completed ? <CheckCircle className="h-5 w-5" /> : idx + 1}
+                                            </button>
                                             <div>
-                                                <h4 className="font-bold text-slate-900">{step.name}</h4>
-                                                <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter">Budget Phase {idx + 1}</p>
+                                                <h4 className={`font-bold ${step.is_completed ? 'text-emerald-700 line-through' : 'text-slate-900'}`}>{step.name}</h4>
+                                                <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
+                                                    {step.is_completed ? 'Étape terminée' : `Budget Phase ${idx + 1}`}
+                                                </p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-lg font-black text-emerald-600">{formatCurrency(Number(step.budget || 0))}</div>
-                                            <div className="flex items-center justify-end gap-1 text-[10px] font-black text-slate-300 uppercase italic">
+                                            <div className={`text-lg font-black ${step.is_completed ? 'text-emerald-500' : 'text-emerald-600'}`}>
+                                                {formatCurrency(Number(step.budget || 0))}
+                                            </div>
+                                            <div className={`flex items-center justify-end gap-1 text-[10px] font-black uppercase italic ${
+                                                step.is_completed ? 'text-emerald-600' : 'text-slate-300'
+                                            }`}>
                                                 <CheckCircle className="h-2.5 w-2.5" />
-                                                Planifié
+                                                {step.is_completed ? 'Consommé' : 'Planifié'}
                                             </div>
                                         </div>
                                     </div>
@@ -498,70 +494,6 @@ return 'Non défini';
                         {isLoading ? 'Enregistrement...' : 'Sauvegarder les modifications'}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="h-12 px-8 rounded-xl font-bold">Annuler</Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-
-        {/* ASSIGN WORKERS MODAL */}
-        <Dialog open={isAssigning} onOpenChange={setIsAssigning}>
-            <DialogContent className="max-w-md p-0 border-0 rounded-3xl overflow-hidden bg-white">
-                <div className="bg-blue-600 p-8 text-white">
-                    <DialogTitle className="text-2xl font-black tracking-tight">Affectation Main d'Œuvre</DialogTitle>
-                    <DialogDescription className="text-blue-100 opacity-80">Sélectionnez les ouvriers affectés à ce chantier</DialogDescription>
-                </div>
-                <div className="p-8 space-y-6">
-                    {Object.keys(errors).length > 0 && (
-                        <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-900 rounded-2xl">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription className="text-xs font-bold">
-                                {Object.values(errors).map((err: any, i) => (
-                                    <div key={i}>{Array.isArray(err) ? err[0] : err}</div>
-                                ))}
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                    <div className="max-h-60 overflow-y-auto space-y-2 pr-2 scrollbar-thin">
-                        {allWorkers.map((worker: any) => (
-                            <label key={worker.id} className={cn(
-                                "flex items-center gap-4 p-3 rounded-2xl border transition-all cursor-pointer group",
-                                selectedWorkerIds.includes(worker.id) ? "border-blue-500 bg-blue-50" : "border-slate-100 bg-slate-50 hover:bg-white hover:border-blue-200"
-                            )}>
-                                <div className={cn(
-                                    "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
-                                    selectedWorkerIds.includes(worker.id) ? "bg-blue-600 border-blue-600" : "bg-white border-slate-200"
-                                )}>
-                                    {selectedWorkerIds.includes(worker.id) && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
-                                </div>
-                                <input 
-                                    type="checkbox" 
-                                    className="hidden" 
-                                    checked={selectedWorkerIds.includes(worker.id)}
-                                    onChange={(e) => {
-                                        if (e.target.checked) {
-setSelectedWorkerIds([...selectedWorkerIds, worker.id]);
-} else {
-setSelectedWorkerIds(selectedWorkerIds.filter(id => id !== worker.id));
-}
-                                    }}
-                                />
-                                <div className="flex-1">
-                                    <div className="text-sm font-bold text-slate-800">{worker.name}</div>
-                                    <div className={cn(
-                                        "text-[10px] font-bold uppercase tracking-widest",
-                                        worker.role === 'magasinier' ? "text-purple-500" : "text-slate-400"
-                                    )}>
-                                        {worker.role === 'magasinier' ? 'Magasinier' : (worker.skills || 'Ouvrier Polyvalent')}
-                                    </div>
-                                </div>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-                <div className="p-8 pt-0 flex gap-3">
-                    <Button onClick={handleAssignWorkers} disabled={isLoading} className="flex-1 h-12 rounded-xl bg-blue-600 font-bold shadow-lg shadow-blue-500/30">
-                        {isLoading ? 'Mise à jour...' : `Assigner ${selectedWorkerIds.length} ouvriers`}
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsAssigning(false)} className="h-12 rounded-xl px-6">Annuler</Button>
                 </div>
             </DialogContent>
         </Dialog>

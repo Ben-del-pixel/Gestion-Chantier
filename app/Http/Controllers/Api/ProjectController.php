@@ -228,20 +228,25 @@ class ProjectController extends Controller
 
         $project->workers()->sync($validated['worker_ids']);
 
-        ActivityLog::create([
-            'user_id' => auth()->id(),
-            'action' => 'assign_workers',
-            'description' => 'Assignation de '.count($validated['worker_ids'])." ouvriers au projet : {$project->name}",
-            'properties' => [
-                'project_id' => $project->id,
-                'worker_count' => count($validated['worker_ids']),
-            ],
-        ]);
+        return back()->with('success', 'Équipe mise à jour avec succès');
+    }
 
-        return response()->json([
-            'message' => 'Ouvriers assignés avec succès',
-            'workers' => $project->workers,
-        ]);
+    public function toggleStep(Project $project, ProjectStep $step)
+    {
+        // Ensure the step belongs to the project
+        if ($step->project_id !== $project->id) {
+            abort(404);
+        }
+
+        if ($step->is_completed) {
+            $step->uncomplete();
+            $message = 'Étape marquée comme non terminée';
+        } else {
+            $step->complete();
+            $message = 'Étape validée et budget consommé';
+        }
+
+        return back()->with('success', $message);
     }
 
     public function destroy(Project $project)
