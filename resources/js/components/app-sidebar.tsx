@@ -4,13 +4,13 @@ import {
     CalendarDays,
     Users,
     Package,
-    TrendingUp,
     History,
     Settings,
     HelpCircle,
     BarChart3,
     Clock,
-    LogOut
+    LogOut,
+    ListChecks
 } from 'lucide-react';
 import { index as activityLogsIndex } from '@/actions/App/Http/Controllers/ActivityLogController';
 import { index as materialsIndex } from '@/actions/App/Http/Controllers/Api/MaterialController';
@@ -39,7 +39,7 @@ import type { NavItem } from '@/types';
 const roleNavItems: Record<string, NavItem[]> = {
     [UserRole.Manager.value]: [
         { title: "Vue d'ensemble", href: dashboard(), icon: LayoutGrid },
-        { title: 'Chantiers', href: projectsIndex(), icon: TrendingUp },
+        { title: 'Chantiers & Tâches', href: projectsIndex(), icon: ListChecks },
         { title: 'Matériaux', href: materialsIndex(), icon: Package },
         { title: "Main-d'oeuvre", href: usersIndex(), icon: Users },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
@@ -48,14 +48,14 @@ const roleNavItems: Record<string, NavItem[]> = {
     ],
     [UserRole.ChefChantier.value]: [
         { title: 'Mes Chantiers', href: dashboard(), icon: LayoutGrid },
-        { title: 'Gestion Chantiers', href: projectsIndex(), icon: TrendingUp },
+        { title: 'Gestion & Tâches', href: projectsIndex(), icon: ListChecks },
         { title: "Main-d'oeuvre", href: usersIndex(), icon: Users },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
     ],
     [UserRole.Engineer.value]: [
         { title: 'Mes Projets', href: dashboard(), icon: LayoutGrid },
-        { title: 'Affectation Chantier', href: projectsIndex(), icon: TrendingUp },
+        { title: 'Gestion Chantiers & Tâches', href: projectsIndex(), icon: ListChecks },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
     ],
@@ -104,8 +104,8 @@ export function AppSidebar({ className, ...props }: React.ComponentProps<typeof 
                 <NavUser />
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton 
-                            asChild 
+                        <SidebarMenuButton
+                            asChild
                             className="h-11 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-colors"
                         >
                             <Link href="/logout" method="post" as="button" className="flex items-center gap-3 w-full">

@@ -34,6 +34,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     Route::post('projects/{project}/steps/{step}/toggle', [ProjectController::class, 'toggleStep'])->name('projects.steps.toggle');
 
+    // Task routes
+    Route::post('tasks', [\App\Http\Controllers\Api\TaskController::class, 'store'])->name('tasks.store');
+    Route::put('tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'update'])->name('tasks.update');
+    Route::delete('tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'destroy'])->name('tasks.destroy');
+
     // Engineer Project Management routes
     Route::get('engineer/projects', [EngineerProjectController::class, 'index'])->name('engineer.projects.index');
     Route::post('projects/{project}/assign-storekeeper', [EngineerProjectController::class, 'assignStorekeeper'])->name('projects.assign-storekeeper');

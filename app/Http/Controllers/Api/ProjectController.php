@@ -284,6 +284,15 @@ class ProjectController extends Controller
 
     public function toggleStep(Project $project, ProjectStep $step)
     {
+        // Permission check
+        $user = auth()->user();
+        if ($user->role !== UserRole::Manager &&
+            !($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
+            !($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
+        ) {
+            abort(403, "Vous n'avez pas la permission de modifier les étapes de ce projet.");
+        }
+
         // Ensure the step belongs to the project
         if ($step->project_id !== $project->id) {
             abort(404);

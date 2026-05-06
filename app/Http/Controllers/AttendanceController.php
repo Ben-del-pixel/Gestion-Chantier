@@ -46,11 +46,16 @@ class AttendanceController extends Controller
             $query->where('project_id', $projectId);
         }
 
-        // Filter attendances for Engineer - only see his workers
+        // Filter attendances for roles
         if ($user->role === UserRole::Engineer) {
             $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
             $workerIds = User::where('role', UserRole::Worker->value)
                 ->whereIn('chef_chantier_id', $chefChantierIds)
+                ->pluck('id');
+            $query->whereIn('user_id', $workerIds);
+        } elseif ($user->role === UserRole::ChefChantier) {
+            $workerIds = User::where('role', UserRole::Worker->value)
+                ->where('chef_chantier_id', $user->id)
                 ->pluck('id');
             $query->whereIn('user_id', $workerIds);
         }

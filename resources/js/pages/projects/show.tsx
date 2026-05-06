@@ -3,7 +3,7 @@ import {
   Calendar, DollarSign, MapPin, User, Users,
   Trash2, Edit, Activity, Clock,
   HardHat, Wallet, FileText, CheckCircle,
-  LayoutGrid, ListChecks, Settings2, AlertCircle
+  LayoutGrid, ListChecks, Settings2, AlertCircle, Plus
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -19,9 +19,14 @@ import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
-export default function ProjectDetail({ project, totalWorkersCount, engineers, chefsChantier, storekeepers }: any) {
+export default function ProjectDetail({ project, totalWorkersCount, engineers, chefsChantier, storekeepers, auth }: any) {
     const { currency, setCurrency, formatCurrency } = useCurrency();
     const { errors }: any = usePage().props;
+    const user = auth.user;
+
+    const canManageProject = user.role === 'manager' || (user.role === 'engineer' && project.engineer_id === user.id);
+    const canManageTasks = canManageProject || (user.role === 'chef_chantier' && project.chef_chantier_id === user.id);
+    const canToggleSteps = canManageTasks;
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -42,6 +47,17 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, c
         name: s.name,
         budget: s.budget
     })) || []
+  });
+
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [taskData, setTaskData] = useState({
+    name: '',
+    description: '',
+    start_date: '',
+    end_date: '',
+    status: 'planifie',
+    worker_ids: [] as number[],
   });
 
 
@@ -120,6 +136,68 @@ return 'Non défini';
     setFormData({ ...formData, steps: newSteps });
   };
 
+  const handleCreateTask = () => {
+    setEditingTask(null);
+    setTaskData({
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        status: 'planifie',
+        worker_ids: [],
+    });
+    setShowTaskDialog(true);
+  };
+
+  const handleEditTask = (task: any) => {
+    setEditingTask(task);
+    setTaskData({
+        name: task.name,
+        description: task.description || '',
+        start_date: task.start_date ? task.start_date.split('T')[0] : '',
+        end_date: task.end_date ? task.end_date.split('T')[0] : '',
+        status: task.status,
+        worker_ids: task.workers?.map((w: any) => w.id) || [],
+    });
+    setShowTaskDialog(true);
+  };
+
+  const handleTaskSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    if (editingTask) {
+        router.put(`/tasks/${editingTask.id}`, taskData, {
+            onSuccess: () => setShowTaskDialog(false),
+            onFinish: () => setIsLoading(false),
+        });
+    } else {
+        router.post('/tasks', { ...taskData, project_id: project.id }, {
+            onSuccess: () => setShowTaskDialog(false),
+            onFinish: () => setIsLoading(false),
+        });
+    }
+  };
+
+  const handleTaskDelete = (taskId: number) => {
+    if (confirm('Supprimer cette tâche ?')) {
+        router.delete(`/tasks/${taskId}`);
+    }
+  };
+
+  const toggleWorkerSelection = (workerId: number) => {
+    const current = [...taskData.worker_ids];
+    const idx = current.indexOf(workerId);
+
+    if (idx > -1) {
+        current.splice(idx, 1);
+    } else {
+        current.push(workerId);
+    }
+
+    setTaskData({ ...taskData, worker_ids: current });
+  };
+
   return (
     <>
       <Head title={`Chantier : ${project.name}`} />
@@ -154,14 +232,18 @@ return 'Non défini';
                             <option value="USD">USD ($)</option>
                             <option value="CDF">FC (CDF)</option>
                         </select>
-            <Button variant="outline" onClick={() => setIsEditing(true)} className="h-11 rounded-xl border-slate-200 bg-white px-6 font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50">
-              <Edit className="mr-2 h-4 w-4 text-blue-500" />
-              Modifier Projet
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} className="h-11 rounded-xl px-6 font-bold shadow-lg shadow-red-500/20">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Supprimer
-            </Button>
+            {canManageProject && (
+                <>
+                    <Button variant="outline" onClick={() => setIsEditing(true)} className="h-11 rounded-xl border-slate-200 bg-white px-6 font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50">
+                    <Edit className="mr-2 h-4 w-4 text-blue-500" />
+                    Modifier Projet
+                    </Button>
+                    <Button variant="destructive" onClick={handleDelete} className="h-11 rounded-xl px-6 font-bold shadow-lg shadow-red-500/20">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Supprimer
+                    </Button>
+                </>
+            )}
           </div>
         </div>
 
@@ -278,12 +360,13 @@ return 'Non défini';
                                     <div key={step.id} className={`flex items-center justify-between px-8 py-6 transition-all hover:bg-slate-50/50 group ${step.is_completed ? 'bg-emerald-50/50' : ''}`}>
                                         <div className="flex items-center gap-6">
                                             <button
-                                                onClick={() => handleToggleStep(step.id)}
+                                                onClick={() => canToggleSteps && handleToggleStep(step.id)}
+                                                disabled={!canToggleSteps}
                                                 className={`flex h-10 w-10 items-center justify-center rounded-2xl border-2 font-black text-sm shadow-sm transition-all ${
                                                     step.is_completed
                                                         ? 'bg-emerald-500 border-emerald-500 text-white'
                                                         : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-500'
-                                                }`}
+                                                } ${!canToggleSteps ? 'cursor-not-allowed opacity-50' : ''}`}
                                             >
                                                 {step.is_completed ? <CheckCircle className="h-5 w-5" /> : idx + 1}
                                             </button>
@@ -328,6 +411,12 @@ return 'Non défini';
                                 <Activity className="h-5 w-5 text-blue-500" />
                                 Tâches Planifiées
                             </CardTitle>
+                            {canManageTasks && (
+                                <Button onClick={handleCreateTask} size="sm" className="h-9 rounded-xl bg-blue-600 font-bold shadow-lg shadow-blue-600/20">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Nouvelle Tâche
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent className="p-8">
@@ -335,10 +424,20 @@ return 'Non défini';
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {project.tasks.map((task: any) => (
                                     <div key={task.id} className="relative rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:border-blue-100 group overflow-hidden">
-                                        <div className="absolute top-0 right-0 p-3">
+                                        <div className="absolute top-0 right-0 p-3 flex gap-2">
                                             <Badge variant="outline" className="rounded-full bg-slate-50 text-[10px] font-black uppercase text-slate-400">
                                                 {task.status}
                                             </Badge>
+                                            {canManageTasks && (
+                                                <>
+                                                    <button onClick={() => handleEditTask(task)} className="p-1 text-slate-400 hover:text-blue-500">
+                                                        <Edit className="h-3 w-3" />
+                                                    </button>
+                                                    <button onClick={() => handleTaskDelete(task.id)} className="p-1 text-slate-400 hover:text-red-500">
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                         <div className="space-y-3">
                                             <h5 className="font-bold text-slate-900 pr-16">{task.name}</h5>
@@ -503,6 +602,87 @@ return 'Non défini';
                         {isLoading ? 'Enregistrement...' : 'Sauvegarder les modifications'}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="h-12 px-8 rounded-xl font-bold">Annuler</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        {/* TASK MODAL */}
+        <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
+            <DialogContent className="max-w-2xl p-0 border-0 rounded-3xl overflow-hidden bg-white max-h-[90vh] flex flex-col">
+                <div className="bg-blue-600 p-8 text-white">
+                    <DialogTitle className="text-2xl font-black italic tracking-tight">
+                        {editingTask ? 'Modifier la Tâche' : 'Nouvelle Tâche'}
+                    </DialogTitle>
+                    <DialogDescription className="text-blue-100 mt-1">Affectation et planification du travail</DialogDescription>
+                </div>
+
+                <form onSubmit={handleTaskSubmit} className="flex-1 overflow-y-auto px-8 py-6 space-y-6 scrollbar-hide">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-black uppercase text-slate-400">Nom de la tâche</Label>
+                            <Input value={taskData.name} onChange={e => setTaskData({...taskData, name: e.target.value})} className="h-12 rounded-xl" placeholder="Ex: Coffrage dalle R+1" required />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-black uppercase text-slate-400">Description</Label>
+                            <textarea
+                                value={taskData.description}
+                                onChange={(e: any) => setTaskData({...taskData, description: e.target.value})}
+                                className="flex min-h-[80px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-black uppercase text-slate-400">Début</Label>
+                                <Input type="date" value={taskData.start_date} onChange={e => setTaskData({...taskData, start_date: e.target.value})} className="h-12 rounded-xl" required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-black uppercase text-slate-400">Fin prévue</Label>
+                                <Input type="date" value={taskData.end_date} onChange={e => setTaskData({...taskData, end_date: e.target.value})} className="h-12 rounded-xl" required />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-black uppercase text-slate-400">Statut</Label>
+                            <select value={taskData.status} onChange={e => setTaskData({...taskData, status: e.target.value})} className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 appearance-none">
+                                <option value="planifie">Planifiée</option>
+                                <option value="en_cours">En cours</option>
+                                <option value="termine">Terminée</option>
+                                <option value="retard">En retard</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label className="text-xs font-black uppercase text-slate-400">Ouvriers assignés</Label>
+                            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                                {project.workers?.map((worker: any) => (
+                                    <div
+                                        key={worker.id}
+                                        onClick={() => toggleWorkerSelection(worker.id)}
+                                        className={cn(
+                                            "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                                            taskData.worker_ids.includes(worker.id)
+                                                ? "bg-blue-50 border-blue-200"
+                                                : "bg-white border-slate-100 hover:border-slate-200"
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                                            taskData.worker_ids.includes(worker.id) ? "bg-blue-500 border-blue-500" : "border-slate-300"
+                                        )}>
+                                            {taskData.worker_ids.includes(worker.id) && <CheckCircle className="h-3 w-3 text-white" />}
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-700">{worker.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-3">
+                    <Button type="submit" disabled={isLoading} onClick={handleTaskSubmit} className="flex-1 h-12 rounded-xl bg-blue-600 font-bold text-white shadow-lg shadow-blue-600/20">
+                        {isLoading ? 'Enregistrement...' : editingTask ? 'Mettre à jour' : 'Créer la Tâche'}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setShowTaskDialog(false)} className="h-12 px-8 rounded-xl font-bold">Annuler</Button>
                 </div>
             </DialogContent>
         </Dialog>
