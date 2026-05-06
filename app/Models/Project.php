@@ -21,6 +21,7 @@ class Project extends Model
         'budget_consumed',
         'manager_id',
         'engineer_id',
+        'chef_chantier_id',
         'storekeeper_id',
     ];
 
@@ -40,6 +41,11 @@ class Project extends Model
     public function engineer()
     {
         return $this->belongsTo(User::class, 'engineer_id');
+    }
+
+    public function chefChantier()
+    {
+        return $this->belongsTo(User::class, 'chef_chantier_id');
     }
 
     public function storekeeper()
@@ -65,6 +71,11 @@ class Project extends Model
     public function steps()
     {
         return $this->hasMany(ProjectStep::class)->orderBy('order');
+    }
+
+    public function projectWorkers()
+    {
+        return $this->hasMany(ProjectWorker::class);
     }
 
     public function getTotalBudgetFromSteps(): float|int

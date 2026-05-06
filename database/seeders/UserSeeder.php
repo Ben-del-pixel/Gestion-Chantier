@@ -15,22 +15,36 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Create Managers (top level)
+        // 1. Create Managers
         $managers = [];
-        for ($i = 1; $i <= 3; $i++) {
+        for ($i = 1; $i <= 2; $i++) {
             $managers[] = User::updateOrCreate(
                 ['email' => "manager{$i}@example.com"],
                 [
-                    'name' => "Directeur {$i}",
+                    'name' => "Manager {$i}",
                     'password' => Hash::make('password'),
                     'role' => UserRole::Manager,
                 ]
             );
         }
 
-        // 2. Create Chef de Chantier (under Managers)
+        // 2. Create Engineers
+        $engineers = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $engineers[] = User::updateOrCreate(
+                ['email' => "engineer{$i}@example.com"],
+                [
+                    'name' => "Ingénieur {$i}",
+                    'password' => Hash::make('password'),
+                    'role' => UserRole::Engineer,
+                ]
+            );
+        }
+
+        // 3. Create Chef de Chantier
+        // Note: Relationally, ChefChantier will be assigned to a project and an engineer
         $chefChantiers = [];
-        for ($i = 1; $i <= 5; $i++) {
+        for ($i = 1; $i <= 4; $i++) {
             $chefChantiers[] = User::updateOrCreate(
                 ['email' => "chef_chantier{$i}@example.com"],
                 [
@@ -41,47 +55,34 @@ class UserSeeder extends Seeder
             );
         }
 
-        // 3. Create Engineers (under Chef de Chantier)
-        $engineers = [];
-        for ($i = 1; $i <= 10; $i++) {
-            $chefChantier = $chefChantiers[($i - 1) % count($chefChantiers)];
-            $engineers[] = User::updateOrCreate(
-                ['email' => "engineer{$i}@example.com"],
-                [
-                    'name' => "Ingénieur {$i}",
-                    'password' => Hash::make('password'),
-                    'role' => UserRole::Engineer,
-                    'chef_chantier_id' => $chefChantier->id,
-                ]
-            );
-        }
-
-        // 4. Create Workers (under Engineers)
-        for ($i = 1; $i <= 20; $i++) {
-            $engineer = $engineers[($i - 1) % count($engineers)];
-            User::updateOrCreate(
-                ['email' => "worker{$i}@example.com"],
-                [
-                    'name' => "Ouvrier {$i}",
-                    'password' => Hash::make('password'),
-                    'role' => UserRole::Worker,
-                    'engineer_id' => $engineer->id,
-                ]
-            );
-        }
-
-        // 5. Create Magasiniers (under Engineers)
-        for ($i = 1; $i <= 5; $i++) {
-            $engineer = $engineers[($i - 1) % count($engineers)];
-            User::updateOrCreate(
+        // 4. Create Magasiniers
+        $magasiniers = [];
+        for ($i = 1; $i <= 4; $i++) {
+            $magasiniers[] = User::updateOrCreate(
                 ['email' => "magasinier{$i}@example.com"],
                 [
                     'name' => "Magasinier {$i}",
                     'password' => Hash::make('password'),
                     'role' => UserRole::Magasinier,
-                    'engineer_id' => $engineer->id,
                 ]
             );
+        }
+
+        // 5. Create Workers and assign to Chef de Chantier
+        // Each Chef de Chantier gets 5 workers
+        foreach ($chefChantiers as $index => $chef) {
+            for ($j = 1; $j <= 5; $j++) {
+                $workerIndex = ($index * 5) + $j;
+                User::updateOrCreate(
+                    ['email' => "worker{$workerIndex}@example.com"],
+                    [
+                        'name' => "Ouvrier {$workerIndex}",
+                        'password' => Hash::make('password'),
+                        'role' => UserRole::Worker,
+                        'chef_chantier_id' => $chef->id,
+                    ]
+                );
+            }
         }
     }
 }

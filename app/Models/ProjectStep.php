@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectStep extends Model
 {
@@ -18,6 +19,32 @@ class ProjectStep extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function subSteps(): HasMany
+    {
+        return $this->hasMany(ProjectSubStep::class, 'project_step_id');
+    }
+
+    /**
+     * Check if all sub-steps assigned to workers are completed
+     */
+    public function areAllSubStepsCompleted(): bool
+    {
+        $totalSubSteps = $this->subSteps()->count();
+        
+        if ($totalSubSteps === 0) {
+            return true; // No sub-steps means step can be completed
+        }
+
+        $completedSubSteps = $this->subSteps()
+            ->whereHas('workers', function ($q) {
+                $q->where('project_sub_step_worker.is_completed', true);
+            })
+            ->count();
+
+        // All sub-steps must have at least one worker who completed them
+        return $completedSubSteps === $totalSubSteps;
     }
 
     /**

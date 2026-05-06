@@ -25,29 +25,28 @@ class UserController extends Controller
         ]);
 
         if ($user->role === UserRole::ChefChantier) {
-            // Chef de Chantier sees only his team
-            $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
-
+            // Chef de Chantier sees only himself, his engineer, and his workers
             $users = User::with(['engineer', 'chefChantier'])
-                ->where(function ($query) use ($user, $engineerIds) {
+                ->where(function ($query) use ($user) {
                     $query->where('id', $user->id) // Himself
-                        ->orWhere('chef_chantier_id', $user->id) // His engineers
-                        ->orWhereIn('engineer_id', $engineerIds); // Workers under his engineers
+                        ->orWhere('id', $user->engineer_id) // His engineer
+                        ->orWhere('chef_chantier_id', $user->id); // His workers
                 })
                 ->get()
                 ->append('status');
 
-            // Only his engineers for the dropdown
-            $engineers = User::where('role', UserRole::Engineer->value)
-                ->where('chef_chantier_id', $user->id)
-                ->get();
-            $chefChantiers = collect(); // Empty - he doesn't need to see other chefs
+            // Empty - he doesn't need to see other engineers
+            $engineers = collect();
+            $chefChantiers = collect();
         } elseif ($user->role === UserRole::Engineer) {
-            // Engineer sees only himself and his workers
+            // Engineer sees himself, his chefs de chantier, and their workers
+            $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
+
             $users = User::with(['engineer', 'chefChantier'])
-                ->where(function ($query) use ($user) {
+                ->where(function ($query) use ($user, $chefChantierIds) {
                     $query->where('id', $user->id) // Himself
-                        ->orWhere('engineer_id', $user->id); // His workers
+                        ->orWhere('engineer_id', $user->id) // His chefs de chantier
+                        ->orWhereIn('chef_chantier_id', $chefChantierIds); // Workers under his chefs
                 })
                 ->get()
                 ->append('status');
@@ -83,10 +82,41 @@ class UserController extends Controller
             'chef_chantier_id' => 'nullable|exists:users,id',
         ]);
 
-        $user = User::create([
-            ...$validated,
+        // Validate hierarchy based on role
+        $role = UserRole::from($validated['role']);
+        
+        if ($role === UserRole::ChefChantier && empty($validated['engineer_id'])) {
+            return back()->with('error', 'Un chef de chantier doit être assigné à un ingénieur.');
+        }
+        
+        if ($role === UserRole::Worker && empty($validated['chef_chantier_id'])) {
+            return back()->with('error', 'Un ouvrier doit être assigné à un chef de chantier.');
+        }
+
+        // Create user with appropriate parent
+        $userData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-        ]);
+            'role' => $validated['role'],
+            'phone' => $validated['phone'] ?? null,
+            'skills' => $validated['skills'] ?? null,
+        ];
+
+        // Set the appropriate parent based on role
+        if ($role === UserRole::ChefChantier) {
+            $userData['engineer_id'] = $validated['engineer_id'];
+            $userData['chef_chantier_id'] = null; // Chef de Chantier doesn't have a chef_chantier
+        } elseif ($role === UserRole::Worker) {
+            $userData['chef_chantier_id'] = $validated['chef_chantier_id'];
+            $userData['engineer_id'] = null; // Worker gets engineer from chef_chantier
+        } else {
+            // Manager, Engineer, Magasinier don't have parents
+            $userData['engineer_id'] = null;
+            $userData['chef_chantier_id'] = null;
+        }
+
+        $user = User::create($userData);
 
         return back()->with('success', 'Utilisateur créé avec succès');
     }
@@ -104,10 +134,34 @@ class UserController extends Controller
             'chef_chantier_id' => 'nullable|exists:users,id',
         ]);
 
+        // Validate hierarchy based on role
+        $role = UserRole::from($validated['role']);
+        
+        if ($role === UserRole::ChefChantier && empty($validated['engineer_id'])) {
+            return back()->with('error', 'Un chef de chantier doit être assigné à un ingénieur.');
+        }
+        
+        if ($role === UserRole::Worker && empty($validated['chef_chantier_id'])) {
+            return back()->with('error', 'Un ouvrier doit être assigné à un chef de chantier.');
+        }
+
         if (! empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);
+        }
+
+        // Set the appropriate parent based on role
+        if ($role === UserRole::ChefChantier) {
+            $validated['engineer_id'] = $validated['engineer_id'];
+            $validated['chef_chantier_id'] = null;
+        } elseif ($role === UserRole::Worker) {
+            $validated['chef_chantier_id'] = $validated['chef_chantier_id'];
+            $validated['engineer_id'] = null;
+        } else {
+            // Manager, Engineer, Magasinier don't have parents
+            $validated['engineer_id'] = null;
+            $validated['chef_chantier_id'] = null;
         }
 
         $user->update($validated);

@@ -1,31 +1,30 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { 
-  Calendar, DollarSign, MapPin, User, Save, Users, 
-  Trash2, Edit, ChevronRight, Activity, Clock, 
-  HardHat, Wallet, FileText, Plus, CheckCircle,
-  LayoutGrid, ListChecks, Settings2, Info, AlertCircle
+import {
+  Calendar, DollarSign, MapPin, User, Users,
+  Trash2, Edit, Activity, Clock,
+  HardHat, Wallet, FileText, CheckCircle,
+  LayoutGrid, ListChecks, Settings2, AlertCircle
 } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
-import { update, destroy, toggleStep } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import React, { useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Dialog, DialogContent, DialogDescription, 
-  DialogHeader, DialogTitle, DialogTrigger 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog, DialogContent, DialogDescription,
+  DialogTitle
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
-export default function ProjectDetail({ project, totalWorkersCount, engineers, storekeepers, allWorkers }: any) {
+export default function ProjectDetail({ project, totalWorkersCount, engineers, chefsChantier, storekeepers }: any) {
     const { currency, setCurrency, formatCurrency } = useCurrency();
     const { errors }: any = usePage().props;
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: project.name,
     description: project.description || '',
@@ -36,11 +35,12 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, s
     deadline: project.deadline ? project.deadline.split('T')[0] : '',
     status: project.status,
     engineer_id: project.engineer_id || '',
+    chef_chantier_id: project.chef_chantier_id || '',
     storekeeper_id: project.storekeeper_id || '',
-    steps: project.steps.map((s: any) => ({ 
-        id: s.id, 
-        name: s.name, 
-        budget: s.budget 
+    steps: project.steps.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        budget: s.budget
     })) || []
   });
 
@@ -52,12 +52,6 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, s
     { value: 'termine', label: 'Terminé', color: 'emerald' },
     { value: 'suspendu', label: 'Suspendu', color: 'rose' },
   ];
-
-  const getStatusTheme = (statusVal: string) => {
-    const found = statusOptions.find(o => o.value === statusVal);
-
-    return found ? found.color : 'slate';
-  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) {
@@ -186,32 +180,40 @@ return 'Non défini';
                 <Card className="border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] overflow-hidden">
                     <CardHeader className="bg-slate-50/50 border-b border-slate-100">
                         <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                           <Settings2 className="h-4 w-4 text-blue-500" /> 
+                           <Settings2 className="h-4 w-4 text-blue-500" />
                            Responsables
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-6">
-                        <PersonnelItem 
-                            label="Ingénieur Responsable" 
-                            name={project.engineer?.name} 
-                            email={project.engineer?.email} 
-                            role="Responsable Technique" 
+                        <PersonnelItem
+                            label="Ingénieur Responsable"
+                            name={project.engineer?.name}
+                            email={project.engineer?.email}
+                            role="Responsable Technique"
                             icon={HardHat}
                             iconColor="orange"
                         />
-                        <PersonnelItem 
-                            label="Magasinier Assigné" 
-                            name={project.storekeeper?.name} 
-                            email={project.storekeeper?.email} 
-                            role="Gestion de Stocks" 
+                        <PersonnelItem
+                            label="Chef de Chantier"
+                            name={project.chef_chantier?.name}
+                            email={project.chef_chantier?.email}
+                            role="Superviseur Terrain"
+                            icon={Users}
+                            iconColor="blue"
+                        />
+                        <PersonnelItem
+                            label="Magasinier Assigné"
+                            name={project.storekeeper?.name}
+                            email={project.storekeeper?.email}
+                            role="Gestion de Stocks"
                             icon={LayoutGrid}
                             iconColor="blue"
                         />
-                        <PersonnelItem 
-                            label="Gérant Créateur" 
-                            name={project.manager?.name} 
-                            email={project.manager?.email} 
-                            role="Administrateur" 
+                        <PersonnelItem
+                            label="Gérant Créateur"
+                            name={project.manager?.name}
+                            email={project.manager?.email}
+                            role="Administrateur"
                             icon={User}
                             iconColor="purple"
                         />
@@ -228,8 +230,8 @@ return 'Non défini';
                                 {project.workers.map((w: any) => (
                                     <div key={w.id} className={cn(
                                         "flex items-center gap-2 rounded-xl border px-3 py-1.5 transition-all group",
-                                        w.role === 'magasinier' 
-                                            ? "bg-purple-50 border-purple-100 hover:border-purple-300 hover:bg-white" 
+                                        w.role === 'magasinier'
+                                            ? "bg-purple-50 border-purple-100 hover:border-purple-300 hover:bg-white"
                                             : "bg-slate-50 border-slate-100 hover:border-blue-200 hover:bg-white"
                                     )}>
                                         <div className={cn(
@@ -341,7 +343,7 @@ return 'Non défini';
                                         <div className="space-y-3">
                                             <h5 className="font-bold text-slate-900 pr-16">{task.name}</h5>
                                             <p className="text-xs text-slate-500 leading-relaxed font-medium line-clamp-2">{task.description}</p>
-                                            
+
                                             <div className="pt-2 flex flex-col gap-2">
                                                 <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400">
                                                     <Calendar className="h-3 w-3" />
@@ -370,7 +372,7 @@ return 'Non défini';
         </div>
 
         {/* MODALS SECTION */}
-        
+
         {/* EDIT PROJECT MODAL */}
         <Dialog open={isEditing} onOpenChange={setIsEditing}>
             <DialogContent className="max-w-4xl p-0 border-0 rounded-3xl overflow-hidden bg-white max-h-[90vh] flex flex-col">
@@ -378,7 +380,7 @@ return 'Non défini';
                     <DialogTitle className="text-2xl font-black italic tracking-tight">Configuration Chantier</DialogTitle>
                     <DialogDescription className="text-slate-400 mt-1">Mise à jour des paramètres structurels du projet</DialogDescription>
                 </div>
-                
+
                 <form onSubmit={handleUpdate} className="flex-1 overflow-y-auto px-8 py-4 space-y-4 scrollbar-hide">
                     {Object.keys(errors).length > 0 && (
                         <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-900 rounded-2xl mb-4">
@@ -403,10 +405,10 @@ return 'Non défini';
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase text-slate-400">Description</Label>
-                                    <textarea 
-                                        value={formData.description} 
-                                        onChange={(e: any) => setFormData({...formData, description: e.target.value})} 
-                                        className="flex min-h-[100px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/20" 
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={(e: any) => setFormData({...formData, description: e.target.value})}
+                                        className="flex min-h-[100px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -432,6 +434,13 @@ return 'Non défini';
                                     <select value={formData.engineer_id} onChange={e => setFormData({...formData, engineer_id: e.target.value})} className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-orange-500/20 appearance-none">
                                         <option value="">Sélectionner un ingénieur...</option>
                                         {engineers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-black uppercase text-slate-400">Chef de Chantier</Label>
+                                    <select value={formData.chef_chantier_id} onChange={e => setFormData({...formData, chef_chantier_id: e.target.value})} className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-blue-500/20 appearance-none">
+                                        <option value="">Sélectionner un chef de chantier...</option>
+                                        {chefsChantier.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-2">
@@ -468,7 +477,7 @@ return 'Non défini';
                                 + AJOUTER ÉTAPE
                             </Button>
                         </div>
-                        
+
                         <div className="space-y-3">
                             {formData.steps.map((step: any, idx: number) => (
                                 <div key={idx} className="flex items-end gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100 group transition-all hover:bg-white hover:border-emerald-200">

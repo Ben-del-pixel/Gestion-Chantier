@@ -108,6 +108,7 @@ class ReportController extends Controller
     {
         return match ($role) {
             UserRole::Engineer->value => 'Manager',
+            UserRole::ChefChantier->value => 'Ingénieur',
             UserRole::Worker->value, UserRole::Magasinier->value => 'Ingénieur',
             default => 'Destinataire',
         };
@@ -115,16 +116,22 @@ class ReportController extends Controller
 
     private function resolveRecipientIdForUser(User $user, string $userRoleValue, ?int $projectId = null): ?int
     {
-        // Chef de Chantier reports go to Manager
+        // Chef de Chantier reports go to Engineer of the project
         if ($userRoleValue === UserRole::ChefChantier->value) {
             if ($projectId) {
-                $projectManagerId = Project::where('id', $projectId)->value('manager_id');
-                if ($projectManagerId) {
-                    return (int) $projectManagerId;
+                $projectEngineerId = Project::where('id', $projectId)->value('engineer_id');
+                if ($projectEngineerId) {
+                    return (int) $projectEngineerId;
                 }
             }
+            
+            // If no project specified, find the engineer the chef is under
+            $engineerId = User::where('id', $user->id)->value('engineer_id');
+            if ($engineerId) {
+                return (int) $engineerId;
+            }
 
-            return User::where('role', UserRole::Manager->value)->value('id');
+            return User::where('role', UserRole::Engineer->value)->value('id');
         }
 
         if ($userRoleValue === UserRole::Engineer->value) {

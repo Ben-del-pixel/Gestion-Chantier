@@ -20,27 +20,30 @@ class ProjectController extends Controller
 
         // Filter projects based on user role
         if ($user->role === UserRole::ChefChantier) {
-            // Chef de Chantier sees only projects assigned to his engineers
-            $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
-            $projects = Project::with('engineer', 'manager', 'workers', 'steps')
-                ->whereIn('engineer_id', $engineerIds)
+            // Chef de Chantier sees only projects assigned to him
+            $projects = Project::with('engineer', 'manager', 'chefChantier', 'workers', 'steps')
+                ->where('chef_chantier_id', $user->id)
                 ->latest()
                 ->get();
-            // Only show his engineers in the filter
+            // Show his engineer in the filter (if any project has one)
             $engineers = User::where('role', UserRole::Engineer)
-                ->where('chef_chantier_id', $user->id)
+                ->where('id', $user->engineer_id)
                 ->get();
         } elseif ($user->role === UserRole::Engineer) {
-            // Engineer sees only his own projects
-            $projects = Project::with('engineer', 'manager', 'workers', 'steps')
-                ->where('engineer_id', $user->id)
+            // Engineer sees his own projects and projects of his chefs de chantier
+            $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
+            $projects = Project::with('engineer', 'manager', 'chefChantier', 'workers', 'steps')
+                ->where(function ($query) use ($user, $chefChantierIds) {
+                    $query->where('engineer_id', $user->id)
+                        ->orWhereIn('chef_chantier_id', $chefChantierIds);
+                })
                 ->latest()
                 ->get();
             // Engineers don't see other engineers in filter
             $engineers = collect();
         } else {
             // Manager sees all projects
-            $projects = Project::with('engineer', 'manager', 'workers', 'steps')->latest()->get();
+            $projects = Project::with('engineer', 'manager', 'chefChantier', 'workers', 'steps')->latest()->get();
             $engineers = User::where('role', UserRole::Engineer)->get();
         }
 
@@ -52,6 +55,11 @@ class ProjectController extends Controller
 
     public function store(Request $request)
     {
+        // Only Manager can create projects
+        if (auth()->user()->role !== UserRole::Manager) {
+            abort(403, 'Seul un Manager peut créer des projets.');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -92,16 +100,8 @@ class ProjectController extends Controller
             $project->syncBudgetFromSteps();
         }
 
-        // Auto-assign engineer's team to project
-        if (! empty($validated['engineer_id'])) {
-            $engineer = User::find($validated['engineer_id']);
-            if ($engineer) {
-                $teamIds = $engineer->team()->pluck('id')->toArray();
-                if (! empty($teamIds)) {
-                    $project->workers()->sync($teamIds);
-                }
-            }
-        }
+        // Note: L'équipe sera assignée par le Chef de Chantier plus tard
+        // Le Manager assigne seulement l'Ingénieur au projet
 
         ActivityLog::create([
             'user_id' => auth()->id(),
@@ -117,11 +117,12 @@ class ProjectController extends Controller
 
     public function show(Project $project): Response
     {
-        $project->load(['engineer', 'manager', 'storekeeper', 'steps', 'tasks.workers', 'workers']);
+        $project->load(['engineer', 'manager', 'chefChantier', 'storekeeper', 'steps', 'tasks.workers', 'workers']);
 
         $engineers = User::where('role', UserRole::Engineer)->get();
+        $chefsChantier = User::where('role', UserRole::ChefChantier)->get();
         $storekeepers = User::where('role', UserRole::Magasinier)->get();
-        $allWorkers = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier])->get();
+        $allWorkers = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier, UserRole::ChefChantier])->get();
 
         // Calculate total unique workers for the project (from workers relation or tasks)
         $totalWorkersCount = $project->workers->count();
@@ -130,6 +131,7 @@ class ProjectController extends Controller
             'project' => $project,
             'totalWorkersCount' => $totalWorkersCount,
             'engineers' => $engineers,
+            'chefsChantier' => $chefsChantier,
             'storekeepers' => $storekeepers,
             'allWorkers' => $allWorkers,
         ]);
@@ -137,6 +139,16 @@ class ProjectController extends Controller
 
     public function update(Request $request, Project $project)
     {
+        // Permission check: Only Manager or Engineer assigned to project can update
+        $user = auth()->user();
+        if ($user->role === UserRole::Manager) {
+            // Manager can update any project
+        } elseif ($user->role === UserRole::Engineer && $project->engineer_id === $user->id) {
+            // Engineer can only update their own projects
+        } else {
+            abort(403, 'Vous n\'avez pas la permission de modifier ce projet.');
+        }
+
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
@@ -147,6 +159,7 @@ class ProjectController extends Controller
             'budget_consumed' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:initialisation,planifie,en_cours,termine,suspendu',
             'engineer_id' => 'nullable|exists:users,id',
+            'chef_chantier_id' => 'nullable|exists:users,id',
             'storekeeper_id' => 'nullable|exists:users,id',
             'steps' => 'nullable|array',
             'steps.*.id' => 'nullable|exists:project_steps,id',
@@ -154,20 +167,20 @@ class ProjectController extends Controller
             'steps.*.budget' => 'nullable|numeric|min:0',
         ]);
 
-        $resolvedStartDate = $validated['start_date'] ?? $project->start_date;
-        $resolvedDeadline = $validated['deadline'] ?? $project->deadline;
-
-        if ($resolvedStartDate && $resolvedDeadline && $resolvedDeadline < $resolvedStartDate) {
-            return back()->withErrors(['deadline' => 'La date de fin doit être postérieure ou égale à la date de début.']);
-        }
+        // Capture original IDs before update
+        $originalEngineerId = $project->engineer_id;
+        $originalChefChanttierId = $project->chef_chantier_id;
 
         $projectData = $request->only([
-            'name', 'description', 'start_date', 'deadline', 'budget', 'status', 'progress', 'budget_consumed', 'engineer_id', 'storekeeper_id',
+            'name', 'description', 'start_date', 'deadline', 'budget', 'status', 'progress', 'budget_consumed', 'engineer_id', 'chef_chantier_id', 'storekeeper_id',
         ]);
 
         // Convert empty strings to null for IDs
         if (isset($projectData['engineer_id']) && $projectData['engineer_id'] === '') {
             $projectData['engineer_id'] = null;
+        }
+        if (isset($projectData['chef_chantier_id']) && $projectData['chef_chantier_id'] === '') {
+            $projectData['chef_chantier_id'] = null;
         }
         if (isset($projectData['storekeeper_id']) && $projectData['storekeeper_id'] === '') {
             $projectData['storekeeper_id'] = null;
@@ -179,30 +192,42 @@ class ProjectController extends Controller
                 ->where('role', UserRole::Magasinier->value)
                 ->where('users.id', '!=', $projectData['storekeeper_id'])
                 ->exists();
-            
+
             if ($otherMagasinierInTeam) {
                 return back()->withErrors(['storekeeper_id' => 'Un autre magasinier est déjà présent dans l\'équipe terrain. Un projet ne peut avoir qu\'un seul magasinier.']);
             }
         }
-
-        // Capture original engineer_id before update
-        $originalEngineerId = $project->engineer_id;
 
         $project->update($projectData);
 
         // Auto-assign new engineer's team if engineer changed
         if (isset($projectData['engineer_id']) && (int)$projectData['engineer_id'] !== (int)$originalEngineerId) {
             if (! empty($projectData['engineer_id'])) {
-                $engineer = User::find($projectData['engineer_id']);
-                if ($engineer) {
-                    $teamIds = $engineer->team()->pluck('id')->toArray();
-                    if (! empty($teamIds)) {
-                        $project->workers()->sync($teamIds);
+                // Engineer change doesn't automatically change workers anymore,
+                // as workers are linked to Chef de Chantier.
+            } else {
+                // Remove all workers if engineer removed?
+                // Usually an engineer removal might mean project reset.
+            }
+        }
+
+        // Auto-assign chef de chantier's team if chef de chantier changed or assigned
+        // Per documentation: when a Chef de Chantier is assigned, his team is automatically linked to the project
+        if (isset($projectData['chef_chantier_id']) && (int)$projectData['chef_chantier_id'] !== (int)$originalChefChanttierId) {
+            if (! empty($projectData['chef_chantier_id'])) {
+                $chefChantier = User::find($projectData['chef_chantier_id']);
+                if ($chefChantier) {
+                    // Get chef's team workers
+                    $chefTeamIds = $chefChantier->team()->pluck('id')->toArray();
+
+                    // Replace workers with chef's team
+                    if (! empty($chefTeamIds)) {
+                        $project->workers()->sync($chefTeamIds);
                     }
                 }
             } else {
-                // Remove all workers if engineer removed
-                $project->workers()->detach();
+                // If chef de chantier is removed, we might want to keep or remove workers.
+                // For now, let's keep them unless an engineer change also happens.
             }
         }
 

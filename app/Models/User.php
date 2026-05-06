@@ -71,22 +71,26 @@ class User extends Authenticatable
         return $this->hasMany(ReportSubmission::class, 'recipient_id');
     }
 
+    // Chef de Chantier belongs to Engineer
     public function engineer()
     {
         return $this->belongsTo(User::class, 'engineer_id');
     }
 
-    public function team()
+    // Engineer has many Chefs de Chantier
+    public function chefsChantier()
     {
         return $this->hasMany(User::class, 'engineer_id');
     }
 
+    // Worker belongs to Chef de Chantier
     public function chefChantier()
     {
         return $this->belongsTo(User::class, 'chef_chantier_id');
     }
 
-    public function ingenieurs()
+    // Chef de Chantier has many Workers
+    public function team()
     {
         return $this->hasMany(User::class, 'chef_chantier_id');
     }

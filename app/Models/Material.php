@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\MaterialFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Material extends Model
@@ -19,6 +20,8 @@ class Material extends Model
         'unit',
         'type',
         'category',
+        'storekeeper_id',
+        'project_id',
     ];
 
     protected $casts = [
@@ -28,5 +31,15 @@ class Material extends Model
     public function movements(): HasMany
     {
         return $this->hasMany(MaterialMovement::class);
+    }
+
+    public function storekeeper(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'storekeeper_id');
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 }

@@ -30,10 +30,32 @@ class MaterialController extends Controller
         );
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $materials = Material::latest('updated_at')
-            ->get()
+        $user = auth()->user();
+        $projectFilter = $request->query('project_id');
+        
+        // Manager sees all materials (optionally filtered by project)
+        if ($user->role === UserRole::Manager) {
+            $materialsQuery = Material::when($projectFilter, function ($q) use ($projectFilter) {
+                $q->where('project_id', $projectFilter);
+            })->latest('updated_at');
+        } elseif ($user->role === UserRole::Magasinier) {
+            // Magasinier sees only materials of their assigned project
+            // Find project where this user is the storekeeper
+            $userProject = Project::where('storekeeper_id', $user->id)->first();
+            if (!$userProject) {
+                // No project assigned, show empty materials
+                $materialsQuery = Material::where('id', null);
+            } else {
+                $materialsQuery = Material::where('project_id', $userProject->id)->latest('updated_at');
+            }
+        } else {
+            // Other roles see no materials
+            $materialsQuery = Material::where('id', null);
+        }
+
+        $materials = $materialsQuery->get()
             ->map(function ($material) {
                 $allocations = ResourceRequest::where('material_id', $material->id)
                     ->where('status', 'livre')
@@ -78,9 +100,18 @@ class MaterialController extends Controller
 
         $projects = Project::select('id', 'name')->latest()->get();
 
-        $movements = MaterialMovement::query()
-            ->with(['material:id,name,unit', 'user:id,name'])
-            ->latest('occurred_at')
+        // Filter movements by materials the user can see
+        $movementsQuery = MaterialMovement::query()
+            ->with(['material:id,name,unit', 'user:id,name']);
+        
+        if ($user->role === UserRole::Magasinier) {
+            $userProject = $user->projects()->first();
+            if ($userProject) {
+                $movementsQuery->whereIn('material_id', Material::where('project_id', $userProject->id)->pluck('id'));
+            }
+        }
+        
+        $movements = $movementsQuery->latest('occurred_at')
             ->limit(40)
             ->get()
             ->map(function (MaterialMovement $movement) {
@@ -120,7 +151,32 @@ class MaterialController extends Controller
             'unit' => 'required|string|max:255',
             'type' => 'required|in:materiel,materiaux',
             'category' => 'nullable|string|max:255',
+            'project_id' => 'nullable|exists:projects,id',
         ]);
+
+        $user = auth()->user();
+
+        // If Magasinier creates material, auto-assign to their project
+        if ($user->role === UserRole::Magasinier) {
+            $userProject = $user->projects()->first();
+            if (!$userProject) {
+                return back()->withErrors(['project' => 'Vous n\'êtes assigné à aucun chantier. Contactez l\'administrateur.']);
+            }
+            $validated['storekeeper_id'] = $user->id;
+            $validated['project_id'] = $userProject->id;
+        } elseif ($user->role === UserRole::Manager) {
+            // Manager must specify which Magasinier and Project
+            if (!isset($validated['project_id']) || !$validated['project_id']) {
+                return back()->withErrors(['project_id' => 'Vous devez spécifier le chantier pour ce matériel.']);
+            }
+            
+            // Get storekeeper from the project
+            $project = Project::find($validated['project_id']);
+            if (!$project || !$project->storekeeper_id) {
+                return back()->withErrors(['project_id' => 'Ce chantier n\'a pas de magasinier assigné.']);
+            }
+            $validated['storekeeper_id'] = $project->storekeeper_id;
+        }
 
         $material = Material::create($validated);
 

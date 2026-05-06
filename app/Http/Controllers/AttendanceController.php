@@ -48,7 +48,10 @@ class AttendanceController extends Controller
 
         // Filter attendances for Engineer - only see his workers
         if ($user->role === UserRole::Engineer) {
-            $workerIds = User::where('engineer_id', $user->id)->pluck('id');
+            $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
+            $workerIds = User::where('role', UserRole::Worker->value)
+                ->whereIn('chef_chantier_id', $chefChantierIds)
+                ->pluck('id');
             $query->whereIn('user_id', $workerIds);
         }
 
@@ -59,9 +62,20 @@ class AttendanceController extends Controller
         $checked_out = $attendances->filter(fn ($a) => $a->check_out)->count();
 
         // Get workers based on user role
-        if ($user->role === UserRole::Engineer) {
+        $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
+
+        if ($userRoleValue === UserRole::Engineer->value) {
+            // Engineer sees workers of his chefs de chantier
+            $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
             $workers = User::where('role', UserRole::Worker->value)
-                ->where('engineer_id', $user->id)
+                ->whereIn('chef_chantier_id', $chefChantierIds)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+        } elseif ($userRoleValue === UserRole::ChefChantier->value) {
+            // Chef de Chantier sees only his own workers
+            $workers = User::where('role', UserRole::Worker->value)
+                ->where('chef_chantier_id', $user->id)
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get();
@@ -72,7 +86,7 @@ class AttendanceController extends Controller
                 ->get();
         }
 
-        $absent = $workers->count() - $attendances->count();
+        $absent = $workers->count() - $attendances->filter(fn ($a) => $a->user->role === UserRole::Worker->value)->count();
 
         $projects = $projectsQuery->get();
 

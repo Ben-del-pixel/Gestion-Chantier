@@ -5,6 +5,8 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Api\FilterController;
 use App\Http\Controllers\Api\MaterialController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\EngineerProjectController;
+use App\Http\Controllers\Api\ProjectSubStepController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceInitializationController;
 use App\Http\Controllers\DashboardController;
@@ -31,6 +33,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     Route::post('projects/{project}/steps/{step}/toggle', [ProjectController::class, 'toggleStep'])->name('projects.steps.toggle');
+
+    // Engineer Project Management routes
+    Route::get('engineer/projects', [EngineerProjectController::class, 'index'])->name('engineer.projects.index');
+    Route::post('projects/{project}/assign-storekeeper', [EngineerProjectController::class, 'assignStorekeeper'])->name('projects.assign-storekeeper');
+    Route::post('projects/{project}/assign-chef-chantier', [EngineerProjectController::class, 'assignChefChantier'])->name('projects.assign-chef-chantier');
+
+    // Project Sub-Step routes
+    Route::get('sub-steps', [ProjectSubStepController::class, 'index'])->name('sub-steps.index');
+    Route::post('sub-steps', [ProjectSubStepController::class, 'store'])->name('sub-steps.store');
+    Route::post('sub-steps/{subStep}/mark-completed', [ProjectSubStepController::class, 'markCompleted'])->name('sub-steps.mark-completed');
+    Route::post('sub-steps/{subStep}/mark-incomplete', [ProjectSubStepController::class, 'markIncomplete'])->name('sub-steps.mark-incomplete');
 
     // Material routes
     Route::get('materials', [MaterialController::class, 'index'])->name('materials.index');

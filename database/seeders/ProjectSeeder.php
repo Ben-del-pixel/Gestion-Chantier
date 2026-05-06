@@ -16,14 +16,9 @@ class ProjectSeeder extends Seeder
     public function run(): void
     {
         $manager = User::where('role', UserRole::Manager)->first();
-        $chefChantiers = User::where('role', UserRole::ChefChantier)->get();
         $engineers = User::where('role', UserRole::Engineer)->get();
-
-        // Get engineers grouped by their chef_chantier
-        $engineersByChef = [];
-        foreach ($chefChantiers as $chef) {
-            $engineersByChef[$chef->id] = $engineers->where('chef_chantier_id', $chef->id);
-        }
+        $chefChantiers = User::where('role', UserRole::ChefChantier)->get();
+        $magasiniers = User::where('role', UserRole::Magasinier)->get();
 
         $projects = [
             [
@@ -45,7 +40,7 @@ class ProjectSeeder extends Seeder
                 'description' => 'Construction d\'un pont routier.',
                 'budget' => 850000.00,
                 'deadline' => now()->addMonths(18),
-                'status' => 'planifie',
+                'status' => 'en_cours',
             ],
             [
                 'name' => 'Hôtel Étoile',
@@ -54,38 +49,26 @@ class ProjectSeeder extends Seeder
                 'deadline' => now()->addMonths(24),
                 'status' => 'initialisation',
             ],
-            [
-                'name' => 'École Technique',
-                'description' => 'Construction d\'un centre de formation technique.',
-                'budget' => 180000.00,
-                'deadline' => now()->addMonths(8),
-                'status' => 'en_cours',
-            ],
         ];
 
-        $projectIndex = 0;
-        foreach ($chefChantiers as $chefChantier) {
-            $chefEngineers = $engineersByChef[$chefChantier->id] ?? collect();
+        foreach ($projects as $index => $projectData) {
+            $engineer = $engineers[$index % $engineers->count()];
+            $chefChantier = $chefChantiers[$index % $chefChantiers->count()];
+            $magasinier = $magasiniers[$index % $magasiniers->count()];
 
-            foreach ($chefEngineers as $engineer) {
-                if ($projectIndex >= count($projects)) {
-                    break 2;
-                }
+            $project = Project::create([
+                ...$projectData,
+                'manager_id' => $manager->id,
+                'engineer_id' => $engineer->id,
+                'chef_chantier_id' => $chefChantier->id,
+                'storekeeper_id' => $magasinier->id,
+                'start_date' => now(),
+            ]);
 
-                $projectData = $projects[$projectIndex];
-                $project = Project::create([
-                    ...$projectData,
-                    'manager_id' => $manager->id,
-                    'engineer_id' => $engineer->id,
-                ]);
-
-                // Auto-assign engineer's team to project (workers)
-                $teamIds = $engineer->team()->pluck('id')->toArray();
-                if (! empty($teamIds)) {
-                    $project->workers()->sync($teamIds);
-                }
-
-                $projectIndex++;
+            // Liaison automatique de l'équipe ouvrière du Chef de Chantier au projet
+            $teamIds = $chefChantier->team()->pluck('id')->toArray();
+            if (! empty($teamIds)) {
+                $project->workers()->sync($teamIds);
             }
         }
     }

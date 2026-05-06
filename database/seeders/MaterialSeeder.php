@@ -12,7 +12,9 @@ class MaterialSeeder extends Seeder
      */
     public function run(): void
     {
-        $materials = [
+        $projects = \App\Models\Project::all();
+
+        $materialTemplates = [
             // Consumables (materiaux)
             [
                 'name' => 'Ciment',
@@ -56,18 +58,17 @@ class MaterialSeeder extends Seeder
                 'type' => 'materiel',
                 'category' => 'Matériel de Chantier',
             ],
-            [
-                'name' => 'Échafaudage (Lot)',
-                'description' => 'Échafaudage tubulaire complet',
-                'quantity_in_stock' => 10,
-                'unit' => 'lot',
-                'type' => 'materiel',
-                'category' => 'Équipement de travail',
-            ],
         ];
 
-        foreach ($materials as $material) {
-            Material::updateOrCreate(['name' => $material['name']], $material);
+        foreach ($projects as $project) {
+            foreach ($materialTemplates as $template) {
+                Material::create([
+                    ...$template,
+                    'name' => $template['name'] . ' - ' . $project->name,
+                    'project_id' => $project->id,
+                    'storekeeper_id' => $project->storekeeper_id,
+                ]);
+            }
         }
     }
 }

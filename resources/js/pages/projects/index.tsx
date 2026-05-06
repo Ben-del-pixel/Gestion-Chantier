@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import React from 'react';
 
-import { destroy, show, store, toggleStep } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import { destroy, show, store } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +56,7 @@ type ProjectItem = {
   status: string;
   progress: number;
   engineer?: { id: number; name: string } | null;
+  chef_chantier?: { id: number; name: string } | null;
   manager?: { id: number; name: string } | null;
   workers?: Array<{ id: number; name: string }>;
   steps?: ProjectStepItem[];
@@ -129,7 +130,7 @@ export default function ProjectsIndex({ projects, engineers }: { projects: Proje
   const filteredProjects = React.useMemo(() => {
     return normalizedProjects.filter((project) => {
       const statusMatch = statusFilter === 'all' || project.status === statusFilter;
-      const searchValue = `${project.name} ${project.description ?? ''} ${project.engineer?.name ?? ''}`.toLowerCase();
+      const searchValue = `${project.name} ${project.description ?? ''} ${project.chef_chantier?.name ?? ''}`.toLowerCase();
       const textMatch = searchValue.includes(searchTerm.toLowerCase());
 
       return statusMatch && textMatch;
@@ -176,10 +177,10 @@ export default function ProjectsIndex({ projects, engineers }: { projects: Proje
   const handleStepChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const newSteps = [...formData.steps];
     newSteps[index] = { ...newSteps[index], [e.target.name]: e.target.value };
-    
+
     // Calculate new total budget
     const totalBudget = newSteps.reduce((sum, step) => sum + (Number(step.budget) || 0), 0);
-    
+
     setFormData((prev) => ({
       ...prev,
       steps: newSteps,
@@ -201,7 +202,7 @@ return;
 
     const newSteps = formData.steps.filter((_, i) => i !== index);
     const totalBudget = newSteps.reduce((sum, step) => sum + (Number(step.budget) || 0), 0);
-    
+
     setFormData((prev) => ({
       ...prev,
       steps: newSteps,
@@ -222,13 +223,13 @@ return;
 
     router.post(store.url(), formData, {
       onSuccess: () => {
-        setFormData({ 
-          name: '', 
-          description: '', 
-          start_date: '', 
-          budget: '', 
-          deadline: '', 
-          status: 'initialisation', 
+        setFormData({
+          name: '',
+          description: '',
+          start_date: '',
+          budget: '',
+          deadline: '',
+          status: 'initialisation',
           engineer_id: '',
           steps: [{ name: '', budget: '' }]
         });
@@ -266,11 +267,11 @@ return;
               {currency === 'CDF' && (
                 <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 h-11">
                   <span className="text-xs font-bold text-slate-500">Taux:</span>
-                  <input 
-                    type="number" 
-                    value={rate} 
-                    onChange={e => setRate(parseFloat(e.target.value) || 0)} 
-                    className="w-20 border-0 p-0 text-sm font-semibold text-slate-700 focus:ring-0" 
+                  <input
+                    type="number"
+                    value={rate}
+                    onChange={e => setRate(parseFloat(e.target.value) || 0)}
+                    className="w-20 border-0 p-0 text-sm font-semibold text-slate-700 focus:ring-0"
                   />
                 </div>
               )}
@@ -391,7 +392,7 @@ return;
                         Ajouter étape
                       </Button>
                     </div>
-                    
+
                     <div className="space-y-3">
                       {formData.steps.map((step, index) => (
                         <div key={index} className="flex gap-2 items-end">
@@ -420,10 +421,10 @@ return;
                               required
                             />
                           </div>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeStep(index)}
                             className="h-9 w-9 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
                             disabled={formData.steps.length <= 1}
@@ -600,20 +601,20 @@ return;
                   </div>
                 )}
 
-                {/* Équipe - Ingénieur & Ouvriers */}
-                {project.engineer && (
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-100">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white">
-                      <span className="text-xs font-black">IN</span>
+                {/* Équipe - Chef de Chantier & Ouvriers */}
+                {project.chef_chantier && (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-white">
+                      <span className="text-xs font-black">CH</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-black uppercase text-indigo-400 tracking-tight">Ingénieur</p>
-                      <p className="text-xs font-bold text-slate-700 truncate">{project.engineer.name}</p>
+                      <p className="text-[10px] font-black uppercase text-blue-400 tracking-tight">Chef de Chantier</p>
+                      <p className="text-xs font-bold text-slate-700 truncate">{project.chef_chantier.name}</p>
                     </div>
                     {project.workerCount > 0 && (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-indigo-200">
-                        <Users className="h-3 w-3 text-indigo-500" />
-                        <span className="text-xs font-black text-indigo-600">{project.workerCount}</span>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-blue-200">
+                        <Users className="h-3 w-3 text-blue-500" />
+                        <span className="text-xs font-black text-blue-600">{project.workerCount}</span>
                       </div>
                     )}
                   </div>
