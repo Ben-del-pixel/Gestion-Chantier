@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { 
   Calendar, Clock, MapPin, User, Users, CheckCircle, XCircle, 
   Plus, Settings, Loader, Filter, Search, ArrowRight, UserCheck, 
@@ -28,7 +28,11 @@ export default function AttendanceIndex({
   statuses,
   shifts,
   selectedProject,
+  assignedTasks = [],
 }: any) {
+  const page = usePage().props as any;
+  const currentRole = page?.auth?.user?.role;
+  const canManageAttendance = currentRole === 'manager' || currentRole === 'magasinier';
   const [displayDate, setDisplayDate] = useState(date);
   const [displayProject, setDisplayProject] = useState(selectedProject);
   const [attendances, setAttendances] = useState(initialAttendances);
@@ -145,6 +149,8 @@ return '-';
           </div>
           
           <div className="flex flex-wrap gap-3">
+            {canManageAttendance && (
+              <>
             <Button 
                 onClick={() => setShowAssignWorkers(true)} 
                 variant="outline" 
@@ -168,6 +174,8 @@ return '-';
               <Plus className="mr-2 h-5 w-5" />
               Nouveau Pointage
             </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -204,6 +212,49 @@ return '-';
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {currentRole === 'worker' && (
+              <div className="lg:col-span-12">
+                <Card className="border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold">Mes tâches assignées</CardTitle>
+                    <CardDescription>Aperçu des tâches que vous devez exécuter</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {assignedTasks.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {assignedTasks.map((task: any) => (
+                          <div key={task.id} className={cn(
+                            "rounded-xl border p-4",
+                            task.status === 'retard'
+                              ? 'border-red-200 bg-red-50/60'
+                              : 'border-slate-200'
+                          )}>
+                            <p className="font-bold text-slate-900">{task.name}</p>
+                            <p className="text-xs text-slate-500">{task.project?.name ?? 'Projet non défini'}</p>
+                            <p className={cn(
+                              "mt-2 text-xs font-semibold uppercase",
+                              task.status === 'retard' ? 'text-red-600' : 'text-slate-500'
+                            )}>
+                              Statut: {task.status}
+                            </p>
+                            {task.end_date && (
+                              <p className={cn(
+                                "mt-1 text-[11px] font-medium",
+                                task.status === 'retard' ? 'text-red-600' : 'text-slate-500'
+                              )}>
+                                Échéance: {new Date(task.end_date).toLocaleDateString('fr-FR')}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">Aucune tâche assignée pour le moment.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
             {/* Filters Sidebar */}
             <div className="lg:col-span-3">
                 <Card className="sticky top-6 border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
@@ -324,7 +375,8 @@ return '-';
                                                     {statuses?.map((st: any) => (
                                                         <button
                                                             key={st.value}
-                                                            onClick={() => handleStatusChange(attendance.id, st.value)}
+                                                            onClick={() => canManageAttendance && handleStatusChange(attendance.id, st.value)}
+                                                            disabled={!canManageAttendance}
                                                             className={cn(
                                                                 "h-2.5 w-2.5 rounded-full transition-all duration-300",
                                                                 attendance.status === st.value 
@@ -342,7 +394,7 @@ return '-';
                                                 </div>
                                             </td>
                                             <td className="whitespace-nowrap px-8 py-5 text-right">
-                                                {!attendance.check_out ? (
+                                                {canManageAttendance && !attendance.check_out ? (
                                                     <Button
                                                         onClick={() => handleCheckOut(attendance.id)}
                                                         size="sm"
@@ -353,7 +405,7 @@ return '-';
                                                 ) : (
                                                     <div className="flex items-center justify-end gap-1 text-emerald-600 text-[10px] font-bold uppercase tracking-widest">
                                                         <CheckCircle className="h-3 w-3" />
-                                                        Complété
+                                                        {attendance.check_out ? 'Complété' : 'Lecture seule'}
                                                     </div>
                                                 )}
                                             </td>
@@ -366,9 +418,9 @@ return '-';
                                                         <Calendar className="h-10 w-10 text-slate-200" />
                                                     </div>
                                                     <p className="text-lg font-bold text-slate-400">Aucun pointage trouvé pour cette date</p>
-                                                    <Button onClick={() => setShowCheckIn(true)} variant="link" className="text-blue-600 font-bold">
+                                                    {canManageAttendance && <Button onClick={() => setShowCheckIn(true)} variant="link" className="text-blue-600 font-bold">
                                                         Effectuer le premier pointage
-                                                    </Button>
+                                                    </Button>}
                                                 </div>
                                             </td>
                                         </tr>

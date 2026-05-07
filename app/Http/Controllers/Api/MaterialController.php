@@ -34,7 +34,7 @@ class MaterialController extends Controller
     {
         $user = auth()->user();
         $projectFilter = $request->query('project_id');
-        
+
         // Manager sees all materials (optionally filtered by project)
         if ($user->role === UserRole::Manager) {
             $materialsQuery = Material::when($projectFilter, function ($q) use ($projectFilter) {
@@ -44,7 +44,7 @@ class MaterialController extends Controller
             // Magasinier sees only materials of their assigned project
             // Find project where this user is the storekeeper
             $userProject = Project::where('storekeeper_id', $user->id)->first();
-            if (!$userProject) {
+            if (! $userProject) {
                 // No project assigned, show empty materials
                 $materialsQuery = Material::where('id', null);
             } else {
@@ -98,19 +98,21 @@ class MaterialController extends Controller
                 ];
             })->values();
 
-        $projects = Project::select('id', 'name')->latest()->get();
+        $projects = $user->role === UserRole::Magasinier
+            ? Project::where('storekeeper_id', $user->id)->select('id', 'name')->latest()->get()
+            : Project::select('id', 'name')->latest()->get();
 
         // Filter movements by materials the user can see
         $movementsQuery = MaterialMovement::query()
             ->with(['material:id,name,unit', 'user:id,name']);
-        
+
         if ($user->role === UserRole::Magasinier) {
             $userProject = $user->projects()->first();
             if ($userProject) {
                 $movementsQuery->whereIn('material_id', Material::where('project_id', $userProject->id)->pluck('id'));
             }
         }
-        
+
         $movements = $movementsQuery->latest('occurred_at')
             ->limit(40)
             ->get()
@@ -159,20 +161,20 @@ class MaterialController extends Controller
         // If Magasinier creates material, auto-assign to their project
         if ($user->role === UserRole::Magasinier) {
             $userProject = $user->projects()->first();
-            if (!$userProject) {
+            if (! $userProject) {
                 return back()->withErrors(['project' => 'Vous n\'êtes assigné à aucun chantier. Contactez l\'administrateur.']);
             }
             $validated['storekeeper_id'] = $user->id;
             $validated['project_id'] = $userProject->id;
         } elseif ($user->role === UserRole::Manager) {
             // Manager must specify which Magasinier and Project
-            if (!isset($validated['project_id']) || !$validated['project_id']) {
+            if (! isset($validated['project_id']) || ! $validated['project_id']) {
                 return back()->withErrors(['project_id' => 'Vous devez spécifier le chantier pour ce matériel.']);
             }
-            
+
             // Get storekeeper from the project
             $project = Project::find($validated['project_id']);
-            if (!$project || !$project->storekeeper_id) {
+            if (! $project || ! $project->storekeeper_id) {
                 return back()->withErrors(['project_id' => 'Ce chantier n\'a pas de magasinier assigné.']);
             }
             $validated['storekeeper_id'] = $project->storekeeper_id;
@@ -227,8 +229,22 @@ class MaterialController extends Controller
             'comment' => 'nullable|string|max:500',
         ]);
 
+        $user = auth()->user();
+
+        if ($user->role === UserRole::Magasinier) {
+            $managedProjectId = Project::where('storekeeper_id', $user->id)->value('id');
+            if (! $managedProjectId || (int) $validated['project_id'] !== (int) $managedProjectId) {
+                abort(403, 'Le magasinier ne peut affecter du matériel qu\'à son chantier.');
+            }
+        }
+
         // Check stock availability
         $material = Material::findOrFail($validated['material_id']);
+        if ((int) $material->project_id !== (int) $validated['project_id']) {
+            return back()->withErrors([
+                'project_id' => 'Le matériel sélectionné n\'appartient pas au chantier choisi.',
+            ]);
+        }
         if ((float) $material->quantity_in_stock < (float) $validated['quantity_requested']) {
             return back()->withErrors([
                 'quantity_requested' => 'La quantité demandée ('.$validated['quantity_requested'].') dépasse le stock disponible ('.$material->quantity_in_stock.').',

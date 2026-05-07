@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Models\ActivityLog;
 use App\Models\Attendance;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -17,10 +18,35 @@ use Inertia\Response;
 
 class AttendanceController extends Controller
 {
+    private function canManageAttendance(Project $project, User $user): bool
+    {
+        if ($user->role === UserRole::Manager) {
+            return true;
+        }
+
+        return $user->role === UserRole::Magasinier && $project->storekeeper_id === $user->id;
+    }
+
+    private function isAllowedAttendanceTargetForMagasinier(Project $project, int $targetUserId): bool
+    {
+        if ((int) $project->chef_chantier_id === $targetUserId) {
+            return true;
+        }
+
+        return $project->workers()
+            ->where('users.role', UserRole::Worker->value)
+            ->where('users.id', $targetUserId)
+            ->exists();
+    }
+
     public function index(): Response
     {
         $user = request()->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
+        if (! in_array($userRoleValue, [UserRole::Manager->value, UserRole::Magasinier->value, UserRole::Engineer->value, UserRole::Worker->value], true)) {
+            abort(403, 'Accès non autorisé au module de présence.');
+        }
+
         $date = request('date') ? Carbon::parse(request('date')) : Carbon::today();
         $projectId = request('project_id');
 
@@ -29,35 +55,33 @@ class AttendanceController extends Controller
 
         $projectsQuery = Project::select('id', 'name')->orderBy('name');
 
-        if (in_array($userRoleValue, [UserRole::Worker->value, UserRole::Magasinier->value], true)) {
-            $userProjectId = $user->projects()->value('projects.id');
-            if ($userProjectId) {
-                $projectsQuery->where('id', $userProjectId);
-                $projectId = $projectId ?: $userProjectId;
-            }
-        } elseif ($userRoleValue === UserRole::Engineer->value) {
-            $projectsQuery->where('engineer_id', $user->id);
+        if ($userRoleValue === UserRole::Magasinier->value) {
+            $projectsQuery->where('storekeeper_id', $user->id);
             if (! $projectId && $projectsQuery->count() === 1) {
                 $projectId = $projectsQuery->value('id');
             }
+        } elseif ($userRoleValue === UserRole::Engineer->value) {
+            $projectsQuery->where('engineer_id', $user->id);
+        } elseif ($userRoleValue === UserRole::Worker->value) {
+            $projectsQuery->whereHas('workers', function ($projectQuery) use ($user) {
+                $projectQuery->where('users.id', $user->id);
+            });
         }
 
         if ($projectId) {
             $query->where('project_id', $projectId);
         }
 
-        // Filter attendances for roles
-        if ($user->role === UserRole::Engineer) {
-            $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
-            $workerIds = User::where('role', UserRole::Worker->value)
-                ->whereIn('chef_chantier_id', $chefChantierIds)
-                ->pluck('id');
-            $query->whereIn('user_id', $workerIds);
-        } elseif ($user->role === UserRole::ChefChantier) {
-            $workerIds = User::where('role', UserRole::Worker->value)
-                ->where('chef_chantier_id', $user->id)
-                ->pluck('id');
-            $query->whereIn('user_id', $workerIds);
+        if ($user->role === UserRole::Magasinier) {
+            $query->whereHas('project', function ($projectQuery) use ($user) {
+                $projectQuery->where('storekeeper_id', $user->id);
+            });
+        } elseif ($user->role === UserRole::Engineer) {
+            $query->whereHas('project', function ($projectQuery) use ($user) {
+                $projectQuery->where('engineer_id', $user->id);
+            });
+        } elseif ($user->role === UserRole::Worker) {
+            $query->where('user_id', $user->id);
         }
 
         $attendances = $query->orderBy('shift')->orderBy('check_in', 'desc')->get();
@@ -69,21 +93,32 @@ class AttendanceController extends Controller
         // Get workers based on user role
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
 
-        if ($userRoleValue === UserRole::Engineer->value) {
-            // Engineer sees workers of his chefs de chantier
-            $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
-            $workers = User::where('role', UserRole::Worker->value)
-                ->whereIn('chef_chantier_id', $chefChantierIds)
+        if ($userRoleValue === UserRole::Magasinier->value) {
+            $managedProjectIds = Project::where('storekeeper_id', $user->id)->pluck('id');
+            $workers = User::whereIn('role', [UserRole::Worker->value, UserRole::ChefChantier->value])
+                ->whereHas('projects', function ($projectQuery) use ($managedProjectIds) {
+                    $projectQuery->whereIn('projects.id', $managedProjectIds);
+                })
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get();
-        } elseif ($userRoleValue === UserRole::ChefChantier->value) {
-            // Chef de Chantier sees only his own workers
+            $chefIds = Project::whereIn('id', $managedProjectIds)
+                ->whereNotNull('chef_chantier_id')
+                ->pluck('chef_chantier_id');
+            if ($chefIds->isNotEmpty()) {
+                $chefs = User::whereIn('id', $chefIds)->select('id', 'name')->orderBy('name')->get();
+                $workers = $workers->merge($chefs)->unique('id')->values();
+            }
+        } elseif ($userRoleValue === UserRole::Engineer->value) {
             $workers = User::where('role', UserRole::Worker->value)
-                ->where('chef_chantier_id', $user->id)
+                ->whereHas('projects', function ($projectQuery) use ($user) {
+                    $projectQuery->where('projects.engineer_id', $user->id);
+                })
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get();
+        } elseif ($userRoleValue === UserRole::Worker->value) {
+            $workers = User::where('id', $user->id)->select('id', 'name')->get();
         } else {
             $workers = User::where('role', UserRole::Worker->value)
                 ->select('id', 'name')
@@ -94,6 +129,16 @@ class AttendanceController extends Controller
         $absent = $workers->count() - $attendances->filter(fn ($a) => $a->user->role === UserRole::Worker->value)->count();
 
         $projects = $projectsQuery->get();
+        $assignedTasks = collect();
+        if ($userRoleValue === UserRole::Worker->value) {
+            $assignedTasks = Task::with('project:id,name')
+                ->whereHas('workers', function ($workersQuery) use ($user) {
+                    $workersQuery->where('users.id', $user->id);
+                })
+                ->orderByRaw("CASE WHEN status = 'retard' THEN 0 WHEN status = 'en_cours' THEN 1 WHEN status = 'planifie' THEN 2 ELSE 3 END")
+                ->orderBy('end_date')
+                ->get();
+        }
 
         // Get available statuses
         $statuses = array_map(
@@ -129,11 +174,18 @@ class AttendanceController extends Controller
             'statuses' => $statuses,
             'shifts' => $shifts,
             'selectedProject' => $projectId,
+            'assignedTasks' => $assignedTasks,
         ]);
     }
 
     public function apiList(): JsonResponse
     {
+        $user = request()->user();
+        $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
+        if (! in_array($userRoleValue, [UserRole::Manager->value, UserRole::Magasinier->value, UserRole::Engineer->value, UserRole::Worker->value], true)) {
+            abort(403, 'Accès non autorisé au module de présence.');
+        }
+
         $date = request('date') ? Carbon::parse(request('date')) : Carbon::today();
         $projectId = request('project_id');
 
@@ -142,6 +194,27 @@ class AttendanceController extends Controller
 
         if ($projectId) {
             $query->where('project_id', $projectId);
+            if ($user->role === UserRole::Magasinier) {
+                $project = Project::findOrFail($projectId);
+                if (! $this->canManageAttendance($project, $user)) {
+                    abort(403, 'Vous ne pouvez gérer que la présence de votre chantier.');
+                }
+            } elseif ($user->role === UserRole::Engineer) {
+                $project = Project::findOrFail($projectId);
+                if ((int) $project->engineer_id !== (int) $user->id) {
+                    abort(403, 'Vous ne pouvez consulter que la présence de vos chantiers.');
+                }
+            }
+        } elseif ($user->role === UserRole::Magasinier) {
+            $query->whereHas('project', function ($projectQuery) use ($user) {
+                $projectQuery->where('storekeeper_id', $user->id);
+            });
+        } elseif ($user->role === UserRole::Engineer) {
+            $query->whereHas('project', function ($projectQuery) use ($user) {
+                $projectQuery->where('engineer_id', $user->id);
+            });
+        } elseif ($user->role === UserRole::Worker) {
+            $query->where('user_id', $user->id);
         }
 
         $attendances = $query->orderBy('shift')->orderBy('check_in', 'desc')->get();
@@ -164,6 +237,14 @@ class AttendanceController extends Controller
         ]);
 
         $shift = $validated['shift'] ?? 'morning';
+        $project = Project::findOrFail($validated['project_id']);
+        if (! $this->canManageAttendance($project, $request->user())) {
+            abort(403, 'Seuls le manager et le magasinier du chantier peuvent gérer la présence.');
+        }
+        if ($request->user()->role === UserRole::Magasinier
+            && ! $this->isAllowedAttendanceTargetForMagasinier($project, (int) $validated['user_id'])) {
+            abort(403, 'Le magasinier peut pointer seulement les ouvriers et le chef de chantier de son chantier.');
+        }
 
         // Check if there is any check-in in the last 24 hours
         $last24Hours = Attendance::where('user_id', $validated['user_id'])
@@ -194,11 +275,15 @@ class AttendanceController extends Controller
             'properties' => $attendance->toArray(),
         ]);
 
-        return back()->with('success', 'Arrivée enregistrée pour ' . $attendance->user->name);
+        return back()->with('success', 'Arrivée enregistrée pour '.$attendance->user->name);
     }
 
     public function checkOut(Request $request, Attendance $attendance)
     {
+        if (! $this->canManageAttendance($attendance->project, $request->user())) {
+            abort(403, 'Seuls le manager et le magasinier du chantier peuvent gérer la présence.');
+        }
+
         if ($attendance->check_out) {
             return back()->with('error', 'Départ déjà enregistré pour cet ouvrier.');
         }
@@ -216,11 +301,15 @@ class AttendanceController extends Controller
             'properties' => $attendance->toArray(),
         ]);
 
-        return back()->with('success', 'Départ enregistré pour ' . $attendance->user->name);
+        return back()->with('success', 'Départ enregistré pour '.$attendance->user->name);
     }
 
     public function updateStatus(Request $request, Attendance $attendance)
     {
+        if (! $this->canManageAttendance($attendance->project, $request->user())) {
+            abort(403, 'Seuls le manager et le magasinier du chantier peuvent gérer la présence.');
+        }
+
         $validated = $request->validate([
             'status' => 'required|string|in:present,absent,retard,malade',
         ]);

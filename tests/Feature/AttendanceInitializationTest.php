@@ -10,9 +10,11 @@ beforeEach(function () {
     $this->manager = User::factory()->create(['role' => 'manager']);
     $this->engineer = User::factory()->create(['role' => 'engineer']);
     $this->workers = User::factory(3)->create(['role' => 'worker']);
+    $this->magasinier = User::factory()->create(['role' => 'magasinier']);
     $this->project = Project::factory()->create([
         'manager_id' => $this->manager->id,
         'engineer_id' => $this->engineer->id,
+        'storekeeper_id' => $this->magasinier->id,
     ]);
 
     // Assign workers to project using sync
@@ -106,6 +108,8 @@ it('updates attendance status', function () {
         'status' => AttendanceStatus::Present->value,
     ]);
 
+    $this->actingAs($this->manager);
+
     $response = $this->putJson("/attendance/{$attendance->id}/status", [
         'status' => AttendanceStatus::Sick->value,
     ]);
@@ -124,6 +128,8 @@ it('validates status enum on update', function () {
         'date' => now()->toDateString(),
     ]);
 
+    $this->actingAs($this->manager);
+
     $response = $this->putJson("/attendance/{$attendance->id}/status", [
         'status' => 'invalid_status',
     ]);
@@ -132,6 +138,7 @@ it('validates status enum on update', function () {
 });
 
 it('lists available workers on attendance index', function () {
+    $this->actingAs($this->manager);
     $response = $this->get('/attendance');
 
     $response->assertSuccessful();
@@ -139,8 +146,32 @@ it('lists available workers on attendance index', function () {
 });
 
 it('includes statuses in attendance index', function () {
+    $this->actingAs($this->manager);
     $response = $this->get('/attendance');
 
     $response->assertSuccessful();
     $response->assertInertia();
+});
+
+it('forbids attendance management for engineer', function () {
+    $this->actingAs($this->engineer);
+
+    $response = $this->get('/attendance');
+
+    $response->assertForbidden();
+});
+
+it('allows assigned magasinier to manage attendance', function () {
+    $attendance = Attendance::factory()->create([
+        'user_id' => $this->workers[0]->id,
+        'project_id' => $this->project->id,
+        'date' => now()->toDateString(),
+        'status' => AttendanceStatus::Present->value,
+    ]);
+
+    $this->actingAs($this->magasinier)
+        ->putJson("/attendance/{$attendance->id}/status", [
+            'status' => AttendanceStatus::Late->value,
+        ])
+        ->assertSuccessful();
 });
