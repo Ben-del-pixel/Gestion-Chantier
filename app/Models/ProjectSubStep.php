@@ -39,6 +39,11 @@ class ProjectSubStep extends Model
             ->withTimestamps();
     }
 
+    public function task()
+    {
+        return $this->hasOne(Task::class, 'project_sub_step_id');
+    }
+
     public function getProgressPercentage(): int
     {
         $totalWorkers = $this->workers()->count();
@@ -47,6 +52,7 @@ class ProjectSubStep extends Model
         }
 
         $completedWorkers = $this->workers()->wherePivot('is_completed', true)->count();
+
         return (int) round(($completedWorkers / $totalWorkers) * 100);
     }
 

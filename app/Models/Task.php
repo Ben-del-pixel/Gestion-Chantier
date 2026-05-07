@@ -13,6 +13,8 @@ class Task extends Model
 
     protected $fillable = [
         'project_id',
+        'project_step_id',
+        'project_sub_step_id',
         'name',
         'description',
         'start_date',
@@ -28,6 +30,16 @@ class Task extends Model
     public function project()
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function projectStep()
+    {
+        return $this->belongsTo(ProjectStep::class);
+    }
+
+    public function projectSubStep()
+    {
+        return $this->belongsTo(ProjectSubStep::class);
     }
 
     public function workers()

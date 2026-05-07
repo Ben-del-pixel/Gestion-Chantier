@@ -53,7 +53,9 @@ class ProjectSeeder extends Seeder
 
         foreach ($projects as $index => $projectData) {
             $engineer = $engineers[$index % $engineers->count()];
-            $chefChantier = $chefChantiers[$index % $chefChantiers->count()];
+            $chefChantier = $chefChantiers
+                ->firstWhere('engineer_id', $engineer->id)
+                ?? $chefChantiers[$index % $chefChantiers->count()];
             $magasinier = $magasiniers[$index % $magasiniers->count()];
 
             $project = Project::create([

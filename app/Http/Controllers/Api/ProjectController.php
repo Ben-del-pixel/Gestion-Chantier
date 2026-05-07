@@ -55,9 +55,10 @@ class ProjectController extends Controller
 
     public function store(Request $request)
     {
-        // Only Manager can create projects
-        if (auth()->user()->role !== UserRole::Manager) {
-            abort(403, 'Seul un Manager peut créer des projets.');
+        $user = auth()->user();
+
+        if (! in_array($user->role, [UserRole::Manager, UserRole::Engineer], true)) {
+            abort(403, 'Seuls le manager et l\'ingénieur peuvent créer des projets.');
         }
 
         $validated = $request->validate([
@@ -81,8 +82,10 @@ class ProjectController extends Controller
             'budget' => $validated['budget'] ?? 0,
             'deadline' => $validated['deadline'],
             'progress' => $validated['progress'] ?? 0,
-            'engineer_id' => $validated['engineer_id'] ?? null,
-            'manager_id' => auth()->id(),
+            'engineer_id' => $user->role === UserRole::Engineer ? $user->id : ($validated['engineer_id'] ?? null),
+            'manager_id' => $user->role === UserRole::Manager
+                ? $user->id
+                : (User::where('role', UserRole::Manager)->value('id') ?? $user->id),
             'status' => $validated['status'] ?? 'initialisation',
         ]);
 
@@ -117,7 +120,7 @@ class ProjectController extends Controller
 
     public function show(Project $project): Response
     {
-        $project->load(['engineer', 'manager', 'chefChantier', 'storekeeper', 'steps', 'tasks.workers', 'workers']);
+        $project->load(['engineer', 'manager', 'chefChantier', 'storekeeper', 'steps.subSteps', 'tasks.workers', 'workers']);
 
         $engineers = User::where('role', UserRole::Engineer)->get();
         $chefsChantier = User::where('role', UserRole::ChefChantier)->get();
@@ -187,7 +190,7 @@ class ProjectController extends Controller
         }
 
         // Restriction: Only one magasinier per project (Storekeeper or in Workers)
-        if (!empty($projectData['storekeeper_id'])) {
+        if (! empty($projectData['storekeeper_id'])) {
             $otherMagasinierInTeam = $project->workers()
                 ->where('role', UserRole::Magasinier->value)
                 ->where('users.id', '!=', $projectData['storekeeper_id'])
@@ -201,7 +204,7 @@ class ProjectController extends Controller
         $project->update($projectData);
 
         // Auto-assign new engineer's team if engineer changed
-        if (isset($projectData['engineer_id']) && (int)$projectData['engineer_id'] !== (int)$originalEngineerId) {
+        if (isset($projectData['engineer_id']) && (int) $projectData['engineer_id'] !== (int) $originalEngineerId) {
             if (! empty($projectData['engineer_id'])) {
                 // Engineer change doesn't automatically change workers anymore,
                 // as workers are linked to Chef de Chantier.
@@ -213,7 +216,7 @@ class ProjectController extends Controller
 
         // Auto-assign chef de chantier's team if chef de chantier changed or assigned
         // Per documentation: when a Chef de Chantier is assigned, his team is automatically linked to the project
-        if (isset($projectData['chef_chantier_id']) && (int)$projectData['chef_chantier_id'] !== (int)$originalChefChanttierId) {
+        if (isset($projectData['chef_chantier_id']) && (int) $projectData['chef_chantier_id'] !== (int) $originalChefChanttierId) {
             if (! empty($projectData['chef_chantier_id'])) {
                 $chefChantier = User::find($projectData['chef_chantier_id']);
                 if ($chefChantier) {
@@ -287,8 +290,8 @@ class ProjectController extends Controller
         // Permission check
         $user = auth()->user();
         if ($user->role !== UserRole::Manager &&
-            !($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
-            !($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
+            ! ($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
+            ! ($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
         ) {
             abort(403, "Vous n'avez pas la permission de modifier les étapes de ce projet.");
         }

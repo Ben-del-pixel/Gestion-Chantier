@@ -59,3 +59,30 @@ test('worker dashboard includes attendance tracking props', function () {
             ->has('workerAttendanceSummary')
         );
 });
+
+test('chef chantier dashboard includes attendance management props', function () {
+    $engineer = User::factory()->create(['role' => 'engineer']);
+    $chef = User::factory()->create([
+        'role' => 'chef_chantier',
+        'engineer_id' => $engineer->id,
+    ]);
+    $worker = User::factory()->create([
+        'role' => 'worker',
+        'chef_chantier_id' => $chef->id,
+    ]);
+    Project::factory()->create([
+        'engineer_id' => $engineer->id,
+        'chef_chantier_id' => $chef->id,
+    ]);
+
+    $this->actingAs($chef);
+
+    $this->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('dashboard')
+            ->has('attendanceProjects')
+            ->has('attendanceWorkers')
+            ->where('attendanceWorkers.0.id', $worker->id)
+        );
+});

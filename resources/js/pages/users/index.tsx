@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, History as ActivityIcon, UsersRound } from 'lucide-react';
 import React from 'react';
 
@@ -83,6 +83,8 @@ function resolveStatus(userId: number): WorkforceRow['status'] {
 }
 
 export default function UsersIndex({ users, engineers, chefChantiers }: { users: UserItem[]; engineers: { id: number; name: string }[]; chefChantiers: { id: number; name: string }[] }) {
+  const page = usePage().props as any;
+  const isChefChantier = page?.auth?.user?.role === UserRole.ChefChantier.value;
   const [open, setOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedRole, setSelectedRole] = React.useState<UserRoleValue | 'all'>('all');
@@ -301,7 +303,7 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
             <div className="flex items-center gap-2">
             </div>
 
-            <Dialog open={open} onOpenChange={setOpen}>
+            {!isChefChantier && <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button className="h-12 rounded-xl bg-emerald-500 px-6 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95">
                   <UserPlus className="mr-2 h-5 w-5" />
@@ -443,7 +445,7 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
                   </div>
                 </form>
               </DialogContent>
-            </Dialog>
+            </Dialog>}
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

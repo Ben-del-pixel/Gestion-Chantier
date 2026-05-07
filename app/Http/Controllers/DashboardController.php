@@ -107,6 +107,48 @@ class DashboardController extends Controller
                 ],
                 AttendanceShift::cases()
             );
+        } elseif ($user->role === UserRole::ChefChantier) {
+            $data['tasks'] = Task::whereHas('project', function ($q) use ($user) {
+                $q->where('chef_chantier_id', $user->id);
+            })->with(['workers', 'project'])->latest()->get();
+
+            $data['stats'] = [
+                'active_tasks' => Task::whereHas('project', function ($q) use ($user) {
+                    $q->where('chef_chantier_id', $user->id);
+                })->where('status', 'en_cours')->count(),
+                'total_workers_under' => User::where('role', UserRole::Worker)
+                    ->where('chef_chantier_id', $user->id)
+                    ->count(),
+            ];
+
+            $data['attendanceProjects'] = Project::where('chef_chantier_id', $user->id)
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+
+            $data['attendanceWorkers'] = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier])
+                ->where('chef_chantier_id', $user->id)
+                ->select('id', 'name', 'email', 'role')
+                ->orderBy('name')
+                ->get();
+
+            $data['attendanceStatuses'] = array_map(
+                fn (AttendanceStatus $status) => [
+                    'value' => $status->value,
+                    'label' => $status->label(),
+                    'color' => $status->color(),
+                ],
+                AttendanceStatus::cases()
+            );
+
+            $data['attendanceShifts'] = array_map(
+                fn (AttendanceShift $shift) => [
+                    'value' => $shift->value,
+                    'label' => $shift->label(),
+                    'icon' => $shift->icon(),
+                ],
+                AttendanceShift::cases()
+            );
         } elseif ($user->role === UserRole::Worker) {
             $data['tasks'] = $user->tasks()->with('project')->latest()->get();
 

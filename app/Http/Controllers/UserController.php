@@ -14,7 +14,7 @@ class UserController extends Controller
     public function index(): Response
     {
         $user = auth()->user();
-        
+
         // Debug: Log user role info
         \Log::info('User role debug', [
             'user_id' => $user->id,
@@ -71,6 +71,8 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        $authenticatedUser = auth()->user();
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
@@ -84,11 +86,15 @@ class UserController extends Controller
 
         // Validate hierarchy based on role
         $role = UserRole::from($validated['role']);
-        
+
+        if ($authenticatedUser->role === UserRole::ChefChantier && $role === UserRole::Worker) {
+            abort(403, 'Le chef de chantier ne peut pas créer un ouvrier.');
+        }
+
         if ($role === UserRole::ChefChantier && empty($validated['engineer_id'])) {
             return back()->with('error', 'Un chef de chantier doit être assigné à un ingénieur.');
         }
-        
+
         if ($role === UserRole::Worker && empty($validated['chef_chantier_id'])) {
             return back()->with('error', 'Un ouvrier doit être assigné à un chef de chantier.');
         }
@@ -136,11 +142,11 @@ class UserController extends Controller
 
         // Validate hierarchy based on role
         $role = UserRole::from($validated['role']);
-        
+
         if ($role === UserRole::ChefChantier && empty($validated['engineer_id'])) {
             return back()->with('error', 'Un chef de chantier doit être assigné à un ingénieur.');
         }
-        
+
         if ($role === UserRole::Worker && empty($validated['chef_chantier_id'])) {
             return back()->with('error', 'Un ouvrier doit être assigné à un chef de chantier.');
         }

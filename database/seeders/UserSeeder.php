@@ -41,16 +41,17 @@ class UserSeeder extends Seeder
             );
         }
 
-        // 3. Create Chef de Chantier
-        // Note: Relationally, ChefChantier will be assigned to a project and an engineer
+        // 3. Create Chef de Chantier and attach each one to an engineer
         $chefChantiers = [];
         for ($i = 1; $i <= 4; $i++) {
+            $engineer = $engineers[($i - 1) % count($engineers)];
             $chefChantiers[] = User::updateOrCreate(
                 ['email' => "chef_chantier{$i}@example.com"],
                 [
                     'name' => "Chef de Chantier {$i}",
                     'password' => Hash::make('password'),
                     'role' => UserRole::ChefChantier,
+                    'engineer_id' => $engineer->id,
                 ]
             );
         }

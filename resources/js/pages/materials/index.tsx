@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Link as LinkIcon, Wrench } from 'lucide-react';
 import React from 'react';
 
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { UserRole } from '@/Enums/UserRole';
 
 type MaterialItem = {
     id: number;
@@ -114,6 +115,9 @@ export default function MaterialsIndex({
     projects?: ProjectItem[];
     movements?: MaterialMovement[];
 }) {
+    const page = usePage().props as any;
+    const authenticatedUser = page?.auth?.user;
+    const canCheckInFromMaterials = authenticatedUser?.role === UserRole.Magasinier.value;
     const [searchTerm, setSearchTerm] = React.useState('');
     const [openDialog, setOpenDialog] = React.useState(false);
     const [openAllocationDialog, setOpenAllocationDialog] = React.useState(false);
@@ -143,6 +147,32 @@ export default function MaterialsIndex({
         reason: '',
         comment: '',
     });
+
+    const handleStorekeeperCheckIn = () => {
+        if (!authenticatedUser?.id) {
+            alert('Utilisateur non authentifié.');
+            return;
+        }
+
+        if (projects.length === 0) {
+            alert('Aucun chantier assigné pour enregistrer la présence.');
+            return;
+        }
+
+        router.post('/attendance/check-in', {
+            user_id: authenticatedUser.id,
+            project_id: projects[0].id,
+            shift: 'morning',
+            status: 'present',
+        }, {
+            onSuccess: () => {
+                alert('Présence enregistrée avec succès');
+            },
+            onError: () => {
+                alert('Erreur lors de l\'enregistrement de la présence');
+            },
+        });
+    };
 
     const normalizedMaterials = React.useMemo(() => {
         return materials.map((material) => {
@@ -202,9 +232,10 @@ export default function MaterialsIndex({
                     setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '' });
                     setEditingMaterial(null);
                     setOpenDialog(false);
+                    alert(editingMaterial ? 'Matériel mis à jour avec succès' : 'Matériel créé avec succès');
                 },
                 onError: () => {
-                    alert('Erreur lors de l\'enregistrement du matériau');
+                    alert(editingMaterial ? 'Erreur lors de la mise à jour du matériel' : 'Erreur lors de la création du matériel');
                 },
                 onFinish: () => {
                     setIsSubmitting(false);
@@ -348,6 +379,11 @@ export default function MaterialsIndex({
             </div>
 
             <div className="flex items-center gap-2">
+              {canCheckInFromMaterials && (
+                <Button onClick={handleStorekeeperCheckIn} variant="outline" className="h-12 rounded-xl">
+                  Pointer ma présence
+                </Button>
+              )}
             </div>
 
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>

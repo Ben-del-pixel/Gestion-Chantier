@@ -40,6 +40,17 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceDate={pageProps.attendanceDate}
                     />
                 )}
+                {roleValue === UserRole.ChefChantier.value && (
+                    <EngineerDashboard
+                        tasks={tasks}
+                        stats={stats}
+                        attendanceProjects={pageProps.attendanceProjects}
+                        attendanceWorkers={pageProps.attendanceWorkers}
+                        attendanceStatuses={pageProps.attendanceStatuses}
+                        attendanceShifts={pageProps.attendanceShifts}
+                        attendanceDate={pageProps.attendanceDate}
+                    />
+                )}
                 {roleValue === UserRole.Worker.value && (
                     <WorkerDashboard
                         tasks={tasks}

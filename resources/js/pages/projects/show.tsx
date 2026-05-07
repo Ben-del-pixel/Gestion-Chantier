@@ -52,6 +52,8 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, c
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [taskData, setTaskData] = useState({
+    project_step_id: '',
+    project_sub_step_id: '',
     name: '',
     description: '',
     start_date: '',
@@ -139,6 +141,8 @@ return 'Non défini';
   const handleCreateTask = () => {
     setEditingTask(null);
     setTaskData({
+        project_step_id: '',
+        project_sub_step_id: '',
         name: '',
         description: '',
         start_date: '',
@@ -152,6 +156,8 @@ return 'Non défini';
   const handleEditTask = (task: any) => {
     setEditingTask(task);
     setTaskData({
+        project_step_id: task.project_step_id ? String(task.project_step_id) : '',
+        project_sub_step_id: task.project_sub_step_id ? String(task.project_sub_step_id) : '',
         name: task.name,
         description: task.description || '',
         start_date: task.start_date ? task.start_date.split('T')[0] : '',
@@ -166,13 +172,19 @@ return 'Non défini';
     e.preventDefault();
     setIsLoading(true);
 
+    const payload = {
+        ...taskData,
+        project_step_id: taskData.project_step_id ? Number(taskData.project_step_id) : null,
+        project_sub_step_id: taskData.project_sub_step_id ? Number(taskData.project_sub_step_id) : null,
+    };
+
     if (editingTask) {
-        router.put(`/tasks/${editingTask.id}`, taskData, {
+        router.put(`/tasks/${editingTask.id}`, payload, {
             onSuccess: () => setShowTaskDialog(false),
             onFinish: () => setIsLoading(false),
         });
     } else {
-        router.post('/tasks', { ...taskData, project_id: project.id }, {
+        router.post('/tasks', { ...payload, project_id: project.id }, {
             onSuccess: () => setShowTaskDialog(false),
             onFinish: () => setIsLoading(false),
         });
@@ -197,6 +209,9 @@ return 'Non défini';
 
     setTaskData({ ...taskData, worker_ids: current });
   };
+
+  const selectedStep = project.steps?.find((step: any) => String(step.id) === taskData.project_step_id);
+  const availableSubSteps = selectedStep?.sub_steps ?? selectedStep?.subSteps ?? [];
 
   return (
     <>
@@ -442,6 +457,12 @@ return 'Non défini';
                                         <div className="space-y-3">
                                             <h5 className="font-bold text-slate-900 pr-16">{task.name}</h5>
                                             <p className="text-xs text-slate-500 leading-relaxed font-medium line-clamp-2">{task.description}</p>
+                                            {(task.project_step_id || task.project_sub_step_id) && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {task.project_step_id && <Badge variant="outline">Etape #{task.project_step_id}</Badge>}
+                                                    {task.project_sub_step_id && <Badge variant="outline">Sous-etape #{task.project_sub_step_id}</Badge>}
+                                                </div>
+                                            )}
 
                                             <div className="pt-2 flex flex-col gap-2">
                                                 <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400">
@@ -621,6 +642,35 @@ return 'Non défini';
                         <div className="space-y-2">
                             <Label className="text-xs font-black uppercase text-slate-400">Nom de la tâche</Label>
                             <Input value={taskData.name} onChange={e => setTaskData({...taskData, name: e.target.value})} className="h-12 rounded-xl" placeholder="Ex: Coffrage dalle R+1" required />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-black uppercase text-slate-400">Étape parente</Label>
+                                <select
+                                    value={taskData.project_step_id}
+                                    onChange={(e) => setTaskData({ ...taskData, project_step_id: e.target.value, project_sub_step_id: '' })}
+                                    className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 appearance-none"
+                                >
+                                    <option value="">Aucune étape</option>
+                                    {project.steps?.map((step: any) => (
+                                        <option key={step.id} value={step.id}>{step.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-black uppercase text-slate-400">Sous-tâche liée</Label>
+                                <select
+                                    value={taskData.project_sub_step_id}
+                                    onChange={(e) => setTaskData({ ...taskData, project_sub_step_id: e.target.value })}
+                                    className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 appearance-none"
+                                    disabled={!taskData.project_step_id}
+                                >
+                                    <option value="">Aucune sous-étape</option>
+                                    {availableSubSteps.map((subStep: any) => (
+                                        <option key={subStep.id} value={subStep.id}>{subStep.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-black uppercase text-slate-400">Description</Label>

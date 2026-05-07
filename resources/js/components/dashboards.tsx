@@ -25,7 +25,7 @@ import {
     HardHat,
     AlertCircle,
 } from 'lucide-react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import React from 'react';
 import { Doughnut, Line } from 'react-chartjs-2';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
@@ -826,9 +826,12 @@ export const EngineerDashboard = ({
 };
 
 export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanceSummary, workerIncidents = [] }: any) => {
+    const page = usePage().props as any;
+    const authenticatedUser = page?.auth?.user;
     const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().slice(0, 10));
     const [showIncidentDialog, setShowIncidentDialog] = React.useState(false);
     const [isSubmittingIncident, setIsSubmittingIncident] = React.useState(false);
+    const [isSubmittingAttendance, setIsSubmittingAttendance] = React.useState(false);
     const [incidentForm, setIncidentForm] = React.useState({
         title: '',
         details: '',
@@ -860,6 +863,82 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
         'h-11 w-full rounded-xl border border-border/60 bg-background/90 px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
     const formTextareaClass =
         'min-h-[120px] w-full rounded-xl border border-border/60 bg-background/90 px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+    const currentProjectId = tasks?.[0]?.project?.id ?? null;
+    const activeAttendance = workerAttendances.find((attendance: any) => !attendance.check_out);
+
+    const submitWorkerCheckIn = async () => {
+        if (!authenticatedUser?.id) {
+            alert('Utilisateur non authentifié.');
+            return;
+        }
+
+        if (!currentProjectId) {
+            alert('Aucun chantier assigné pour le pointage.');
+            return;
+        }
+
+        setIsSubmittingAttendance(true);
+
+        try {
+            const response = await fetch('/attendance/check-in', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    user_id: authenticatedUser?.id,
+                    project_id: currentProjectId,
+                    shift: 'morning',
+                    status: 'present',
+                }),
+            });
+
+            if (!response.ok) {
+                alert('Erreur lors du pointage d\'arrivée.');
+                return;
+            }
+
+            window.location.reload();
+        } catch {
+            alert('Erreur reseau pendant le pointage d\'arrivée.');
+        } finally {
+            setIsSubmittingAttendance(false);
+        }
+    };
+
+    const submitWorkerCheckOut = async () => {
+        if (!activeAttendance?.id) {
+            alert('Aucun pointage actif trouvé pour enregistrer la sortie.');
+            return;
+        }
+
+        setIsSubmittingAttendance(true);
+
+        try {
+            const response = await fetch(`/attendance/${activeAttendance.id}/check-out`, {
+                method: 'PUT',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+            });
+
+            if (!response.ok) {
+                alert('Erreur lors du pointage de sortie.');
+                return;
+            }
+
+            window.location.reload();
+        } catch {
+            alert('Erreur reseau pendant le pointage de sortie.');
+        } finally {
+            setIsSubmittingAttendance(false);
+        }
+    };
 
     const submitIncident = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -945,8 +1024,12 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <Button className="h-18 rounded-2xl text-base font-extrabold uppercase tracking-wide shadow-md shadow-primary/15 hover:scale-[1.01] active:scale-[0.99] transition-all">
-                    Pointer Début
+                <Button
+                    onClick={activeAttendance ? submitWorkerCheckOut : submitWorkerCheckIn}
+                    disabled={isSubmittingAttendance}
+                    className="h-18 rounded-2xl text-base font-extrabold uppercase tracking-wide shadow-md shadow-primary/15 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                >
+                    {isSubmittingAttendance ? 'Traitement...' : activeAttendance ? 'Pointer Fin' : 'Pointer Début'}
                     <CheckCircle2 className="ml-2 h-5 w-5" />
                 </Button>
                 <Dialog open={showIncidentDialog} onOpenChange={setShowIncidentDialog}>

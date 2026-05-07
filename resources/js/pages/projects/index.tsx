@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
   Calendar,
   Circle,
@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCurrency } from '@/lib/currency';
+import { UserRole } from '@/Enums/UserRole';
 
 type ProjectStepItem = {
   id: number;
@@ -93,6 +94,8 @@ function getProgress(project: ProjectItem): number {
 }
 
 export default function ProjectsIndex({ projects, engineers }: { projects: ProjectItem[], engineers: Array<{ id: number, name: string }> }) {
+  const page = usePage().props as any;
+  const canCreateProject = [UserRole.Manager.value, UserRole.Engineer.value].includes(page?.auth?.user?.role);
   const { currency, setCurrency, formatCurrency, rate, setRate } = useCurrency();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('all');
@@ -277,7 +280,7 @@ return;
               )}
             </div>
 
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            {canCreateProject && <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
                 <Button className="h-12 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all hover:scale-105 active:scale-95">
                   <Plus className="mr-2 h-5 w-5" />
@@ -447,7 +450,7 @@ return;
                   </div>
                 </form>
               </DialogContent>
-            </Dialog>
+            </Dialog>}
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-5">

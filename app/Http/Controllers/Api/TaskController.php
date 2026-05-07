@@ -6,6 +6,8 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Project;
+use App\Models\ProjectStep;
+use App\Models\ProjectSubStep;
 use App\Models\Task;
 use Illuminate\Http\Request;
 
@@ -15,6 +17,8 @@ class TaskController extends Controller
     {
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
+            'project_step_id' => 'nullable|exists:project_steps,id',
+            'project_sub_step_id' => 'nullable|exists:project_sub_steps,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'required|date',
@@ -29,14 +33,33 @@ class TaskController extends Controller
 
         // Permission check
         if ($user->role !== UserRole::Manager &&
-            !($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
-            !($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
+            ! ($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
+            ! ($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
         ) {
             abort(403, "Vous n'avez pas la permission de créer des tâches pour ce projet.");
         }
 
+        if (! empty($validated['project_step_id'])) {
+            $step = ProjectStep::findOrFail($validated['project_step_id']);
+            if ($step->project_id !== $project->id) {
+                abort(422, 'L\'étape sélectionnée n\'appartient pas à ce projet.');
+            }
+        }
+
+        if (! empty($validated['project_sub_step_id'])) {
+            $subStep = ProjectSubStep::findOrFail($validated['project_sub_step_id']);
+            if ($subStep->projectStep->project_id !== $project->id) {
+                abort(422, 'La sous-étape sélectionnée n\'appartient pas à ce projet.');
+            }
+            if (! empty($validated['project_step_id']) && $subStep->project_step_id !== (int) $validated['project_step_id']) {
+                abort(422, 'La sous-étape ne correspond pas à l\'étape sélectionnée.');
+            }
+        }
+
         $task = Task::create([
             'project_id' => $validated['project_id'],
+            'project_step_id' => $validated['project_step_id'] ?? null,
+            'project_sub_step_id' => $validated['project_sub_step_id'] ?? null,
             'name' => $validated['name'],
             'description' => $validated['description'],
             'start_date' => $validated['start_date'],
@@ -61,6 +84,8 @@ class TaskController extends Controller
     public function update(Request $request, Task $task)
     {
         $validated = $request->validate([
+            'project_step_id' => 'nullable|exists:project_steps,id',
+            'project_sub_step_id' => 'nullable|exists:project_sub_steps,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'required|date',
@@ -75,13 +100,32 @@ class TaskController extends Controller
 
         // Permission check
         if ($user->role !== UserRole::Manager &&
-            !($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
-            !($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
+            ! ($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
+            ! ($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
         ) {
             abort(403, "Vous n'avez pas la permission de modifier des tâches pour ce projet.");
         }
 
+        if (! empty($validated['project_step_id'])) {
+            $step = ProjectStep::findOrFail($validated['project_step_id']);
+            if ($step->project_id !== $project->id) {
+                abort(422, 'L\'étape sélectionnée n\'appartient pas à ce projet.');
+            }
+        }
+
+        if (! empty($validated['project_sub_step_id'])) {
+            $subStep = ProjectSubStep::findOrFail($validated['project_sub_step_id']);
+            if ($subStep->projectStep->project_id !== $project->id) {
+                abort(422, 'La sous-étape sélectionnée n\'appartient pas à ce projet.');
+            }
+            if (! empty($validated['project_step_id']) && $subStep->project_step_id !== (int) $validated['project_step_id']) {
+                abort(422, 'La sous-étape ne correspond pas à l\'étape sélectionnée.');
+            }
+        }
+
         $task->update([
+            'project_step_id' => $validated['project_step_id'] ?? null,
+            'project_sub_step_id' => $validated['project_sub_step_id'] ?? null,
             'name' => $validated['name'],
             'description' => $validated['description'],
             'start_date' => $validated['start_date'],
@@ -110,8 +154,8 @@ class TaskController extends Controller
 
         // Permission check
         if ($user->role !== UserRole::Manager &&
-            !($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
-            !($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
+            ! ($user->role === UserRole::Engineer && $project->engineer_id === $user->id) &&
+            ! ($user->role === UserRole::ChefChantier && $project->chef_chantier_id === $user->id)
         ) {
             abort(403, "Vous n'avez pas la permission de supprimer des tâches pour ce projet.");
         }
