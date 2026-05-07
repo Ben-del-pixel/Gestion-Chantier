@@ -11,12 +11,14 @@ test('guests are redirected to login when visiting materials page', function () 
 });
 
 test('authenticated users can view materials page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['role' => UserRole::Manager]);
+    $project = Project::factory()->create();
     Material::factory()->create([
         'name' => 'Ciment',
         'description' => 'Fournisseur A',
         'quantity_in_stock' => 250,
         'unit' => 'sacs',
+        'project_id' => $project->id,
     ]);
 
     $this->actingAs($user)
@@ -31,6 +33,7 @@ test('authenticated users can view materials page', function () {
 
 test('magasinier can create a material', function () {
     $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $project = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
 
     $this->actingAs($magasinier)
         ->post(route('materials.store'), [
@@ -38,6 +41,7 @@ test('magasinier can create a material', function () {
             'description' => 'Fournisseur X',
             'quantity_in_stock' => 42,
             'unit' => 'sacs',
+            'type' => 'materiaux',
             'category' => 'construction',
         ])
         ->assertRedirect(route('materials.index'));
@@ -46,11 +50,15 @@ test('magasinier can create a material', function () {
         'name' => 'Ciment rapide',
         'quantity_in_stock' => 42,
         'unit' => 'sacs',
+        'project_id' => $project->id,
+        'storekeeper_id' => $magasinier->id,
     ]);
 });
 
 test('manager can create a material', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $storekeeper = User::factory()->create(['role' => UserRole::Magasinier]);
+    $project = Project::factory()->create(['storekeeper_id' => $storekeeper->id]);
 
     $this->actingAs($manager)
         ->post(route('materials.store'), [
@@ -58,7 +66,9 @@ test('manager can create a material', function () {
             'description' => 'Fournisseur M',
             'quantity_in_stock' => 65,
             'unit' => 'tonnes',
+            'type' => 'materiaux',
             'category' => 'construction',
+            'project_id' => $project->id,
         ])
         ->assertRedirect(route('materials.index'));
 
@@ -66,6 +76,8 @@ test('manager can create a material', function () {
         'name' => 'Gravier premium',
         'quantity_in_stock' => 65,
         'unit' => 'tonnes',
+        'project_id' => $project->id,
+        'storekeeper_id' => $storekeeper->id,
     ]);
 });
 
@@ -75,6 +87,7 @@ test('manager can update a material', function () {
         'name' => 'Bois ancien',
         'quantity_in_stock' => 20,
         'unit' => 'm3',
+        'type' => 'materiaux',
     ]);
 
     $this->actingAs($manager)
@@ -83,6 +96,7 @@ test('manager can update a material', function () {
             'description' => 'Lot B',
             'quantity_in_stock' => 30,
             'unit' => 'm3',
+            'type' => 'materiaux',
             'category' => 'charpente',
         ])
         ->assertRedirect(route('materials.index'));
@@ -109,11 +123,14 @@ test('manager can delete a material', function () {
 
 test('manager can allocate material to project', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $storekeeper = User::factory()->create(['role' => UserRole::Magasinier]);
+    $project = Project::factory()->create(['storekeeper_id' => $storekeeper->id]);
     $material = Material::factory()->create([
+        'project_id' => $project->id,
+        'storekeeper_id' => $storekeeper->id,
         'quantity_in_stock' => 100,
         'unit' => 'sacs',
     ]);
-    $project = Project::factory()->create();
 
     $this->actingAs($manager)
         ->post(route('materials.allocate'), [

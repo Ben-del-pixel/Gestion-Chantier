@@ -107,7 +107,7 @@ class MaterialController extends Controller
             ->with(['material:id,name,unit', 'user:id,name']);
 
         if ($user->role === UserRole::Magasinier) {
-            $userProject = $user->projects()->first();
+            $userProject = Project::where('storekeeper_id', $user->id)->first();
             if ($userProject) {
                 $movementsQuery->whereIn('material_id', Material::where('project_id', $userProject->id)->pluck('id'));
             }
@@ -160,22 +160,22 @@ class MaterialController extends Controller
 
         // If Magasinier creates material, auto-assign to their project
         if ($user->role === UserRole::Magasinier) {
-            $userProject = $user->projects()->first();
+            $userProject = Project::where('storekeeper_id', $user->id)->first();
             if (! $userProject) {
-                return back()->withErrors(['project' => 'Vous n\'êtes assigné à aucun chantier. Contactez l\'administrateur.']);
+                return back()->with('error', 'Vous n\'êtes assigné à aucun chantier. Contactez l\'administrateur.');
             }
             $validated['storekeeper_id'] = $user->id;
             $validated['project_id'] = $userProject->id;
         } elseif ($user->role === UserRole::Manager) {
             // Manager must specify which Magasinier and Project
             if (! isset($validated['project_id']) || ! $validated['project_id']) {
-                return back()->withErrors(['project_id' => 'Vous devez spécifier le chantier pour ce matériel.']);
+                return back()->with('error', 'Vous devez spécifier le chantier pour ce matériel.');
             }
 
             // Get storekeeper from the project
             $project = Project::find($validated['project_id']);
             if (! $project || ! $project->storekeeper_id) {
-                return back()->withErrors(['project_id' => 'Ce chantier n\'a pas de magasinier assigné.']);
+                return back()->with('error', 'Ce chantier n\'a pas de magasinier assigné.');
             }
             $validated['storekeeper_id'] = $project->storekeeper_id;
         }
@@ -241,14 +241,10 @@ class MaterialController extends Controller
         // Check stock availability
         $material = Material::findOrFail($validated['material_id']);
         if ((int) $material->project_id !== (int) $validated['project_id']) {
-            return back()->withErrors([
-                'project_id' => 'Le matériel sélectionné n\'appartient pas au chantier choisi.',
-            ]);
+            return back()->with('error', 'Le matériel sélectionné n\'appartient pas au chantier choisi.');
         }
         if ((float) $material->quantity_in_stock < (float) $validated['quantity_requested']) {
-            return back()->withErrors([
-                'quantity_requested' => 'La quantité demandée ('.$validated['quantity_requested'].') dépasse le stock disponible ('.$material->quantity_in_stock.').',
-            ]);
+            return back()->with('error', 'La quantité demandée ('.$validated['quantity_requested'].') dépasse le stock disponible ('.$material->quantity_in_stock.').');
         }
 
         $allocation = ResourceRequest::create([
@@ -295,9 +291,7 @@ class MaterialController extends Controller
         $material = Material::findOrFail($validated['material_id']);
 
         if (($validated['reason'] ?? '') === 'retour_chantier' && $material->type !== 'materiel') {
-            return back()->withErrors([
-                'reason' => 'Seul le matériel (équipement) peut faire l\'objet d\'un retour de chantier.',
-            ]);
+            return back()->with('error', 'Seul le matériel (équipement) peut faire l\'objet d\'un retour de chantier.');
         }
 
         $material->increment('quantity_in_stock', $validated['quantity']);
@@ -331,9 +325,7 @@ class MaterialController extends Controller
         $material = Material::findOrFail($validated['material_id']);
 
         if ((float) $material->quantity_in_stock < (float) $validated['quantity']) {
-            return back()->withErrors([
-                'quantity' => 'La quantité demandée dépasse le stock disponible.',
-            ]);
+            return back()->with('error', 'La quantité demandée dépasse le stock disponible.');
         }
 
         $material->decrement('quantity_in_stock', $validated['quantity']);
