@@ -26,6 +26,7 @@ class TaskController extends Controller
 
         $task->workers()->updateExistingPivot($user->id, ['executed_at' => now()]);
         $task->refresh();
+        $task->unsetRelation('workers');
 
         $this->syncTaskStatusFromWorkerExecutions($task);
 
@@ -210,24 +211,26 @@ class TaskController extends Controller
 
     private function syncTaskStatusFromWorkerExecutions(Task $task): void
     {
-        $task->load('workers');
-        $total = $task->workers->count();
+        $stepId = $task->project_step_id;
+
+        // Compter depuis la base (pivot) pour éviter tout cache / pivot non rechargé après updateExistingPivot.
+        $total = $task->workers()->count();
 
         if ($total === 0) {
-            $this->syncStepCompletionFromTasks($task->projectStep);
+            $this->syncStepCompletionFromTasks(ProjectStep::query()->find($stepId));
 
             return;
         }
 
-        $executed = $task->workers->filter(fn ($w) => $w->pivot->executed_at !== null)->count();
+        $executed = $task->workers()->wherePivotNotNull('executed_at')->count();
 
         if ($executed === $total) {
             $task->update(['status' => 'termine']);
-        } elseif ($executed > 0 && $task->status !== 'termine') {
+        } elseif ($executed > 0 && $task->fresh()->status !== 'termine') {
             $task->update(['status' => 'en_cours']);
         }
 
-        $this->syncStepCompletionFromTasks($task->projectStep);
+        $this->syncStepCompletionFromTasks(ProjectStep::query()->find($stepId));
     }
 
     private function syncStepCompletionFromTasks(?ProjectStep $step): void
