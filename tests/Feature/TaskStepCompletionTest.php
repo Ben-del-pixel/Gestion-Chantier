@@ -26,6 +26,7 @@ test('step is automatically completed when all tasks are completed', function ()
         'engineer_id' => $engineer->id,
         'chef_chantier_id' => $chef->id,
     ]);
+    $project->workers()->sync([$worker->id]);
 
     $step = $project->steps()->create([
         'name' => 'Etape 1',

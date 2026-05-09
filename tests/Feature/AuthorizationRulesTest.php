@@ -29,7 +29,7 @@ test('chef de chantier cannot create project', function () {
         ->assertForbidden();
 });
 
-test('engineer can create project', function () {
+test('engineer cannot create project', function () {
     $engineer = User::factory()->create(['role' => UserRole::Engineer->value]);
 
     $this->actingAs($engineer)
@@ -38,5 +38,5 @@ test('engineer can create project', function () {
             'deadline' => now()->addMonth()->toDateString(),
             'status' => 'initialisation',
         ])
-        ->assertRedirect();
+        ->assertForbidden();
 });

@@ -88,4 +88,18 @@ class Project extends Model
         $total = $this->getTotalBudgetFromSteps();
         $this->update(['budget' => $total]);
     }
+
+    /**
+     * @return array<int, int>
+     */
+    public function assignableTaskUserIds(): array
+    {
+        $ids = $this->workers()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
+
+        if ($this->chef_chantier_id) {
+            $ids[] = (int) $this->chef_chantier_id;
+        }
+
+        return array_values(array_unique($ids));
+    }
 }

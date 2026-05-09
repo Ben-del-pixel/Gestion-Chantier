@@ -44,6 +44,8 @@ class Task extends Model
 
     public function workers()
     {
-        return $this->belongsToMany(User::class);
+        return $this->belongsToMany(User::class)
+            ->withPivot(['executed_at'])
+            ->withTimestamps();
     }
 }

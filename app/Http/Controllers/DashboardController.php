@@ -67,7 +67,10 @@ class DashboardController extends Controller
         } elseif ($user->role === UserRole::Engineer) {
             $data['tasks'] = Task::whereHas('project', function ($q) use ($user) {
                 $q->where('engineer_id', $user->id);
-            })->with(['workers', 'project'])->latest()->get();
+            })->with([
+                'project',
+                'workers' => fn ($q) => $q->withPivot(['executed_at']),
+            ])->latest()->get();
 
             $data['stats'] = [
                 'active_tasks' => Task::whereHas('project', function ($q) use ($user) {
@@ -110,7 +113,10 @@ class DashboardController extends Controller
         } elseif ($user->role === UserRole::ChefChantier) {
             $data['tasks'] = Task::whereHas('project', function ($q) use ($user) {
                 $q->where('chef_chantier_id', $user->id);
-            })->with(['workers', 'project'])->latest()->get();
+            })->with([
+                'project',
+                'workers' => fn ($q) => $q->withPivot(['executed_at']),
+            ])->latest()->get();
 
             $data['stats'] = [
                 'active_tasks' => Task::whereHas('project', function ($q) use ($user) {
@@ -150,7 +156,10 @@ class DashboardController extends Controller
                 AttendanceShift::cases()
             );
         } elseif ($user->role === UserRole::Worker) {
-            $data['tasks'] = $user->tasks()->with('project')->latest()->get();
+            $data['tasks'] = $user->tasks()->with([
+                'project',
+                'workers' => fn ($q) => $q->withPivot(['executed_at']),
+            ])->latest()->get();
 
             $attendances = Attendance::with('project:id,name')
                 ->where('user_id', $user->id)

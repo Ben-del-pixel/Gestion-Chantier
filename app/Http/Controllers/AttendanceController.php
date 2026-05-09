@@ -131,7 +131,10 @@ class AttendanceController extends Controller
         $projects = $projectsQuery->get();
         $assignedTasks = collect();
         if ($userRoleValue === UserRole::Worker->value) {
-            $assignedTasks = Task::with('project:id,name')
+            $assignedTasks = Task::with([
+                'project:id,name',
+                'workers' => fn ($q) => $q->withPivot(['executed_at']),
+            ])
                 ->whereHas('workers', function ($workersQuery) use ($user) {
                     $workersQuery->where('users.id', $user->id);
                 })

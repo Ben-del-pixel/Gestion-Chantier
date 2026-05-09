@@ -1,11 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
 import {
   Calendar, DollarSign, MapPin, User, Users,
   Trash2, Edit, Activity, Clock,
   HardHat, Wallet, FileText, CheckCircle,
   LayoutGrid, ListChecks, Settings2, AlertCircle, Plus
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,10 +20,21 @@ import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
-export default function ProjectDetail({ project, totalWorkersCount, engineers, chefsChantier, storekeepers, auth }: any) {
+export default function ProjectDetail({ project, totalWorkersCount, engineers, chefsChantier, storekeepers }: any) {
     const { currency, setCurrency, formatCurrency } = useCurrency();
-    const { errors }: any = usePage().props;
-    const user = auth.user;
+    const pageProps = usePage().props as any;
+    const { errors }: any = pageProps;
+    const user = pageProps?.auth?.user;
+    const isManager = user?.role === 'manager';
+
+    const assignableForTasks = useMemo(() => {
+        const list = project.workers ? [...project.workers] : [];
+        if (project.chef_chantier?.id && !list.some((x: any) => x.id === project.chef_chantier.id)) {
+            list.push(project.chef_chantier);
+        }
+
+        return list;
+    }, [project.workers, project.chef_chantier]);
 
     const canManageProject = user.role === 'manager' || (user.role === 'engineer' && project.engineer_id === user.id);
     const canManageTasks = canManageProject || (user.role === 'chef_chantier' && project.chef_chantier_id === user.id);
@@ -246,10 +258,12 @@ return 'Non défini';
                     <Edit className="mr-2 h-4 w-4 text-blue-500" />
                     Modifier Projet
                     </Button>
+                    {isManager && (
                     <Button variant="destructive" onClick={handleDelete} className="h-11 rounded-xl px-6 font-bold shadow-lg shadow-red-500/20">
                     <Trash2 className="mr-2 h-4 w-4" />
                     Supprimer
                     </Button>
+                    )}
                 </>
             )}
           </div>
@@ -468,6 +482,24 @@ return 'Non défini';
                                                         </div>
                                                     ))}
                                                 </div>
+                                                {['worker', 'chef_chantier'].includes(user?.role) && task.workers?.some((w: any) => w.id === user?.id) && (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        className="mt-2 w-full rounded-xl font-bold"
+                                                        variant={
+                                                            task.workers?.find((w: any) => w.id === user?.id)?.pivot?.executed_at
+                                                                ? 'outline'
+                                                                : 'default'
+                                                        }
+                                                        disabled={Boolean(task.workers?.find((w: any) => w.id === user?.id)?.pivot?.executed_at)}
+                                                        onClick={() => router.post(markExecuted.url({ task: task.id }), {}, { preserveScroll: true })}
+                                                    >
+                                                        {task.workers?.find((w: any) => w.id === user?.id)?.pivot?.executed_at
+                                                            ? 'Exécution confirmée'
+                                                            : 'Confirmer l\'exécution'}
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -541,6 +573,7 @@ return 'Non défini';
                                 <Users className="h-3 w-3" /> Encadrement & Statut
                             </h3>
                             <div className="space-y-4">
+                                {isManager && (
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase text-slate-400">Ingénieur Responsable</Label>
                                     <select value={formData.engineer_id} onChange={e => setFormData({...formData, engineer_id: e.target.value})} className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-orange-500/20 appearance-none">
@@ -548,6 +581,7 @@ return 'Non défini';
                                         {engineers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                                     </select>
                                 </div>
+                                )}
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase text-slate-400">Chef de Chantier</Label>
                                     <select value={formData.chef_chantier_id} onChange={e => setFormData({...formData, chef_chantier_id: e.target.value})} className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-blue-500/20 appearance-none">
@@ -555,6 +589,7 @@ return 'Non défini';
                                         {chefsChantier.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                                     </select>
                                 </div>
+                                {isManager && (
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase text-slate-400">Magasinier</Label>
                                     <select value={formData.storekeeper_id} onChange={e => setFormData({...formData, storekeeper_id: e.target.value})} className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-blue-500/20 appearance-none">
@@ -562,6 +597,7 @@ return 'Non défini';
                                         {storekeepers.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                                     </select>
                                 </div>
+                                )}
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase text-slate-400">Statut de réalisation</Label>
                                     <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full h-12 rounded-xl border border-slate-200 px-4 text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-emerald-500/20 appearance-none">
@@ -680,9 +716,9 @@ return 'Non défini';
                         </div>
 
                         <div className="space-y-3">
-                            <Label className="text-xs font-black uppercase text-slate-400">Ouvriers assignés</Label>
+                            <Label className="text-xs font-black uppercase text-slate-400">Ouvriers & responsables assignés</Label>
                             <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
-                                {project.workers?.map((worker: any) => (
+                                {assignableForTasks.map((worker: any) => (
                                     <div
                                         key={worker.id}
                                         onClick={() => toggleWorkerSelection(worker.id)}

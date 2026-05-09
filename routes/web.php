@@ -2,11 +2,12 @@
 
 use App\Http\Controllers\AbsenceNotificationController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\Api\EngineerProjectController;
 use App\Http\Controllers\Api\FilterController;
 use App\Http\Controllers\Api\MaterialController;
 use App\Http\Controllers\Api\ProjectController;
-use App\Http\Controllers\Api\EngineerProjectController;
 use App\Http\Controllers\Api\ProjectSubStepController;
+use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceInitializationController;
 use App\Http\Controllers\DashboardController;
@@ -35,9 +36,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('projects/{project}/steps/{step}/toggle', [ProjectController::class, 'toggleStep'])->name('projects.steps.toggle');
 
     // Task routes
-    Route::post('tasks', [\App\Http\Controllers\Api\TaskController::class, 'store'])->name('tasks.store');
-    Route::put('tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'update'])->name('tasks.update');
-    Route::delete('tasks/{task}', [\App\Http\Controllers\Api\TaskController::class, 'destroy'])->name('tasks.destroy');
+    Route::post('tasks', [TaskController::class, 'store'])->name('tasks.store');
+    Route::post('tasks/{task}/execute', [TaskController::class, 'markExecuted'])->name('tasks.execute');
+    Route::put('tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+    Route::delete('tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
 
     // Engineer Project Management routes
     Route::get('engineer/projects', [EngineerProjectController::class, 'index'])->name('engineer.projects.index');

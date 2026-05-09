@@ -1,10 +1,11 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
 import { 
   Calendar, Clock, MapPin, User, Users, CheckCircle, XCircle, 
   Plus, Settings, Loader, Filter, Search, ArrowRight, UserCheck, 
   Clock3, AlertCircle, ChevronRight
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,13 +35,24 @@ export default function AttendanceIndex({
   const currentRole = page?.auth?.user?.role;
   const canManageAttendance = currentRole === 'manager' || currentRole === 'magasinier';
   const [displayDate, setDisplayDate] = useState(date);
-  const [displayProject, setDisplayProject] = useState(selectedProject);
+  const [displayProject, setDisplayProject] = useState(
+    selectedProject != null && selectedProject !== '' ? String(selectedProject) : ''
+  );
   const [attendances, setAttendances] = useState(initialAttendances);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showAssignWorkers, setShowAssignWorkers] = useState(false);
   const [showInitialize, setShowInitialize] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    setAttendances(initialAttendances);
+  }, [initialAttendances]);
+
+  useEffect(() => {
+    setDisplayDate(date);
+    setDisplayProject(selectedProject != null && selectedProject !== '' ? String(selectedProject) : '');
+  }, [date, selectedProject]);
   
   const defaultStatus = statuses?.length > 0 ? statuses[0].value : 'present';
   const defaultShift = shifts?.length > 0 ? shifts[0].value : 'morning';
@@ -65,7 +77,8 @@ params.append('project_id', displayProject);
 }
       
       const response = await fetch(`/api/attendance/list?${params.toString()}`, {
-        headers: { 'Accept': 'application/json' },
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
       });
 
       if (response.ok) {
@@ -80,10 +93,14 @@ params.append('project_id', displayProject);
   };
 
   const handleFiltersChange = () => {
-    router.get('/attendance', {
+    router.get(
+      '/attendance',
+      {
         date: displayDate,
-        project_id: displayProject
-    }, { preserveState: true, preserveScroll: true });
+        ...(displayProject ? { project_id: displayProject } : {}),
+      },
+      { preserveScroll: true },
+    );
   };
 
   const handleCheckIn = (e: React.FormEvent) => {

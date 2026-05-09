@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
 import React from 'react';
+import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
 import { Doughnut, Line } from 'react-chartjs-2';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { apiList, updateStatus } from '@/actions/App/Http/Controllers/AttendanceController';
@@ -49,6 +50,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+
+function TaskExecuteButton({ task }: { task: any }) {
+    const page = usePage().props as any;
+    const user = page?.auth?.user;
+    const uid = user?.id as number | undefined;
+    const role = user?.role as string | undefined;
+
+    if (!uid || !role || !['worker', 'chef_chantier'].includes(role)) {
+        return null;
+    }
+
+    const assigned = task.workers?.some((w: any) => w.id === uid);
+    if (!assigned) {
+        return null;
+    }
+
+    const self = task.workers?.find((w: any) => w.id === uid);
+    const done = Boolean(self?.pivot?.executed_at ?? task.pivot?.executed_at);
+
+    return (
+        <Button
+            type="button"
+            size="sm"
+            variant={done ? 'outline' : 'default'}
+            disabled={done}
+            className="shrink-0 rounded-xl font-bold"
+            onClick={() => {
+                if (done) {
+                    return;
+                }
+                router.post(markExecuted.url({ task: task.id }), {}, { preserveScroll: true });
+            }}
+        >
+            {done ? 'Exécution confirmée' : 'Confirmer l’exécution'}
+        </Button>
+    );
+}
 
 ChartJS.register(
     ArcElement,
@@ -811,7 +849,8 @@ export const EngineerDashboard = ({
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <TaskExecuteButton task={t} />
                                 <StatusBadge status={t.status} />
                                 <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8"><ChevronRight size={18} /></Button>
                             </div>
@@ -1237,6 +1276,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                     <MapPin size={12} /> {t.project?.name}
                                 </div>
                             </div>
+                            <TaskExecuteButton task={t} />
                             <StatusBadge status={t.status} />
                         </div>
                     ))}

@@ -12,6 +12,33 @@ use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
+    public function markExecuted(Task $task)
+    {
+        $user = auth()->user();
+
+        if (! in_array($user->role, [UserRole::Worker, UserRole::ChefChantier], true)) {
+            abort(403, 'Seuls les ouvriers et chefs de chantier assignés peuvent confirmer l\'exécution.');
+        }
+
+        if (! $task->workers()->where('users.id', $user->id)->exists()) {
+            abort(403, 'Vous n\'êtes pas assigné à cette tâche.');
+        }
+
+        $task->workers()->updateExistingPivot($user->id, ['executed_at' => now()]);
+        $task->refresh();
+
+        $this->syncTaskStatusFromWorkerExecutions($task);
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => 'task_execution_confirmed',
+            'description' => "Exécution confirmée pour la tâche : {$task->name}",
+            'properties' => ['task_id' => $task->id, 'project_id' => $task->project_id],
+        ]);
+
+        return back()->with('success', 'Votre travail sur cette tâche est enregistré.');
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -42,6 +69,8 @@ class TaskController extends Controller
             abort(422, 'L\'étape sélectionnée n\'appartient pas à ce projet.');
         }
 
+        $this->assertWorkersAssignableToProject($project, $validated['worker_ids'] ?? []);
+
         $task = Task::create([
             'project_id' => $validated['project_id'],
             'project_step_id' => $validated['project_step_id'],
@@ -56,7 +85,7 @@ class TaskController extends Controller
         if (! empty($validated['worker_ids'])) {
             $task->workers()->sync($validated['worker_ids']);
         }
-        $this->syncStepCompletionFromTasks($step);
+        $this->syncTaskStatusFromWorkerExecutions($task->fresh());
 
         ActivityLog::create([
             'user_id' => auth()->id(),
@@ -99,6 +128,10 @@ class TaskController extends Controller
             abort(422, 'L\'étape sélectionnée n\'appartient pas à ce projet.');
         }
 
+        if (isset($validated['worker_ids'])) {
+            $this->assertWorkersAssignableToProject($project, $validated['worker_ids']);
+        }
+
         $task->update([
             'project_step_id' => $validated['project_step_id'],
             'project_sub_step_id' => null,
@@ -112,7 +145,7 @@ class TaskController extends Controller
         if (isset($validated['worker_ids'])) {
             $task->workers()->sync($validated['worker_ids']);
         }
-        $this->syncStepCompletionFromTasks($step);
+        $this->syncTaskStatusFromWorkerExecutions($task->fresh());
         if ($previousStepId && $previousStepId !== $step->id) {
             $this->syncStepCompletionFromTasks(ProjectStep::find($previousStepId));
         }
@@ -157,6 +190,46 @@ class TaskController extends Controller
         return back()->with('success', 'Tâche supprimée avec succès');
     }
 
+    /**
+     * @param  array<int, mixed>  $workerIds
+     */
+    private function assertWorkersAssignableToProject(Project $project, array $workerIds): void
+    {
+        if ($workerIds === []) {
+            return;
+        }
+
+        $allowed = $project->assignableTaskUserIds();
+
+        foreach ($workerIds as $workerId) {
+            if (! in_array((int) $workerId, $allowed, true)) {
+                abort(422, 'Un ou plusieurs membres ne sont pas affectés à ce chantier (ouvriers ou chef de chantier du projet).');
+            }
+        }
+    }
+
+    private function syncTaskStatusFromWorkerExecutions(Task $task): void
+    {
+        $task->load('workers');
+        $total = $task->workers->count();
+
+        if ($total === 0) {
+            $this->syncStepCompletionFromTasks($task->projectStep);
+
+            return;
+        }
+
+        $executed = $task->workers->filter(fn ($w) => $w->pivot->executed_at !== null)->count();
+
+        if ($executed === $total) {
+            $task->update(['status' => 'termine']);
+        } elseif ($executed > 0 && $task->status !== 'termine') {
+            $task->update(['status' => 'en_cours']);
+        }
+
+        $this->syncStepCompletionFromTasks($task->projectStep);
+    }
+
     private function syncStepCompletionFromTasks(?ProjectStep $step): void
     {
         if (! $step) {
@@ -168,11 +241,43 @@ class TaskController extends Controller
         $completedTasks = (clone $tasksQuery)->where('status', 'termine')->count();
 
         if ($totalTasks > 0 && $completedTasks === $totalTasks) {
-            $step->complete();
+            if (! $step->is_completed) {
+                $step->complete();
+                $this->notifyStepStakeholders($step);
+            }
 
             return;
         }
 
-        $step->uncomplete();
+        if ($step->is_completed) {
+            $step->uncomplete();
+        }
+    }
+
+    private function notifyStepStakeholders(ProjectStep $step): void
+    {
+        $project = $step->project;
+        if (! $project) {
+            return;
+        }
+
+        $recipientIds = array_unique(array_filter([
+            $project->chef_chantier_id,
+            $project->engineer_id,
+            $project->manager_id,
+        ]));
+
+        foreach ($recipientIds as $userId) {
+            ActivityLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'step_completed',
+                'description' => "Étape terminée (toutes les tâches complétées) : {$step->name} — projet {$project->name}",
+                'properties' => [
+                    'project_id' => $project->id,
+                    'step_id' => $step->id,
+                    'recipient_id' => $userId,
+                ],
+            ]);
+        }
     }
 }

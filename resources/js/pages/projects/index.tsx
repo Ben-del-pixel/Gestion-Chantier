@@ -95,7 +95,7 @@ function getProgress(project: ProjectItem): number {
 
 export default function ProjectsIndex({ projects, engineers }: { projects: ProjectItem[], engineers: Array<{ id: number, name: string }> }) {
   const page = usePage().props as any;
-  const canCreateProject = [UserRole.Manager.value, UserRole.Engineer.value].includes(page?.auth?.user?.role);
+  const canCreateProject = page?.auth?.user?.role === UserRole.Manager.value;
   const { currency, setCurrency, formatCurrency, rate, setRate } = useCurrency();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('all');

@@ -54,8 +54,8 @@ class EngineerProjectController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->role !== UserRole::Engineer || $project->engineer_id !== $user->id) {
-            abort(403, 'Vous ne pouvez pas modifier ce projet.');
+        if ($user->role !== UserRole::Manager) {
+            abort(403, 'Seul le manager peut assigner un magasinier à un projet.');
         }
 
         $validated = $request->validate([
@@ -105,7 +105,7 @@ class EngineerProjectController extends Controller
 
         // Assigner automatiquement l'équipe du chef de chantier au projet
         $teamIds = $chefChantier->team()->pluck('id')->toArray();
-        if (!empty($teamIds)) {
+        if (! empty($teamIds)) {
             // Créer les entrées dans project_workers
             foreach ($teamIds as $workerId) {
                 $project->projectWorkers()->create([

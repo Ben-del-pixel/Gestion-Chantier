@@ -41,7 +41,9 @@ class User extends Authenticatable
 
     public function tasks()
     {
-        return $this->belongsToMany(Task::class);
+        return $this->belongsToMany(Task::class)
+            ->withPivot(['executed_at'])
+            ->withTimestamps();
     }
 
     public function attendances()

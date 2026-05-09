@@ -57,8 +57,8 @@ class ProjectController extends Controller
     {
         $user = auth()->user();
 
-        if (! in_array($user->role, [UserRole::Manager, UserRole::Engineer], true)) {
-            abort(403, 'Seuls le manager et l\'ingénieur peuvent créer des projets.');
+        if ($user->role !== UserRole::Manager) {
+            abort(403, 'Seul le manager peut créer un projet.');
         }
 
         $validated = $request->validate([
@@ -82,10 +82,8 @@ class ProjectController extends Controller
             'budget' => $validated['budget'] ?? 0,
             'deadline' => $validated['deadline'],
             'progress' => $validated['progress'] ?? 0,
-            'engineer_id' => $user->role === UserRole::Engineer ? $user->id : ($validated['engineer_id'] ?? null),
-            'manager_id' => $user->role === UserRole::Manager
-                ? $user->id
-                : (User::where('role', UserRole::Manager)->value('id') ?? $user->id),
+            'engineer_id' => $validated['engineer_id'] ?? null,
+            'manager_id' => $user->id,
             'status' => $validated['status'] ?? 'initialisation',
         ]);
 
@@ -120,11 +118,26 @@ class ProjectController extends Controller
 
     public function show(Project $project): Response
     {
-        $project->load(['engineer', 'manager', 'chefChantier', 'storekeeper', 'steps.subSteps', 'tasks.workers', 'workers']);
+        $project->load([
+            'engineer',
+            'manager',
+            'chefChantier',
+            'storekeeper',
+            'steps.subSteps',
+            'tasks.workers' => fn ($query) => $query->withPivot(['executed_at']),
+            'workers',
+        ]);
 
-        $engineers = User::where('role', UserRole::Engineer)->get();
-        $chefsChantier = User::where('role', UserRole::ChefChantier)->get();
-        $storekeepers = User::where('role', UserRole::Magasinier)->get();
+        $viewer = auth()->user();
+
+        $engineers = User::where('role', UserRole::Engineer)->orderBy('name')->get();
+
+        $chefsChantierQuery = User::where('role', UserRole::ChefChantier)->orderBy('name');
+        if ($viewer->role === UserRole::Engineer) {
+            $chefsChantierQuery->where('engineer_id', $viewer->id);
+        }
+        $chefsChantier = $chefsChantierQuery->get();
+        $storekeepers = User::where('role', UserRole::Magasinier)->orderBy('name')->get();
         $allWorkers = User::whereIn('role', [UserRole::Worker, UserRole::Magasinier, UserRole::ChefChantier])->get();
 
         // Calculate total unique workers for the project (from workers relation or tasks)
@@ -187,6 +200,16 @@ class ProjectController extends Controller
         }
         if (isset($projectData['storekeeper_id']) && $projectData['storekeeper_id'] === '') {
             $projectData['storekeeper_id'] = null;
+        }
+
+        if ($user->role === UserRole::Engineer) {
+            unset($projectData['engineer_id'], $projectData['storekeeper_id']);
+            if (! empty($projectData['chef_chantier_id'])) {
+                $chef = User::find($projectData['chef_chantier_id']);
+                if (! $chef || $chef->role !== UserRole::ChefChantier || (int) $chef->engineer_id !== (int) $user->id) {
+                    return back()->with('error', 'Vous ne pouvez assigner qu’un chef de chantier rattaché à votre équipe.');
+                }
+            }
         }
 
         // Restriction: Only one magasinier per project (Storekeeper or in Workers)
