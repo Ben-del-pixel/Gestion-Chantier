@@ -1,12 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
 import {
   Calendar, DollarSign, MapPin, User, Users,
   Trash2, Edit, Activity, Clock,
   HardHat, Wallet, FileText, CheckCircle,
-  LayoutGrid, ListChecks, Settings2, AlertCircle, Plus
+  LayoutGrid, ListChecks, Settings2, AlertCircle, Plus, ChevronDown,
 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
+import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, c
 
     const assignableForTasks = useMemo(() => {
         const list = project.workers ? [...project.workers] : [];
+
         if (project.chef_chantier?.id && !list.some((x: any) => x.id === project.chef_chantier.id)) {
             list.push(project.chef_chantier);
         }
@@ -63,6 +64,7 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, c
 
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [expandedStepIds, setExpandedStepIds] = useState<Record<number, boolean>>({});
   const [taskData, setTaskData] = useState({
     project_step_id: '',
     name: '',
@@ -162,6 +164,40 @@ return 'Non défini';
     });
     setShowTaskDialog(true);
   };
+
+  const handleCreateTaskForStep = (stepId: number) => {
+    setEditingTask(null);
+    setTaskData({
+        project_step_id: String(stepId),
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        status: 'planifie',
+        worker_ids: [],
+    });
+    setShowTaskDialog(true);
+  };
+
+  const toggleStepTasksPanel = (stepId: number) => {
+    setExpandedStepIds((prev) => ({
+      ...prev,
+      [stepId]: !prev[stepId],
+    }));
+  };
+
+  const tasksForStep = (stepId: number) =>
+    (project.tasks || []).filter((t: any) => Number(t.project_step_id) === Number(stepId));
+
+  const selectedStepLabelForTask = useMemo(() => {
+    if (!taskData.project_step_id) {
+      return null;
+    }
+
+    const s = (project.steps || []).find((x: any) => String(x.id) === String(taskData.project_step_id));
+
+    return s?.name ?? null;
+  }, [taskData.project_step_id, project.steps]);
 
   const handleEditTask = (task: any) => {
     setEditingTask(task);
@@ -378,13 +414,25 @@ return 'Non défini';
                     <CardContent className="p-0">
                         {project.steps?.length > 0 ? (
                             <div className="divide-y divide-slate-50">
-                                {project.steps.map((step: any, idx: number) => (
-                                    <div key={step.id} className={`flex items-center justify-between px-8 py-6 transition-all hover:bg-slate-50/50 group ${step.is_completed ? 'bg-emerald-50/50' : ''}`}>
-                                        <div className="flex items-center gap-6">
+                                {project.steps.map((step: any, idx: number) => {
+                                    const stepTasks = tasksForStep(step.id);
+                                    const isExpanded = Boolean(expandedStepIds[step.id]);
+
+                                    return (
+                                    <div key={step.id} className={cn(step.is_completed ? 'bg-emerald-50/50' : '')}>
+                                    <div className={`flex flex-wrap items-center justify-between gap-4 px-8 py-6 transition-all hover:bg-slate-50/50 group ${step.is_completed ? '' : ''}`}>
+                                        <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-6">
                                             <button
-                                                onClick={() => canToggleSteps && handleToggleStep(step.id)}
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+
+                                                    if (canToggleSteps) {
+                                                        handleToggleStep(step.id);
+                                                    }
+                                                }}
                                                 disabled={!canToggleSteps}
-                                                className={`flex h-10 w-10 items-center justify-center rounded-2xl border-2 font-black text-sm shadow-sm transition-all ${
+                                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border-2 font-black text-sm shadow-sm transition-all ${
                                                     step.is_completed
                                                         ? 'bg-emerald-500 border-emerald-500 text-white'
                                                         : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-400 hover:text-emerald-500'
@@ -392,26 +440,124 @@ return 'Non défini';
                                             >
                                                 {step.is_completed ? <CheckCircle className="h-5 w-5" /> : idx + 1}
                                             </button>
-                                            <div>
-                                                <h4 className={`font-bold ${step.is_completed ? 'text-emerald-700 line-through' : 'text-slate-900'}`}>{step.name}</h4>
-                                                <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter">
-                                                    {step.is_completed ? 'Étape terminée' : `Budget Phase ${idx + 1}`}
-                                                </p>
-                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleStepTasksPanel(step.id)}
+                                                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-1 text-left transition-colors hover:bg-slate-100/80 sm:gap-4"
+                                            >
+                                                <ChevronDown
+                                                    className={cn(
+                                                        'h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200',
+                                                        isExpanded && 'rotate-180',
+                                                    )}
+                                                />
+                                                <div className="min-w-0">
+                                                    <h4 className={`font-bold ${step.is_completed ? 'text-emerald-700 line-through' : 'text-slate-900'}`}>{step.name}</h4>
+                                                    <p className="text-xs font-bold uppercase tracking-tighter text-slate-400">
+                                                        {step.is_completed ? 'Étape terminée' : `Budget phase ${idx + 1}`}
+                                                        {stepTasks.length > 0 && (
+                                                            <span className="ml-2 normal-case text-blue-600">
+                                                                · {stepTasks.length} tâche{stepTasks.length > 1 ? 's' : ''}
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </button>
                                         </div>
-                                        <div className="text-right">
-                                            <div className={`text-lg font-black ${step.is_completed ? 'text-emerald-500' : 'text-emerald-600'}`}>
-                                                {formatCurrency(Number(step.budget || 0))}
-                                            </div>
-                                            <div className={`flex items-center justify-end gap-1 text-[10px] font-black uppercase italic ${
-                                                step.is_completed ? 'text-emerald-600' : 'text-slate-300'
-                                            }`}>
-                                                <CheckCircle className="h-2.5 w-2.5" />
-                                                {step.is_completed ? 'Consommé' : 'Planifié'}
+                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+                                            {canManageTasks && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-9 rounded-xl border-blue-200 font-bold text-blue-700 hover:bg-blue-50"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCreateTaskForStep(step.id);
+                                                    }}
+                                                >
+                                                    <Plus className="mr-1.5 h-4 w-4" />
+                                                    Créer tâche
+                                                </Button>
+                                            )}
+                                            <div className="text-right">
+                                                <div className={`text-lg font-black ${step.is_completed ? 'text-emerald-500' : 'text-emerald-600'}`}>
+                                                    {formatCurrency(Number(step.budget || 0))}
+                                                </div>
+                                                <div className={`flex items-center justify-end gap-1 text-[10px] font-black uppercase italic ${
+                                                    step.is_completed ? 'text-emerald-600' : 'text-slate-300'
+                                                }`}>
+                                                    <CheckCircle className="h-2.5 w-2.5" />
+                                                    {step.is_completed ? 'Consommé' : 'Planifié'}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                    {isExpanded && (
+                                        <div className="border-t border-slate-100 bg-slate-50/90 px-8 py-4">
+                                            <p className="mb-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Tâches de cette étape</p>
+                                            {stepTasks.length > 0 ? (
+                                                <ul className="space-y-2">
+                                                    {stepTasks.map((task: any) => (
+                                                        <li
+                                                            key={task.id}
+                                                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
+                                                        >
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="font-bold text-slate-900">{task.name}</p>
+                                                                <p className="text-xs text-slate-500">
+                                                                    {task.status}
+                                                                    {task.end_date && (
+                                                                        <span className="ml-2">
+                                                                            · fin {formatDate(task.end_date)}
+                                                                        </span>
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex shrink-0 items-center gap-1">
+                                                                {canManageTasks && (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleEditTask(task)}
+                                                                            className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+                                                                            title="Modifier"
+                                                                        >
+                                                                            <Edit className="h-4 w-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleTaskDelete(task.id)}
+                                                                            className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                                                            title="Supprimer"
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm font-medium italic text-slate-500">
+                                                    Aucune tâche pour cette étape.
+                                                    {canManageTasks && (
+                                                        <button
+                                                            type="button"
+                                                            className="ml-2 font-bold text-blue-600 underline"
+                                                            onClick={() => handleCreateTaskForStep(step.id)}
+                                                        >
+                                                            Créer une tâche
+                                                        </button>
+                                                    )}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    </div>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="py-20 text-center">
@@ -662,7 +808,14 @@ return 'Non défini';
                     <DialogTitle className="text-2xl font-black italic tracking-tight">
                         {editingTask ? 'Modifier la Tâche' : 'Nouvelle Tâche'}
                     </DialogTitle>
-                    <DialogDescription className="text-blue-100 mt-1">Affectation et planification du travail</DialogDescription>
+                    <DialogDescription className="mt-1 text-blue-100">
+                        Affectation et planification du travail
+                        {selectedStepLabelForTask && (
+                            <span className="mt-1 block font-semibold text-white">
+                                Étape : {selectedStepLabelForTask}
+                            </span>
+                        )}
+                    </DialogDescription>
                 </div>
 
                 <form onSubmit={handleTaskSubmit} className="flex-1 overflow-y-auto px-8 py-6 space-y-6 scrollbar-hide">

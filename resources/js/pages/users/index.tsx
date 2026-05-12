@@ -32,6 +32,12 @@ type UserItem = {
   chefChantier?: { id: number; name: string } | null;
 };
 
+type AssignableWorker = {
+  id: number;
+  name: string;
+  chef_chantier_id: number | null;
+};
+
 type WorkforceRow = UserItem & {
   roleLabel: string;
   phone: string;
@@ -82,16 +88,32 @@ function resolveStatus(userId: number): WorkforceRow['status'] {
   return 'Actif';
 }
 
-export default function UsersIndex({ users, engineers, chefChantiers }: { users: UserItem[]; engineers: { id: number; name: string }[]; chefChantiers: { id: number; name: string }[] }) {
+export default function UsersIndex({
+  users,
+  engineers,
+  chefChantiers,
+  assignableWorkers = [],
+}: {
+  users: UserItem[];
+  engineers: { id: number; name: string }[];
+  chefChantiers: { id: number; name: string }[];
+  assignableWorkers?: AssignableWorker[];
+}) {
   const page = usePage().props as any;
   const isChefChantier = page?.auth?.user?.role === UserRole.ChefChantier.value;
+  const canManageChefTeam = !isChefChantier;
   const [open, setOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedRole, setSelectedRole] = React.useState<UserRoleValue | 'all'>('all');
   const [isLoading, setIsLoading] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<UserItem | null>(null);
-  
-  // Team management modal state
+  const [teamWorkerIds, setTeamWorkerIds] = React.useState<number[]>([]);
+
+  const [chefTeamModalOpen, setChefTeamModalOpen] = React.useState(false);
+  const [selectedChef, setSelectedChef] = React.useState<UserItem | null>(null);
+  const [chefTeamWorkerIds, setChefTeamWorkerIds] = React.useState<number[]>([]);
+
+  // Team management modal state (ingénieur — existant)
   const [teamModalOpen, setTeamModalOpen] = React.useState(false);
   const [selectedEngineer, setSelectedEngineer] = React.useState<UserItem | null>(null);
   const [selectedTeamIds, setSelectedTeamIds] = React.useState<number[]>([]);
@@ -164,11 +186,37 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
   }, [workforce]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === 'role' && value !== UserRole.ChefChantier.value) {
+        setTeamWorkerIds([]);
+      }
+      if (name === 'role' && value === UserRole.ChefChantier.value && engineers.length === 1) {
+        next.engineer_id = String(engineers[0].id);
+      }
+
+      return next;
     });
   };
+
+  const toggleTeamWorker = (workerId: number) => {
+    setTeamWorkerIds((prev) =>
+      prev.includes(workerId) ? prev.filter((id) => id !== workerId) : [...prev, workerId],
+    );
+  };
+
+  const toggleChefModalWorker = (workerId: number) => {
+    setChefTeamWorkerIds((prev) =>
+      prev.includes(workerId) ? prev.filter((id) => id !== workerId) : [...prev, workerId],
+    );
+  };
+
+  React.useEffect(() => {
+    if (formData.role === UserRole.ChefChantier.value && engineers.length === 1 && !formData.engineer_id) {
+      setFormData((prev) => ({ ...prev, engineer_id: String(engineers[0].id) }));
+    }
+  }, [formData.role, formData.engineer_id, engineers]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,11 +225,28 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
     const url = editingUser ? update.url({ user: editingUser.id }) : store.url();
     const method = editingUser ? 'put' : 'post';
 
+    const payload: Record<string, unknown> = { ...formData };
+    if (formData.role === UserRole.ChefChantier.value) {
+      payload.team_worker_ids = teamWorkerIds;
+    } else {
+      delete payload.team_worker_ids;
+    }
+
     router.visit(url, {
       method,
-      data: formData,
+      data: payload,
       onSuccess: () => {
-        setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '', engineer_id: '', chef_chantier_id: '' });
+        setFormData({
+          name: '',
+          email: '',
+          password: '',
+          role: UserRole.Worker.value,
+          phone: '',
+          skills: '',
+          engineer_id: '',
+          chef_chantier_id: '',
+        });
+        setTeamWorkerIds([]);
         setEditingUser(null);
         setOpen(false);
       },
@@ -206,7 +271,57 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
       engineer_id: user.engineer_id ? user.engineer_id.toString() : '',
       chef_chantier_id: user.chef_chantier_id ? user.chef_chantier_id.toString() : '',
     });
+    if (user.role === UserRole.ChefChantier.value) {
+      setTeamWorkerIds(
+        users.filter((u) => u.role === UserRole.Worker.value && u.chef_chantier_id === user.id).map((u) => u.id),
+      );
+    } else {
+      setTeamWorkerIds([]);
+    }
     setOpen(true);
+  };
+
+  const openChefTeamModal = (chef: UserItem) => {
+    setSelectedChef(chef);
+    setChefTeamWorkerIds(
+      users.filter((u) => u.role === UserRole.Worker.value && u.chef_chantier_id === chef.id).map((u) => u.id),
+    );
+    setChefTeamModalOpen(true);
+  };
+
+  const saveChefTeam = () => {
+    if (!selectedChef) {
+      return;
+    }
+
+    setIsLoading(true);
+    router.put(
+      update.url({ user: selectedChef.id }),
+      {
+        name: selectedChef.name,
+        email: selectedChef.email,
+        role: selectedChef.role,
+        phone: selectedChef.phone ?? '',
+        skills: selectedChef.skills ?? '',
+        engineer_id: selectedChef.engineer_id ? String(selectedChef.engineer_id) : '',
+        chef_chantier_id: '',
+        team_worker_ids: chefTeamWorkerIds,
+      },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          setChefTeamModalOpen(false);
+          setSelectedChef(null);
+          setChefTeamWorkerIds([]);
+        },
+        onError: () => {
+          alert('Erreur lors de la mise à jour de l\'équipe');
+        },
+        onFinish: () => {
+          setIsLoading(false);
+        },
+      },
+    );
   };
 
   const handleDelete = async (userId: number) => {
@@ -303,7 +418,17 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
             <div className="flex items-center gap-2">
             </div>
 
-            {!isChefChantier && <Dialog open={open} onOpenChange={setOpen}>
+            {!isChefChantier && (
+              <Dialog
+                open={open}
+                onOpenChange={(next) => {
+                  setOpen(next);
+                  if (!next) {
+                    setEditingUser(null);
+                    setTeamWorkerIds([]);
+                  }
+                }}
+              >
               <DialogTrigger asChild>
                 <Button className="h-12 rounded-xl bg-emerald-500 px-6 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95">
                   <UserPlus className="mr-2 h-5 w-5" />
@@ -395,11 +520,32 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
                     />
                   </div>
 
-                  {(formData.role === UserRole.Worker.value || formData.role === UserRole.ChefChantier.value || formData.role === UserRole.Magasinier.value) && (
+                  {formData.role === UserRole.ChefChantier.value && (
                     <div>
-                      <Label htmlFor="engineer_id">Ingénieur responsable (Équipe)</Label>
+                      <Label htmlFor="engineer_id">Ingénieur responsable *</Label>
                       <select
                         id="engineer_id"
+                        name="engineer_id"
+                        value={formData.engineer_id}
+                        onChange={handleChange}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                        required
+                      >
+                        <option value="">-- Sélectionner --</option>
+                        {engineers.map((engineer) => (
+                          <option key={engineer.id} value={engineer.id.toString()}>
+                            {engineer.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {formData.role === UserRole.Magasinier.value && (
+                    <div>
+                      <Label htmlFor="engineer_id_mag">Ingénieur responsable (optionnel)</Label>
+                      <select
+                        id="engineer_id_mag"
                         name="engineer_id"
                         value={formData.engineer_id}
                         onChange={handleChange}
@@ -412,6 +558,66 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
                           </option>
                         ))}
                       </select>
+                    </div>
+                  )}
+
+                  {formData.role === UserRole.Worker.value && (
+                    <div>
+                      <Label htmlFor="chef_chantier_id_worker">Chef de chantier *</Label>
+                      <select
+                        id="chef_chantier_id_worker"
+                        name="chef_chantier_id"
+                        value={formData.chef_chantier_id}
+                        onChange={handleChange}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                        required
+                      >
+                        <option value="">-- Sélectionner un chef --</option>
+                        {chefChantiers.map((chef) => (
+                          <option key={chef.id} value={chef.id.toString()}>
+                            {chef.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {formData.role === UserRole.ChefChantier.value && assignableWorkers.length > 0 && (
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+                      <Label className="text-indigo-900">Équipe d&apos;ouvriers (optionnel)</Label>
+                      <p className="mb-2 text-xs text-indigo-700">
+                        Cochez les ouvriers à rattacher à ce chef. Vous pourrez modifier cette liste plus tard via « Équipe ».
+                      </p>
+                      <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                        {assignableWorkers.map((w) => {
+                          const onOtherChef =
+                            w.chef_chantier_id != null &&
+                            (!editingUser || w.chef_chantier_id !== editingUser.id);
+                          const checked = teamWorkerIds.includes(w.id);
+
+                          return (
+                            <label
+                              key={w.id}
+                              className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm ${
+                                checked ? 'border-indigo-400 bg-white' : 'border-slate-200 bg-white'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleTeamWorker(w.id)}
+                                className="rounded border-slate-300"
+                              />
+                              <span className="font-medium text-slate-800">{w.name}</span>
+                              {onOtherChef && (
+                                <span className="text-[10px] font-bold uppercase text-amber-700">
+                                  (autre équipe)
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -437,15 +643,33 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
 
                   <div className="flex justify-end gap-2 pt-2">
                     <DialogClose asChild>
-                      <Button type="button" variant="outline" onClick={() => {
- setEditingUser(null); setFormData({ name: '', email: '', password: '', role: UserRole.Worker.value, phone: '', skills: '', engineer_id: '', chef_chantier_id: '' }); 
-}}>Annuler</Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingUser(null);
+                          setTeamWorkerIds([]);
+                          setFormData({
+                            name: '',
+                            email: '',
+                            password: '',
+                            role: UserRole.Worker.value,
+                            phone: '',
+                            skills: '',
+                            engineer_id: '',
+                            chef_chantier_id: '',
+                          });
+                        }}
+                      >
+                        Annuler
+                      </Button>
                     </DialogClose>
                     <Button type="submit" disabled={isLoading}>{isLoading ? 'Enregistrement...' : (editingUser ? 'Modifier' : 'Créer')}</Button>
                   </div>
                 </form>
               </DialogContent>
-            </Dialog>}
+            </Dialog>
+            )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -600,11 +824,15 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
                       <td className="px-6 py-4">
                         {row.role === UserRole.ChefChantier.value ? (
                           <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-600 border border-indigo-100">
-                            Responsable chantier
+                            Sous {row.engineer?.name ?? '—'}
                           </span>
                         ) : row.role === UserRole.Engineer.value ? (
                           <span className="text-[11px] font-medium text-slate-600">
                             {row.chefChantier ? `Sous ${row.chefChantier.name}` : 'Indépendant'}
+                          </span>
+                        ) : row.role === UserRole.Worker.value && row.chefChantier ? (
+                          <span className="text-[11px] font-medium text-slate-600">
+                            Chef : {row.chefChantier.name}
                           </span>
                         ) : row.engineer ? (
                           <span className="text-[11px] font-medium text-slate-600">
@@ -633,6 +861,17 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
                               className="h-9 rounded-xl text-purple-600 hover:text-purple-700 hover:bg-purple-50 font-bold text-xs"
                             >
                               <UsersRound className="h-4 w-4 mr-1" />
+                              Équipe
+                            </Button>
+                          )}
+                          {canManageChefTeam && row.role === UserRole.ChefChantier.value && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openChefTeamModal(row)}
+                              className="h-9 rounded-xl text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-bold text-xs"
+                            >
+                              <Users className="h-4 w-4 mr-1" />
                               Équipe
                             </Button>
                           )}
@@ -667,6 +906,73 @@ export default function UsersIndex({ users, engineers, chefChantiers }: { users:
             </table>
           </CardContent>
         </Card>
+
+        {/* Équipe ouvriers — chef de chantier */}
+        <Dialog open={chefTeamModalOpen} onOpenChange={setChefTeamModalOpen}>
+          <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
+            <DialogTitle className="text-xl font-black">
+              Équipe de {selectedChef?.name}
+            </DialogTitle>
+            <p className="mt-1 text-sm text-slate-500">
+              Sélectionnez les ouvriers rattachés à ce chef de chantier.
+            </p>
+
+            <div className="mt-4 max-h-96 space-y-2 overflow-y-auto pr-2">
+              {assignableWorkers.length === 0 ? (
+                <p className="py-4 text-center text-slate-400">Aucun ouvrier disponible pour l&apos;affectation.</p>
+              ) : (
+                assignableWorkers.map((worker) => {
+                  const selected = chefTeamWorkerIds.includes(worker.id);
+                  const otherChef =
+                    worker.chef_chantier_id != null &&
+                    (!selectedChef || worker.chef_chantier_id !== selectedChef.id);
+
+                  return (
+                    <label
+                      key={worker.id}
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-all ${
+                        selected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-200'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300"
+                        checked={selected}
+                        onChange={() => toggleChefModalWorker(worker.id)}
+                      />
+                      <div className="flex-1">
+                        <div className="font-bold text-slate-800">{worker.name}</div>
+                        {otherChef && (
+                          <div className="text-xs text-amber-700">Déjà affecté à un autre chef (sera réaffecté)</div>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2 border-t pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setChefTeamModalOpen(false);
+                  setSelectedChef(null);
+                  setChefTeamWorkerIds([]);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={saveChefTeam}
+                disabled={isLoading}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                {isLoading ? 'Sauvegarde...' : `Enregistrer (${chefTeamWorkerIds.length})`}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Team Management Modal */}
         <Dialog open={teamModalOpen} onOpenChange={setTeamModalOpen}>
