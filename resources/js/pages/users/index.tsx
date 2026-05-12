@@ -2,10 +2,10 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, History as ActivityIcon, UsersRound } from 'lucide-react';
 import React from 'react';
 
-import { destroy, index, store, update } from '@/actions/App/Http/Controllers/UserController';
+import { destroy, store, update } from '@/actions/App/Http/Controllers/UserController';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogClose,
@@ -74,18 +74,6 @@ function formatPhone(userId: number): string {
   const suffix = (970000000 + userId * 37).toString().slice(-9);
 
   return `+243 ${suffix.slice(0, 3)} ${suffix.slice(3, 6)} ${suffix.slice(6, 9)}`;
-}
-
-function resolveStatus(userId: number): WorkforceRow['status'] {
-  if (userId % 7 === 0) {
-    return 'Congé';
-  }
-
-  if (userId % 5 === 0) {
-    return 'Inactif';
-  }
-
-  return 'Actif';
 }
 
 export default function UsersIndex({
@@ -170,6 +158,7 @@ export default function UsersIndex({
       }
 
       const haystack = `${row.name} ${row.email} ${row.roleLabel} ${row.phone} ${row.skillsList.join(' ')}`.toLowerCase();
+
       return haystack.includes(term);
     });
   }, [workforce, searchTerm, selectedRole]);
@@ -189,9 +178,11 @@ export default function UsersIndex({
     const { name, value } = e.target;
     setFormData((prev) => {
       const next = { ...prev, [name]: value };
+
       if (name === 'role' && value !== UserRole.ChefChantier.value) {
         setTeamWorkerIds([]);
       }
+
       if (name === 'role' && value === UserRole.ChefChantier.value && engineers.length === 1) {
         next.engineer_id = String(engineers[0].id);
       }
@@ -226,6 +217,7 @@ export default function UsersIndex({
     const method = editingUser ? 'put' : 'post';
 
     const payload: Record<string, unknown> = { ...formData };
+
     if (formData.role === UserRole.ChefChantier.value) {
       payload.team_worker_ids = teamWorkerIds;
     } else {
@@ -271,6 +263,7 @@ export default function UsersIndex({
       engineer_id: user.engineer_id ? user.engineer_id.toString() : '',
       chef_chantier_id: user.chef_chantier_id ? user.chef_chantier_id.toString() : '',
     });
+
     if (user.role === UserRole.ChefChantier.value) {
       setTeamWorkerIds(
         users.filter((u) => u.role === UserRole.Worker.value && u.chef_chantier_id === user.id).map((u) => u.id),
@@ -278,6 +271,7 @@ export default function UsersIndex({
     } else {
       setTeamWorkerIds([]);
     }
+
     setOpen(true);
   };
 
@@ -358,19 +352,23 @@ export default function UsersIndex({
 
   // Save team assignments
   const saveTeamAssignments = () => {
-    if (!selectedEngineer) return;
+    if (!selectedEngineer) {
+return;
+}
     
     setIsLoading(true);
     
     // Update all selected workers to have this engineer_id
     const promises = selectedTeamIds.map(workerId => {
       const worker = users.find(u => u.id === workerId);
+
       if (worker) {
         return router.put(update.url({ user: workerId }), {
           ...worker,
           engineer_id: selectedEngineer.id.toString()
         }, { preserveScroll: true });
       }
+
       return Promise.resolve();
     });
 
@@ -383,12 +381,14 @@ export default function UsersIndex({
     
     const removePromises = removedIds.map(workerId => {
       const worker = users.find(u => u.id === workerId);
+
       if (worker) {
         return router.put(update.url({ user: workerId }), {
           ...worker,
           engineer_id: ''
         }, { preserveScroll: true });
       }
+
       return Promise.resolve();
     });
 
@@ -410,9 +410,20 @@ export default function UsersIndex({
 
       <div className="space-y-6">
         <div className="flex flex-row items-center justify-between pb-2">
-            <div>
+            <div className="max-w-3xl">
               <h1 className="text-4xl font-black tracking-tight text-slate-900">Main-d'œuvre</h1>
               <p className="mt-1 text-slate-500 font-medium">Gestion des ouvriers et du personnel</p>
+              {canManageChefTeam && (
+                <p className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/80 px-4 py-3 text-sm leading-relaxed text-slate-700">
+                  <span className="font-bold text-indigo-900">Rattacher des ouvriers à un chef :</span>{' '}
+                  repérez la ligne du <strong>chef de chantier</strong>, puis cliquez sur{' '}
+                  <span className="rounded-md bg-white px-1.5 py-0.5 font-semibold text-indigo-700 shadow-sm">
+                    Équipe
+                  </span>{' '}
+                  — vous pouvez modifier l&apos;effectif à tout moment, pas seulement à la création du chef.
+                  Alternative : <strong>Modifier</strong> un ouvrier et choisir son chef dans le champ prévu.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -423,6 +434,7 @@ export default function UsersIndex({
                 open={open}
                 onOpenChange={(next) => {
                   setOpen(next);
+
                   if (!next) {
                     setEditingUser(null);
                     setTeamWorkerIds([]);
@@ -852,7 +864,7 @@ export default function UsersIndex({
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex flex-wrap justify-end gap-1">
                           {row.role === UserRole.Engineer.value && (
                             <Button
                               variant="ghost"
