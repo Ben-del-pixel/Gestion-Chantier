@@ -141,6 +141,59 @@ test('magasinier can check in only worker or chef chantier of own project', func
         ->assertForbidden();
 });
 
+test('chef chantier can view attendance index in read only mode', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier->value]);
+    Project::factory()->create([
+        'manager_id' => $manager->id,
+        'chef_chantier_id' => $chef->id,
+    ]);
+
+    $this->actingAs($chef)
+        ->get(route('attendance.index'))
+        ->assertOk();
+});
+
+test('chef chantier cannot check in workers', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier->value]);
+    $worker = User::factory()->create(['role' => UserRole::Worker->value]);
+    $project = Project::factory()->create([
+        'manager_id' => $manager->id,
+        'chef_chantier_id' => $chef->id,
+    ]);
+    $project->workers()->sync([$worker->id]);
+
+    $this->actingAs($chef)
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'shift' => 'morning',
+            'status' => 'present',
+        ])
+        ->assertForbidden();
+});
+
+test('chef chantier api list rejects project they do not lead', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier->value]);
+    $myProject = Project::factory()->create([
+        'manager_id' => $manager->id,
+        'chef_chantier_id' => $chef->id,
+    ]);
+    $otherProject = Project::factory()->create([
+        'manager_id' => $manager->id,
+    ]);
+
+    $this->actingAs($chef)
+        ->getJson('/api/attendance/list?project_id='.$otherProject->id.'&date='.now()->toDateString())
+        ->assertForbidden();
+
+    $this->actingAs($chef)
+        ->getJson('/api/attendance/list?project_id='.$myProject->id.'&date='.now()->toDateString())
+        ->assertOk();
+});
+
 test('manager can update attendance status', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager->value]);
     $worker = User::factory()->create(['role' => UserRole::Worker->value]);

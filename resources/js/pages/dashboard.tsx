@@ -49,6 +49,7 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceStatuses={pageProps.attendanceStatuses}
                         attendanceShifts={pageProps.attendanceShifts}
                         attendanceDate={pageProps.attendanceDate}
+                        presenceActionsEnabled={false}
                     />
                 )}
                 {roleValue === UserRole.Worker.value && (

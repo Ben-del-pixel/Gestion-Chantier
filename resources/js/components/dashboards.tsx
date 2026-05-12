@@ -1,3 +1,4 @@
+import { router, usePage } from '@inertiajs/react';
 import {
     Chart as ChartJS,
     ArcElement,
@@ -25,11 +26,10 @@ import {
     HardHat,
     AlertCircle,
 } from 'lucide-react';
-import { router, usePage } from '@inertiajs/react';
 import React from 'react';
-import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
 import { Doughnut, Line } from 'react-chartjs-2';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
 import { apiList, updateStatus } from '@/actions/App/Http/Controllers/AttendanceController';
 import {
     assignWorkers,
@@ -62,6 +62,7 @@ function TaskExecuteButton({ task }: { task: any }) {
     }
 
     const assigned = task.workers?.some((w: any) => w.id === uid);
+
     if (!assigned) {
         return null;
     }
@@ -80,6 +81,7 @@ function TaskExecuteButton({ task }: { task: any }) {
                 if (done) {
                     return;
                 }
+
                 router.post(markExecuted.url({ task: task.id }), {}, { preserveScroll: true });
             }}
         >
@@ -415,6 +417,7 @@ export const EngineerDashboard = ({
     attendanceStatuses = [],
     attendanceShifts = [],
     attendanceDate,
+    presenceActionsEnabled = true,
 }: any) => {
     const [selectedDate, setSelectedDate] = React.useState(attendanceDate || new Date().toISOString().slice(0, 10));
     const [selectedProjectId, setSelectedProjectId] = React.useState<string>(
@@ -632,10 +635,17 @@ export const EngineerDashboard = ({
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex items-end justify-between">
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-bold tracking-tight">Espace Ingénierie</h1>
-                    <p className="text-sm text-muted-foreground">Superviser l'ordonnancement et les ressources humaines.</p>
+                    <h1 className="text-3xl font-bold tracking-tight">
+                        {presenceActionsEnabled ? 'Espace Ingénierie' : 'Espace Chef de chantier'}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        {presenceActionsEnabled
+                            ? 'Superviser l\'ordonnancement et les ressources humaines.'
+                            : 'Coordination des chantiers ; la présence est consultable en lecture seule.'}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {presenceActionsEnabled && (
                     <Dialog
                         open={showAssignDialog}
                         onOpenChange={(isOpen) => {
@@ -685,7 +695,9 @@ export const EngineerDashboard = ({
                             </div>
                         </DialogContent>
                     </Dialog>
+                    )}
 
+                    {presenceActionsEnabled && (
                     <Dialog open={showInitializeDialog} onOpenChange={setShowInitializeDialog}>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm">
@@ -722,6 +734,7 @@ export const EngineerDashboard = ({
                             </div>
                         </DialogContent>
                     </Dialog>
+                    )}
 
                     <Button size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm"><PlusCircle className="mr-2 h-4 w-4" />Nouvelle Tâche</Button>
                 </div>
@@ -736,7 +749,11 @@ export const EngineerDashboard = ({
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
                 <CardHeader>
                     <CardTitle className="text-lg font-bold">Gestion Presence Ouvriers</CardTitle>
-                    <CardDescription className="text-xs">Pilotage de la presence quotidienne par projet</CardDescription>
+                    <CardDescription className="text-xs">
+                        {presenceActionsEnabled
+                            ? 'Pilotage de la presence quotidienne par projet'
+                            : 'Consultation de la présence (lecture seule — pointage réservé au magasinier ou au manager)'}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -788,6 +805,7 @@ export const EngineerDashboard = ({
                                                     : '-'}
                                             </td>
                                             <td className="px-4 py-2">
+                                                {presenceActionsEnabled ? (
                                                 <div className="flex flex-wrap gap-2">
                                                     {attendanceStatuses.map((status: any) => (
                                                         <button
@@ -804,6 +822,11 @@ export const EngineerDashboard = ({
                                                         </button>
                                                     ))}
                                                 </div>
+                                                ) : (
+                                                    <span className="text-xs font-semibold text-muted-foreground">
+                                                        {attendanceStatuses.find((s: any) => s.value === attendance.status)?.label ?? attendance.status}
+                                                    </span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))
@@ -908,11 +931,13 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
     const submitWorkerCheckIn = async () => {
         if (!authenticatedUser?.id) {
             alert('Utilisateur non authentifié.');
+
             return;
         }
 
         if (!currentProjectId) {
             alert('Aucun chantier assigné pour le pointage.');
+
             return;
         }
 
@@ -937,6 +962,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
 
             if (!response.ok) {
                 alert('Erreur lors du pointage d\'arrivée.');
+
                 return;
             }
 
@@ -951,6 +977,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
     const submitWorkerCheckOut = async () => {
         if (!activeAttendance?.id) {
             alert('Aucun pointage actif trouvé pour enregistrer la sortie.');
+
             return;
         }
 
@@ -968,6 +995,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
 
             if (!response.ok) {
                 alert('Erreur lors du pointage de sortie.');
+
                 return;
             }
 

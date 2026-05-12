@@ -43,7 +43,13 @@ class AttendanceController extends Controller
     {
         $user = request()->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
-        if (! in_array($userRoleValue, [UserRole::Manager->value, UserRole::Magasinier->value, UserRole::Engineer->value, UserRole::Worker->value], true)) {
+        if (! in_array($userRoleValue, [
+            UserRole::Manager->value,
+            UserRole::Magasinier->value,
+            UserRole::Engineer->value,
+            UserRole::ChefChantier->value,
+            UserRole::Worker->value,
+        ], true)) {
             abort(403, 'Accès non autorisé au module de présence.');
         }
 
@@ -62,6 +68,11 @@ class AttendanceController extends Controller
             }
         } elseif ($userRoleValue === UserRole::Engineer->value) {
             $projectsQuery->where('engineer_id', $user->id);
+        } elseif ($userRoleValue === UserRole::ChefChantier->value) {
+            $projectsQuery->where('chef_chantier_id', $user->id);
+            if (! $projectId && $projectsQuery->count() === 1) {
+                $projectId = $projectsQuery->value('id');
+            }
         } elseif ($userRoleValue === UserRole::Worker->value) {
             $projectsQuery->whereHas('workers', function ($projectQuery) use ($user) {
                 $projectQuery->where('users.id', $user->id);
@@ -79,6 +90,10 @@ class AttendanceController extends Controller
         } elseif ($user->role === UserRole::Engineer) {
             $query->whereHas('project', function ($projectQuery) use ($user) {
                 $projectQuery->where('engineer_id', $user->id);
+            });
+        } elseif ($user->role === UserRole::ChefChantier) {
+            $query->whereHas('project', function ($projectQuery) use ($user) {
+                $projectQuery->where('chef_chantier_id', $user->id);
             });
         } elseif ($user->role === UserRole::Worker) {
             $query->where('user_id', $user->id);
@@ -117,6 +132,22 @@ class AttendanceController extends Controller
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get();
+        } elseif ($userRoleValue === UserRole::ChefChantier->value) {
+            $managedProjectIds = Project::where('chef_chantier_id', $user->id)->pluck('id');
+            $workers = User::where('role', UserRole::Worker->value)
+                ->whereHas('projects', function ($projectQuery) use ($managedProjectIds) {
+                    $projectQuery->whereIn('projects.id', $managedProjectIds);
+                })
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+            $chefIds = Project::whereIn('id', $managedProjectIds)
+                ->whereNotNull('chef_chantier_id')
+                ->pluck('chef_chantier_id');
+            if ($chefIds->isNotEmpty()) {
+                $chefs = User::whereIn('id', $chefIds)->select('id', 'name')->orderBy('name')->get();
+                $workers = $workers->merge($chefs)->unique('id')->values();
+            }
         } elseif ($userRoleValue === UserRole::Worker->value) {
             $workers = User::where('id', $user->id)->select('id', 'name')->get();
         } else {
@@ -185,7 +216,13 @@ class AttendanceController extends Controller
     {
         $user = request()->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
-        if (! in_array($userRoleValue, [UserRole::Manager->value, UserRole::Magasinier->value, UserRole::Engineer->value, UserRole::Worker->value], true)) {
+        if (! in_array($userRoleValue, [
+            UserRole::Manager->value,
+            UserRole::Magasinier->value,
+            UserRole::Engineer->value,
+            UserRole::ChefChantier->value,
+            UserRole::Worker->value,
+        ], true)) {
             abort(403, 'Accès non autorisé au module de présence.');
         }
 
@@ -207,6 +244,11 @@ class AttendanceController extends Controller
                 if ((int) $project->engineer_id !== (int) $user->id) {
                     abort(403, 'Vous ne pouvez consulter que la présence de vos chantiers.');
                 }
+            } elseif ($user->role === UserRole::ChefChantier) {
+                $project = Project::findOrFail($projectId);
+                if ((int) $project->chef_chantier_id !== (int) $user->id) {
+                    abort(403, 'Vous ne pouvez consulter que la présence de vos chantiers.');
+                }
             }
         } elseif ($user->role === UserRole::Magasinier) {
             $query->whereHas('project', function ($projectQuery) use ($user) {
@@ -215,6 +257,10 @@ class AttendanceController extends Controller
         } elseif ($user->role === UserRole::Engineer) {
             $query->whereHas('project', function ($projectQuery) use ($user) {
                 $projectQuery->where('engineer_id', $user->id);
+            });
+        } elseif ($user->role === UserRole::ChefChantier) {
+            $query->whereHas('project', function ($projectQuery) use ($user) {
+                $projectQuery->where('chef_chantier_id', $user->id);
             });
         } elseif ($user->role === UserRole::Worker) {
             $query->where('user_id', $user->id);
