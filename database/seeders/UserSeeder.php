@@ -22,7 +22,7 @@ class UserSeeder extends Seeder
         $managers = [];
         for ($i = 1; $i <= 2; $i++) {
             $managers[] = User::updateOrCreate(
-                ['email' => "directeur{$i}@example.com"],
+                ['email' => "manager{$i}@example.com"],
                 [
                     'name' => "Directeur de projet {$i}",
                     'password' => Hash::make('password'),

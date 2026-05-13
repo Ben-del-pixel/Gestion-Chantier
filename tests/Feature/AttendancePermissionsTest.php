@@ -216,7 +216,7 @@ test('manager can update attendance status', function () {
     ]);
 });
 
-test('manager can check in same worker twice same day for morning and evening shifts', function () {
+test('manager cannot check in same worker twice on the same day', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager->value]);
     $worker = User::factory()->create(['role' => UserRole::Worker->value]);
     $project = Project::factory()->create(['manager_id' => $manager->id]);
@@ -226,29 +226,29 @@ test('manager can check in same worker twice same day for morning and evening sh
         ->post(route('attendance.check-in'), [
             'user_id' => $worker->id,
             'project_id' => $project->id,
-            'shift' => 'morning',
             'status' => 'present',
         ])
         ->assertRedirect()
         ->assertSessionHas('success');
 
     $this->actingAs($manager)
+        ->from(route('attendance.index'))
         ->post(route('attendance.check-in'), [
             'user_id' => $worker->id,
             'project_id' => $project->id,
-            'shift' => 'evening',
             'status' => 'present',
         ])
         ->assertRedirect()
-        ->assertSessionHas('success');
+        ->assertSessionHas('error');
 
     expect(
         Attendance::query()
             ->where('user_id', $worker->id)
             ->where('project_id', $project->id)
             ->whereDate('date', today())
+            ->where('shift', 'morning')
             ->count()
-    )->toBe(2);
+    )->toBe(1);
 });
 
 test('manager cannot record arrival twice for same shift same day', function () {
@@ -261,7 +261,6 @@ test('manager cannot record arrival twice for same shift same day', function () 
         ->post(route('attendance.check-in'), [
             'user_id' => $worker->id,
             'project_id' => $project->id,
-            'shift' => 'morning',
             'status' => 'present',
         ])
         ->assertRedirect();
@@ -271,7 +270,6 @@ test('manager cannot record arrival twice for same shift same day', function () 
         ->post(route('attendance.check-in'), [
             'user_id' => $worker->id,
             'project_id' => $project->id,
-            'shift' => 'morning',
             'status' => 'present',
         ])
         ->assertRedirect()

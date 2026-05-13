@@ -3,7 +3,7 @@ import React from 'react';
 import { ManagerDashboard, EngineerDashboard, WorkerDashboard } from '@/components/dashboards';
 import { UserRole } from '@/Enums/UserRole';
 
-export default function Dashboard({ stats, tasks, projects, recentActivities, materialDistribution, projectDeadlineAlerts, ...props }: any) {
+export default function Dashboard({ stats, tasks, projects, recentActivities, materialDistribution, projectDeadlineAlerts }: any) {
     const pageProps = usePage().props as any;
     const { auth } = pageProps;
     const roleValue = auth.user?.role;
@@ -37,7 +37,6 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceProjects={pageProps.attendanceProjects}
                         attendanceWorkers={pageProps.attendanceWorkers}
                         attendanceStatuses={pageProps.attendanceStatuses}
-                        attendanceShifts={pageProps.attendanceShifts}
                         attendanceDate={pageProps.attendanceDate}
                         showQuickStats={false}
                         projectDeadlineAlerts={projectDeadlineAlerts}
@@ -50,7 +49,6 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceProjects={pageProps.attendanceProjects}
                         attendanceWorkers={pageProps.attendanceWorkers}
                         attendanceStatuses={pageProps.attendanceStatuses}
-                        attendanceShifts={pageProps.attendanceShifts}
                         attendanceDate={pageProps.attendanceDate}
                         presenceActionsEnabled={false}
                         projectDeadlineAlerts={projectDeadlineAlerts}

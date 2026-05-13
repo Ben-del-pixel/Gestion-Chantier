@@ -12,6 +12,7 @@ use App\Models\Task;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -99,9 +100,11 @@ class AttendanceController extends Controller
             $query->where('user_id', $user->id);
         }
 
-        $attendances = $query->orderBy('shift')->orderBy('check_in', 'desc')->get();
+        $query->where('shift', AttendanceShift::Morning->value);
 
-        // Count statistics (two shifts per day → count people, not rows, where relevant)
+        $attendances = $query->orderBy('check_in', 'desc')->get();
+
+        // Count statistics (une entrée par personne et par jour — présence « journée »)
         $present = $attendances
             ->filter(fn ($a) => $a->check_in && ! $a->check_out)
             ->unique('user_id')
@@ -191,16 +194,6 @@ class AttendanceController extends Controller
             AttendanceStatus::cases()
         );
 
-        // Get available shifts
-        $shifts = array_map(
-            fn (AttendanceShift $shift) => [
-                'value' => $shift->value,
-                'label' => $shift->label(),
-                'icon' => $shift->icon(),
-            ],
-            AttendanceShift::cases()
-        );
-
         return Inertia::render('attendance/index', [
             'attendances' => $attendances,
             'date' => $date->format('Y-m-d'),
@@ -213,7 +206,6 @@ class AttendanceController extends Controller
             'projects' => $projects,
             'workers' => $workers,
             'statuses' => $statuses,
-            'shifts' => $shifts,
             'selectedProject' => $projectId,
             'assignedTasks' => $assignedTasks,
         ]);
@@ -273,7 +265,9 @@ class AttendanceController extends Controller
             $query->where('user_id', $user->id);
         }
 
-        $attendances = $query->orderBy('shift')->orderBy('check_in', 'desc')->get();
+        $query->where('shift', AttendanceShift::Morning->value);
+
+        $attendances = $query->orderBy('check_in', 'desc')->get();
 
         return response()->json([
             'attendances' => $attendances,
@@ -286,13 +280,12 @@ class AttendanceController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'project_id' => 'required|exists:projects,id',
-            'shift' => 'nullable|string|in:morning,evening',
             'status' => 'nullable|string|in:present,absent,retard,malade',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
         ]);
 
-        $shift = $validated['shift'] ?? 'morning';
+        $shift = AttendanceShift::Morning->value;
         $project = Project::findOrFail($validated['project_id']);
         if (! $this->canManageAttendance($project, $request->user())) {
             abort(403, 'Seuls le manager et le magasinier du chantier peuvent gérer la présence.');
@@ -312,7 +305,7 @@ class AttendanceController extends Controller
             ->first();
 
         if ($attendance?->check_in) {
-            return back()->with('error', 'Une arrivée est déjà enregistrée pour ce créneau (matin ou soir).');
+            return back()->with('error', 'Une arrivée est déjà enregistrée pour cette journée.');
         }
 
         if (! $attendance) {
@@ -370,7 +363,7 @@ class AttendanceController extends Controller
         return back()->with('success', 'Départ enregistré pour '.$attendance->user->name);
     }
 
-    public function updateStatus(Request $request, Attendance $attendance)
+    public function updateStatus(Request $request, Attendance $attendance): RedirectResponse|JsonResponse
     {
         if (! $this->canManageAttendance($attendance->project, $request->user())) {
             abort(403, 'Seuls le manager et le magasinier du chantier peuvent gérer la présence.');
@@ -385,6 +378,12 @@ class AttendanceController extends Controller
         ]);
 
         $attendance->load('user', 'project');
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'attendance' => $attendance,
+            ]);
+        }
 
         return back()->with('success', 'Statut mis à jour avec succès');
     }

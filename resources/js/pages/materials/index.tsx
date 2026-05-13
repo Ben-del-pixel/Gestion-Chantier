@@ -1,11 +1,16 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Link as LinkIcon, Wrench } from 'lucide-react';
+import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Link as LinkIcon, Wrench, ChevronDown, User } from 'lucide-react';
 import React from 'react';
 
 import { allocate, destroy, returnMaterial, stockIn, stockOut, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogClose,
@@ -34,22 +39,32 @@ type MaterialItem = {
     }[];
 };
 
+type AllocationLine = {
+    resource_request_id: number;
+    material_id: number;
+    name: string;
+    quantity: number;
+    unit: string;
+    type: string;
+};
+
+type ProjectAllocationDetail = {
+    project_id: number;
+    project_name: string;
+    materiaux: AllocationLine[];
+    materiel: AllocationLine[];
+};
+
+type StorekeeperAllocationGroup = {
+    storekeeper_id: number | null;
+    storekeeper_name: string;
+    storekeeper_email: string | null;
+    projects: ProjectAllocationDetail[];
+};
+
 type ProjectItem = {
     id: number;
     name: string;
-};
-
-type ProjectAllocation = {
-    project_id: number;
-    project_name: string;
-    materials: {
-        id: number;
-        material_id: number;
-        name: string;
-        quantity: number;
-        unit: string;
-        type: 'materiel' | 'materiaux';
-    }[];
 };
 
 type MaterialMovement = {
@@ -92,12 +107,6 @@ function normalizeKey(value: string): string {
     return value.trim().toLowerCase();
 }
 
-function formatQuantity(quantity: number, unit: string): string {
-    const rounded = Number.isInteger(quantity) ? quantity.toString() : quantity.toFixed(2);
-
-    return `${rounded} ${unit}`;
-}
-
 function isLowStock(quantity: number, unit: string): boolean {
     const threshold = STOCK_THRESHOLD_BY_UNIT[normalizeKey(unit)] ?? 100;
 
@@ -106,12 +115,12 @@ function isLowStock(quantity: number, unit: string): boolean {
 
 export default function MaterialsIndex({ 
     materials, 
-    projectAllocations = [],
+    storekeeperAllocationGroups = [],
     projects = [],
     movements = [],
 }: { 
     materials: MaterialItem[]; 
-    projectAllocations?: ProjectAllocation[];
+    storekeeperAllocationGroups?: StorekeeperAllocationGroup[];
     projects?: ProjectItem[];
     movements?: MaterialMovement[];
 }) {
@@ -151,11 +160,13 @@ export default function MaterialsIndex({
     const handleStorekeeperCheckIn = () => {
         if (!authenticatedUser?.id) {
             alert('Utilisateur non authentifié.');
+
             return;
         }
 
         if (projects.length === 0) {
             alert('Aucun chantier assigné pour enregistrer la présence.');
+
             return;
         }
 
@@ -296,9 +307,11 @@ export default function MaterialsIndex({
 
         // Validation instantanée du stock
         const selectedMaterial = materials.find(m => m.id === materialId);
+
         if (selectedMaterial && quantityRequested > selectedMaterial.quantity_in_stock) {
             alert(`Stock insuffisant !\n\nQuantité demandée: ${quantityRequested} ${selectedMaterial.unit}\nStock disponible: ${selectedMaterial.quantity_in_stock} ${selectedMaterial.unit}\n\nVous ne pouvez pas affecter plus que le stock disponible.`);
             setIsSubmitting(false);
+
             return;
         }
 
@@ -892,49 +905,118 @@ export default function MaterialsIndex({
             )}
 
             {activeTab === 'allocations' && (
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {projectAllocations.length > 0 ? projectAllocations.map((allocation) => (
-                        <Card key={allocation.project_id} className="group relative rounded-[32px] border border-blue-100 bg-blue-50/30 p-2 shadow-xl shadow-blue-500/5 transition-all hover:shadow-2xl hover:shadow-blue-500/10">
-                            <CardHeader className="pb-4 p-6 pt-6">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-blue-500 text-white shadow-lg shadow-blue-500/30">
-                                        <TrendingUp className="h-5 w-5" />
-                                    </div>
-                                    <p className="text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">Affectation Chantier</p>
-                                </div>
-                                <CardTitle className="text-2xl font-black text-blue-900 leading-tight">{allocation.project_name}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="px-6 pb-6">
-                                <div className="space-y-3">
-                                    {allocation.materials.map((m, idx) => (
-                                        <div key={idx} className="flex justify-between items-center bg-white p-4 rounded-2xl border border-blue-100/50 shadow-sm transition-transform hover:scale-[1.02]">
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-slate-700">{m.name}</span>
-                                                <span className="text-[10px] uppercase font-black text-slate-400">{m.type === 'materiel' ? 'Équipement' : 'Consommable'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight">
-                                                    {m.quantity} {m.unit}
-                                                </span>
-                                                {m.type === 'materiel' && (
-                                                    <Button 
-                                                        size="sm" 
-                                                        onClick={() => router.visit(returnMaterial.url({ resourceRequest: m.id }), { method: 'post' })}
-                                                        className="h-8 rounded-lg bg-indigo-600 text-white font-black text-[10px] uppercase hover:bg-indigo-700 shadow-lg shadow-indigo-600/20"
-                                                    >
-                                                        Remettre
-                                                    </Button>
-                                                )}
-                                            </div>
+                <div className="space-y-4">
+                    {storekeeperAllocationGroups.length > 0 ? (
+                        storekeeperAllocationGroups.map((group) => (
+                            <Collapsible
+                                key={group.storekeeper_id ?? `sk-none-${group.storekeeper_name}`}
+                                defaultOpen={false}
+                                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                            >
+                                <CollapsibleTrigger className="group flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-slate-50/90">
+                                    <div className="flex min-w-0 flex-1 items-center gap-4">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+                                            <User className="h-6 w-6" />
                                         </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )) : (
-                        <div className="col-span-full py-20 text-center">
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-violet-600">Magasinier du chantier</p>
+                                            <p className="truncate text-lg font-black text-slate-900">{group.storekeeper_name}</p>
+                                            {group.storekeeper_email ? (
+                                                <p className="truncate text-xs font-medium text-slate-500">{group.storekeeper_email}</p>
+                                            ) : null}
+                                            <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                                Matériaux et matériel affectés aux chantiers suivis par ce magasinier — ouvrez pour le détail.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-3">
+                                        <Badge variant="outline" className="rounded-full text-[10px] font-black uppercase">
+                                            {group.projects.length} chantier{group.projects.length > 1 ? 's' : ''}
+                                        </Badge>
+                                        <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                    </div>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                    <div className="space-y-5 border-t border-slate-100 bg-slate-50/50 p-5">
+                                        {group.projects.map((proj) => (
+                                            <div
+                                                key={proj.project_id}
+                                                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                                            >
+                                                <p className="mb-4 text-[10px] font-black uppercase tracking-wider text-blue-600">
+                                                    Chantier — {proj.project_name}
+                                                </p>
+                                                <div className="grid gap-6 md:grid-cols-2">
+                                                    <div>
+                                                        <p className="mb-2 text-[10px] font-black uppercase text-amber-600">Matériaux (consommables)</p>
+                                                        {proj.materiaux.length === 0 ? (
+                                                            <p className="text-xs italic text-slate-400">Aucun consommable affecté sur ce chantier.</p>
+                                                        ) : (
+                                                            <ul className="space-y-2">
+                                                                {proj.materiaux.map((line) => (
+                                                                    <li
+                                                                        key={line.resource_request_id}
+                                                                        className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 text-sm"
+                                                                    >
+                                                                        <span className="font-bold text-slate-800">{line.name}</span>
+                                                                        <span className="font-black text-amber-900">
+                                                                            {line.quantity} {line.unit}
+                                                                        </span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="mb-2 text-[10px] font-black uppercase text-indigo-600">Matériel (équipement)</p>
+                                                        {proj.materiel.length === 0 ? (
+                                                            <p className="text-xs italic text-slate-400">Aucun équipement en service sur ce chantier.</p>
+                                                        ) : (
+                                                            <ul className="space-y-2">
+                                                                {proj.materiel.map((line) => (
+                                                                    <li
+                                                                        key={line.resource_request_id}
+                                                                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2.5 text-sm"
+                                                                    >
+                                                                        <span className="font-bold text-slate-800">{line.name}</span>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="rounded-lg bg-indigo-100 px-2.5 py-1 text-[10px] font-black uppercase text-indigo-800">
+                                                                                {line.quantity} {line.unit}
+                                                                            </span>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    router.visit(
+                                                                                        returnMaterial.url({
+                                                                                            resourceRequest: line.resource_request_id,
+                                                                                        }),
+                                                                                        { method: 'post' }
+                                                                                    )
+                                                                                }
+                                                                                className="h-8 rounded-lg bg-indigo-600 px-3 text-[10px] font-black uppercase text-white hover:bg-indigo-700"
+                                                                            >
+                                                                                Remettre
+                                                                            </Button>
+                                                                        </div>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CollapsibleContent>
+                            </Collapsible>
+                        ))
+                    ) : (
+                        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 py-20 text-center">
                             <p className="text-xl font-black text-slate-900">Aucune affectation enregistrée</p>
-                            <p className="text-slate-500 font-medium">Les matériaux livrés aux chantiers apparaîtront ici.</p>
+                            <p className="mt-2 font-medium text-slate-500">
+                                Les livraisons vers chantier (par magasinier) apparaissent ici, regroupées par responsable magasin.
+                            </p>
                         </div>
                     )}
                 </div>

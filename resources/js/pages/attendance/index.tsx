@@ -18,7 +18,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
-import { attendanceShiftLabel } from '@/lib/attendance-labels';
 import { cn } from '@/lib/utils';
 
 export default function AttendanceIndex({
@@ -28,7 +27,6 @@ export default function AttendanceIndex({
   projects,
   workers,
   statuses,
-  shifts,
   selectedProject,
   assignedTasks = [],
 }: any) {
@@ -56,12 +54,10 @@ export default function AttendanceIndex({
   }, [date, selectedProject]);
   
   const defaultStatus = statuses?.length > 0 ? statuses[0].value : 'present';
-  const defaultShift = shifts?.length > 0 ? shifts[0].value : 'morning';
-  
-  const [checkInData, setCheckInData] = useState({ user_id: '', project_id: '', shift: defaultShift, status: defaultStatus });
+
+  const [checkInData, setCheckInData] = useState({ user_id: '', project_id: '', status: defaultStatus });
   const [selectedProjectForAssign, setSelectedProjectForAssign] = useState('');
   const [selectedWorkersForAssign, setSelectedWorkersForAssign] = useState<number[]>([]);
-  const [selectedShiftsForInit, setSelectedShiftsForInit] = useState<string[]>(['morning', 'evening']);
 
   const refreshAttendances = async () => {
     setRefreshing(true);
@@ -111,7 +107,7 @@ params.append('project_id', displayProject);
     router.post('/attendance/check-in', checkInData, {
       onSuccess: () => {
         setShowCheckIn(false);
-        setCheckInData({ user_id: '', project_id: '', shift: defaultShift, status: defaultStatus });
+        setCheckInData({ user_id: '', project_id: '', status: defaultStatus });
       },
       onError: (err) => {
         alert('Erreur lors de l\'enregistrement');
@@ -346,7 +342,6 @@ return '-';
                                 <thead>
                                     <tr className="bg-slate-50/50">
                                         <th className="whitespace-nowrap px-8 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Ouvrier / Employé</th>
-                                        <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Créneau</th>
                                         <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Pointage</th>
                                         <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Statut</th>
                                         <th className="whitespace-nowrap px-8 py-4 text-right text-xs font-bold uppercase text-slate-400 tracking-wider">Actions</th>
@@ -368,11 +363,6 @@ return '-';
                                                         </p>
                                                     </div>
                                                 </div>
-                                            </td>
-                                            <td className="whitespace-nowrap px-6 py-5">
-                                                <Badge variant="outline" className="rounded-lg border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-tight px-3 py-1 text-slate-600">
-                                                    {attendanceShiftLabel(attendance.shift, shifts)}
-                                                </Badge>
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-5">
                                                 <div className="flex flex-col gap-1">
@@ -430,7 +420,7 @@ return '-';
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="py-20 text-center">
+                                            <td colSpan={4} className="py-20 text-center">
                                                 <div className="flex flex-col items-center justify-center gap-3">
                                                     <div className="rounded-full bg-slate-50 p-4">
                                                         <Calendar className="h-10 w-10 text-slate-200" />
@@ -490,32 +480,17 @@ return '-';
                             </select>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-slate-400">Créneau horaire</Label>
-                                <select
-                                    value={checkInData.shift}
-                                    onChange={(e) => setCheckInData({ ...checkInData, shift: e.target.value })}
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-blue-500/20"
-                                    required
-                                >
-                                    {shifts?.map((sh: any) => (
-                                        <option key={sh.value} value={sh.value}>{sh.icon} {sh.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-slate-400">Statut initial</Label>
-                                <select
-                                    value={checkInData.status}
-                                    onChange={(e) => setCheckInData({ ...checkInData, status: e.target.value })}
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-blue-500/20"
-                                >
-                                    {statuses?.map((s: any) => (
-                                        <option key={s.value} value={s.value}>{s.label}</option>
-                                    ))}
-                                </select>
-                            </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase text-slate-400">Statut initial</Label>
+                            <select
+                                value={checkInData.status}
+                                onChange={(e) => setCheckInData({ ...checkInData, status: e.target.value })}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-blue-500/20"
+                            >
+                                {statuses?.map((s: any) => (
+                                    <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="flex gap-3 pt-4">

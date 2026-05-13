@@ -3,6 +3,7 @@
 use App\Enums\UserRole;
 use App\Models\Material;
 use App\Models\Project;
+use App\Models\ResourceRequest;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -27,6 +28,7 @@ test('authenticated users can view materials page', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('materials/index')
             ->has('materials', 1)
+            ->has('storekeeperAllocationGroups')
             ->where('materials.0.name', 'Ciment')
         );
 });
@@ -219,6 +221,81 @@ test('stock exit cannot exceed available quantity', function () {
 
     $material->refresh();
     expect((float) $material->quantity_in_stock)->toBe(2.0);
+});
+
+test('materials index groups allocations by storekeeper for manager', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier, 'name' => 'Jean Dupot']);
+    $project = Project::factory()->create([
+        'storekeeper_id' => $magasinier->id,
+        'name' => 'Chantier Nord',
+    ]);
+    $material = Material::factory()->create([
+        'project_id' => $project->id,
+        'storekeeper_id' => $magasinier->id,
+        'type' => 'materiaux',
+        'quantity_in_stock' => 100,
+    ]);
+
+    ResourceRequest::create([
+        'material_id' => $material->id,
+        'project_id' => $project->id,
+        'user_id' => $manager->id,
+        'quantity_requested' => 5,
+        'status' => 'livre',
+    ]);
+
+    $this->actingAs($manager)
+        ->get(route('materials.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('materials/index')
+            ->has('storekeeperAllocationGroups', 1)
+            ->where('storekeeperAllocationGroups.0.storekeeper_name', 'Jean Dupot')
+            ->has('storekeeperAllocationGroups.0.projects', 1)
+            ->has('storekeeperAllocationGroups.0.projects.0.materiaux', 1)
+            ->has('storekeeperAllocationGroups.0.projects.0.materiel', 0)
+        );
+});
+
+test('magasinier only sees own storekeeper allocation group', function () {
+    $magA = User::factory()->create(['role' => UserRole::Magasinier, 'name' => 'Magasinier A']);
+    $magB = User::factory()->create(['role' => UserRole::Magasinier, 'name' => 'Magasinier B']);
+    $projectA = Project::factory()->create(['storekeeper_id' => $magA->id]);
+    $projectB = Project::factory()->create(['storekeeper_id' => $magB->id]);
+    $matA = Material::factory()->create([
+        'project_id' => $projectA->id,
+        'storekeeper_id' => $magA->id,
+        'type' => 'materiaux',
+    ]);
+    $matB = Material::factory()->create([
+        'project_id' => $projectB->id,
+        'storekeeper_id' => $magB->id,
+        'type' => 'materiaux',
+    ]);
+    ResourceRequest::create([
+        'material_id' => $matA->id,
+        'project_id' => $projectA->id,
+        'user_id' => $magA->id,
+        'quantity_requested' => 2,
+        'status' => 'livre',
+    ]);
+    ResourceRequest::create([
+        'material_id' => $matB->id,
+        'project_id' => $projectB->id,
+        'user_id' => $magB->id,
+        'quantity_requested' => 3,
+        'status' => 'livre',
+    ]);
+
+    $this->actingAs($magA)
+        ->get(route('materials.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('materials/index')
+            ->has('storekeeperAllocationGroups', 1)
+            ->where('storekeeperAllocationGroups.0.storekeeper_name', 'Magasinier A')
+        );
 });
 
 test('non magasinier cannot create a material', function () {

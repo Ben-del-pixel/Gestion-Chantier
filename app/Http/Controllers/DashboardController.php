@@ -34,7 +34,6 @@ class DashboardController extends Controller
             'attendanceProjects' => [],
             'attendanceWorkers' => [],
             'attendanceStatuses' => [],
-            'attendanceShifts' => [],
             'attendanceDate' => now()->toDateString(),
             'workerAttendances' => [],
             'workerAttendanceSummary' => [
@@ -116,15 +115,6 @@ class DashboardController extends Controller
                 ],
                 AttendanceStatus::cases()
             );
-
-            $data['attendanceShifts'] = array_map(
-                fn (AttendanceShift $shift) => [
-                    'value' => $shift->value,
-                    'label' => $shift->label(),
-                    'icon' => $shift->icon(),
-                ],
-                AttendanceShift::cases()
-            );
         } elseif ($user->role === UserRole::ChefChantier) {
             $chefProjectsForAlerts = Project::where('chef_chantier_id', $user->id)
                 ->get(['id', 'name', 'deadline', 'status']);
@@ -165,15 +155,6 @@ class DashboardController extends Controller
                 ],
                 AttendanceStatus::cases()
             );
-
-            $data['attendanceShifts'] = array_map(
-                fn (AttendanceShift $shift) => [
-                    'value' => $shift->value,
-                    'label' => $shift->label(),
-                    'icon' => $shift->icon(),
-                ],
-                AttendanceShift::cases()
-            );
         } elseif ($user->role === UserRole::Worker) {
             $data['tasks'] = $user->tasks()->with([
                 'project',
@@ -182,6 +163,7 @@ class DashboardController extends Controller
 
             $attendances = Attendance::with('project:id,name')
                 ->where('user_id', $user->id)
+                ->where('shift', AttendanceShift::Morning->value)
                 ->latest('date')
                 ->latest('id')
                 ->get();

@@ -64,7 +64,6 @@ test('engineer dashboard includes attendance management props', function () {
             ->has('attendanceWorkers')
             ->where('attendanceWorkers.0.id', $magasinier->id)
             ->has('attendanceStatuses')
-            ->has('attendanceShifts')
             ->has('attendanceDate')
         );
 });

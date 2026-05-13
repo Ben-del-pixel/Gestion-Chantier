@@ -8,7 +8,9 @@ use App\Models\Material;
 use App\Models\MaterialMovement;
 use App\Models\Project;
 use App\Models\ResourceRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -75,28 +77,7 @@ class MaterialController extends Controller
                 return $material;
             });
 
-        $projectAllocations = ResourceRequest::where('status', 'livre')
-            ->with(['project:id,name', 'material:id,name,unit'])
-            ->get()
-            ->groupBy('project_id')
-            ->map(function ($items) {
-                $project = $items->first()->project;
-
-                return [
-                    'project_id' => $project->id,
-                    'project_name' => $project->name,
-                    'materials' => $items->map(function ($item) {
-                        return [
-                            'id' => $item->id,
-                            'material_id' => $item->material_id,
-                            'name' => $item->material?->name,
-                            'quantity' => (float) $item->quantity_requested,
-                            'unit' => $item->material?->unit,
-                            'type' => $item->material?->type,
-                        ];
-                    })->values(),
-                ];
-            })->values();
+        $storekeeperAllocationGroups = $this->buildStorekeeperAllocationGroups($user);
 
         $projects = $user->role === UserRole::Magasinier
             ? Project::where('storekeeper_id', $user->id)->select('id', 'name')->latest()->get()
@@ -134,10 +115,96 @@ class MaterialController extends Controller
 
         return Inertia::render('materials/index', [
             'materials' => $materials,
-            'projectAllocations' => $projectAllocations,
+            'storekeeperAllocationGroups' => $storekeeperAllocationGroups,
             'projects' => $projects,
             'movements' => $movements,
         ]);
+    }
+
+    /**
+     * @return list<array{storekeeper_id: int|null, storekeeper_name: string, storekeeper_email: string|null, projects: list<array<string, mixed>>}>
+     */
+    private function buildStorekeeperAllocationGroups(User $user): array
+    {
+        if ($user->role !== UserRole::Manager && $user->role !== UserRole::Magasinier) {
+            return [];
+        }
+
+        $query = ResourceRequest::query()
+            ->where('status', 'livre')
+            ->with([
+                'project:id,name,storekeeper_id',
+                'project.storekeeper:id,name,email',
+                'material:id,name,unit,type',
+            ]);
+
+        if ($user->role === UserRole::Magasinier) {
+            $query->whereHas('project', function ($q) use ($user) {
+                $q->where('storekeeper_id', $user->id);
+            });
+        }
+
+        /** @var Collection<int, ResourceRequest> $rows */
+        $rows = $query->get()->filter(fn (ResourceRequest $r) => $r->project !== null);
+
+        return $rows
+            ->groupBy(fn (ResourceRequest $r) => $r->project?->storekeeper_id ?? 'none')
+            ->map(function (Collection $group, mixed $storekeeperKey) {
+                $storekeeper = $group->first()?->project?->storekeeper;
+                $storekeeperId = $storekeeperKey === 'none' ? null : (int) $storekeeperKey;
+
+                $projects = $group
+                    ->groupBy('project_id')
+                    ->map(function (Collection $projectRows) {
+                        $project = $projectRows->first()->project;
+                        if (! $project) {
+                            return null;
+                        }
+
+                        $materiaux = [];
+                        $materiel = [];
+
+                        foreach ($projectRows as $item) {
+                            $type = (string) ($item->material?->type ?? 'materiaux');
+                            $line = [
+                                'resource_request_id' => $item->id,
+                                'material_id' => $item->material_id,
+                                'name' => $item->material?->name,
+                                'quantity' => (float) $item->quantity_requested,
+                                'unit' => (string) ($item->material?->unit ?? ''),
+                                'type' => $type,
+                            ];
+
+                            if ($type === 'materiel') {
+                                $materiel[] = $line;
+                            } else {
+                                $materiaux[] = $line;
+                            }
+                        }
+
+                        return [
+                            'project_id' => $project->id,
+                            'project_name' => $project->name,
+                            'materiaux' => $materiaux,
+                            'materiel' => $materiel,
+                        ];
+                    })
+                    ->filter()
+                    ->sortBy('project_name')
+                    ->values()
+                    ->all();
+
+                return [
+                    'storekeeper_id' => $storekeeperId,
+                    'storekeeper_name' => $storekeeper?->name ?? 'Sans magasinier assigné',
+                    'storekeeper_email' => $storekeeper?->email,
+                    'projects' => $projects,
+                ];
+            })
+            ->values()
+            ->sortBy('storekeeper_name')
+            ->values()
+            ->all();
     }
 
     public function store(Request $request)

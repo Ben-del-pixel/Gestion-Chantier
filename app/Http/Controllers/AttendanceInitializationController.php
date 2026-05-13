@@ -22,8 +22,6 @@ class AttendanceInitializationController extends Controller
         $validated = $request->validate([
             'date' => 'required|date',
             'project_id' => 'required|exists:projects,id',
-            'shifts' => 'nullable|array',
-            'shifts.*' => 'string|in:morning,evening',
         ]);
 
         $project = Project::findOrFail($validated['project_id']);
@@ -34,12 +32,14 @@ class AttendanceInitializationController extends Controller
         }
 
         $date = Carbon::parse($validated['date'])->startOfDay();
-        $shifts = $validated['shifts'] ?? ['morning', 'evening'];
+        $shifts = ['morning'];
 
         // Presence initialization must target assigned project workers only.
         $workers = $project->workers()->get();
         if ($workers->isEmpty()) {
-            return back()->withErrors(['workers' => 'Aucun ouvrier affecté à ce projet. Veuillez affecter des ouvriers d\'abord.']);
+            return response()->json([
+                'message' => 'Aucun ouvrier affecté à ce projet. Veuillez affecter des ouvriers d\'abord.',
+            ], 422);
         }
 
         $created = 0;
@@ -74,13 +74,16 @@ class AttendanceInitializationController extends Controller
             }
         }
 
-        return back()->with('success', "Présence initialisée : {$created} entrées créées.");
+        return response()->json([
+            'created' => $created,
+            'errors' => $errors,
+        ]);
     }
 
     /**
      * Assign workers to a project.
      */
-    public function assignWorkers(Request $request, Project $project): mixed
+    public function assignWorkers(Request $request, Project $project): JsonResponse
     {
         $authorizationError = $this->authorizeEngineerForProject($request, $project);
 
@@ -99,29 +102,37 @@ class AttendanceInitializationController extends Controller
             ->get();
 
         if ($workers->count() !== count($validated['worker_ids'])) {
-            return back()->withErrors(['workers' => 'Certaines personnes sélectionnées ne sont pas assignables (ouvrier/magasinier).']);
+            return response()->json([
+                'message' => 'Certaines personnes sélectionnées ne sont pas assignables (ouvrier/magasinier).',
+            ], 422);
         }
 
         // Restriction: Only one magasinier per project team
-        $magasiniers = $workers->filter(fn($w) => $w->role->value === UserRole::Magasinier->value);
-        
+        $magasiniers = $workers->filter(fn ($w) => $w->role->value === UserRole::Magasinier->value);
+
         if ($magasiniers->count() > 1) {
-            return back()->withErrors(['workers' => 'Un projet ne peut avoir qu\'un seul magasinier dans l\'équipe.']);
+            return response()->json([
+                'message' => 'Un projet ne peut avoir qu\'un seul magasinier dans l\'équipe.',
+            ], 422);
         }
 
-        // If there's already a storekeeper assigned to the project, 
+        // If there's already a storekeeper assigned to the project,
         // the only magasinier allowed in the team is that storekeeper itself.
         if ($project->storekeeper_id && $magasiniers->count() > 0) {
             $assignedMagasinierId = $magasiniers->first()->id;
-            if ((int)$assignedMagasinierId !== (int)$project->storekeeper_id) {
-                return back()->withErrors(['workers' => 'Ce projet a déjà un magasinier responsable assigné. Vous ne pouvez pas en ajouter un autre dans l\'équipe.']);
+            if ((int) $assignedMagasinierId !== (int) $project->storekeeper_id) {
+                return response()->json([
+                    'message' => 'Ce projet a déjà un magasinier responsable assigné. Vous ne pouvez pas en ajouter un autre dans l\'équipe.',
+                ], 422);
             }
         }
 
         // Sync the workers (replace existing)
         $project->workers()->sync($validated['worker_ids']);
 
-        return back()->with('success', 'Personnel assigné avec succès');
+        return response()->json([
+            'message' => 'Personnel assigné avec succès',
+        ]);
     }
 
     /**

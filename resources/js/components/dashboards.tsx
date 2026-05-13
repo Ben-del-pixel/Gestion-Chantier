@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { attendanceShiftLabel, attendanceStatusLabel } from '@/lib/attendance-labels';
+import { attendanceStatusLabel } from '@/lib/attendance-labels';
 import { useCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
@@ -230,6 +230,11 @@ export const ManagerDashboard = ({
             <div className="space-y-1">
                 <h1 className="text-[30px] font-bold tracking-tight text-slate-900 dark:text-white">Tableau de bord</h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Vue d'ensemble des activités en temps réel</p>
+                {projects.length > 0 && (
+                    <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        {projects.length} chantier{projects.length > 1 ? 's' : ''} enregistré{projects.length > 1 ? 's' : ''}
+                    </p>
+                )}
             </div>
 
             <ProjectDeadlineAlertsBanner alerts={projectDeadlineAlerts} />
@@ -425,7 +430,6 @@ export const EngineerDashboard = ({
     attendanceProjects = [],
     attendanceWorkers = [],
     attendanceStatuses = [],
-    attendanceShifts = [],
     attendanceDate,
     presenceActionsEnabled = true,
     showQuickStats = true,
@@ -440,7 +444,6 @@ export const EngineerDashboard = ({
     const [isSavingAssignment, setIsSavingAssignment] = React.useState(false);
     const [isInitializing, setIsInitializing] = React.useState(false);
     const [selectedWorkers, setSelectedWorkers] = React.useState<number[]>([]);
-    const [selectedShifts, setSelectedShifts] = React.useState<string[]>(['morning', 'evening']);
     const [showAssignDialog, setShowAssignDialog] = React.useState(false);
     const [showInitializeDialog, setShowInitializeDialog] = React.useState(false);
 
@@ -551,10 +554,6 @@ export const EngineerDashboard = ({
         );
     };
 
-    const toggleShift = (shift: string) => {
-        setSelectedShifts((prev) => (prev.includes(shift) ? prev.filter((item) => item !== shift) : [...prev, shift]));
-    };
-
     const submitWorkersAssignment = async () => {
         if (!selectedProjectId) {
             alert('Selectionnez un projet');
@@ -603,12 +602,6 @@ export const EngineerDashboard = ({
             return;
         }
 
-        if (selectedShifts.length === 0) {
-            alert('Sélectionnez au moins un créneau');
-
-            return;
-        }
-
         setIsInitializing(true);
 
         try {
@@ -621,7 +614,6 @@ export const EngineerDashboard = ({
                 body: JSON.stringify({
                     project_id: Number(selectedProjectId),
                     date: selectedDate,
-                    shifts: selectedShifts,
                 }),
             });
 
@@ -720,23 +712,8 @@ export const EngineerDashboard = ({
                             <DialogTitle>Initialiser la présence du projet</DialogTitle>
                             <div className="mt-4 space-y-4">
                                 <p className="text-sm text-muted-foreground">
-                                    Crée des présences vides pour la date et les créneaux choisis.
+                                    Crée des présences vides pour la journée sélectionnée (une ligne par ouvrier affecté).
                                 </p>
-                                <div className="space-y-2">
-                                    <Label>Créneaux</Label>
-                                    <div className="flex flex-wrap gap-4">
-                                        {attendanceShifts.map((shift: any) => (
-                                            <label key={shift.value} className="flex items-center gap-2 text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedShifts.includes(shift.value)}
-                                                    onChange={() => toggleShift(shift.value)}
-                                                />
-                                                <span>{shift.label}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
                                 <div className="flex justify-end gap-2">
                                     <DialogClose asChild>
                                         <Button type="button" variant="outline">Annuler</Button>
@@ -808,7 +785,6 @@ export const EngineerDashboard = ({
                             <thead className="bg-muted/30">
                                 <tr>
                                     <th className="px-4 py-2 font-semibold">Ouvrier</th>
-                                    <th className="px-4 py-2 font-semibold">Créneau</th>
                                     <th className="px-4 py-2 font-semibold">Heure d&apos;arrivée</th>
                                     <th className="px-4 py-2 font-semibold">Statut</th>
                                 </tr>
@@ -818,7 +794,6 @@ export const EngineerDashboard = ({
                                     attendances.map((attendance) => (
                                         <tr key={attendance.id} className="border-t">
                                             <td className="px-4 py-2 font-medium">{attendance.user?.name ?? '-'}</td>
-                                            <td className="px-4 py-2">{attendanceShiftLabel(attendance.shift, attendanceShifts)}</td>
                                             <td className="px-4 py-2">
                                                 {attendance.check_in
                                                     ? new Date(attendance.check_in).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -852,7 +827,7 @@ export const EngineerDashboard = ({
                                     ))
                                 ) : (
                                     <tr>
-                                        <td className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>
+                                        <td className="px-4 py-8 text-center text-muted-foreground" colSpan={3}>
                                             Aucune présence pour cette sélection.
                                         </td>
                                     </tr>
@@ -968,7 +943,6 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                 body: JSON.stringify({
                     user_id: authenticatedUser?.id,
                     project_id: currentProjectId,
-                    shift: 'morning',
                     status: 'present',
                 }),
             });
@@ -1240,7 +1214,6 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                 <tr>
                                     <th className="px-4 py-2 font-semibold">Date</th>
                                     <th className="px-4 py-2 font-semibold">Projet</th>
-                                    <th className="px-4 py-2 font-semibold">Créneau</th>
                                     <th className="px-4 py-2 font-semibold">Statut</th>
                                 </tr>
                             </thead>
@@ -1252,7 +1225,6 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                                 {new Date(attendance.date).toLocaleDateString('fr-FR')}
                                             </td>
                                             <td className="px-4 py-2">{attendance.project?.name ?? '-'}</td>
-                                            <td className="px-4 py-2">{attendanceShiftLabel(attendance.shift)}</td>
                                             <td className="px-4 py-2">
                                                 <span
                                                     className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${attendanceStatusClasses[attendance.status] ?? 'bg-muted text-foreground border-border'}`}
@@ -1264,7 +1236,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
                                             Aucun enregistrement pour cette date.
                                         </td>
                                     </tr>
@@ -1283,7 +1255,6 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                             <p className="font-semibold text-sm">
                                                 {new Date(attendance.date).toLocaleDateString('fr-FR')} - {attendance.project?.name ?? 'Sans projet'}
                                             </p>
-                                            <p className="text-xs text-muted-foreground">Créneau : {attendanceShiftLabel(attendance.shift)}</p>
                                         </div>
                                         <span
                                             className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${attendanceStatusClasses[attendance.status] ?? 'bg-muted text-foreground border-border'}`}

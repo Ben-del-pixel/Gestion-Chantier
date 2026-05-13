@@ -15,7 +15,8 @@ import {
 import React from 'react';
 
 import { destroy, show, store } from '@/actions/App/Http/Controllers/Api/ProjectController';
-import { ProjectDeadlineAlertsBanner, type ProjectDeadlineAlertsShape } from '@/components/project-deadline-alerts-banner';
+import type { ProjectDeadlineAlertsShape } from '@/components/project-deadline-alerts-banner';
+import { ProjectDeadlineAlertsBanner } from '@/components/project-deadline-alerts-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,8 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCurrency } from '@/lib/currency';
 import { UserRole } from '@/Enums/UserRole';
+import { useCurrency } from '@/lib/currency';
 
 type ProjectStepItem = {
   id: number;

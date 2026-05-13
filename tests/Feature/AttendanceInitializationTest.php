@@ -74,8 +74,8 @@ it('allows engineer to assign magasinier to a project', function () {
     $this->assertTrue($this->project->workers()->where('users.id', $magasinier->id)->exists());
 });
 
-it('forbids worker assignment by non engineer users', function () {
-    $this->actingAs($this->manager);
+it('forbids worker assignment by users without engineer or manager role', function () {
+    $this->actingAs($this->workers[0]);
 
     $response = $this->postJson(
         "/api/projects/{$this->project->id}/workers",
@@ -153,12 +153,12 @@ it('includes statuses in attendance index', function () {
     $response->assertInertia();
 });
 
-it('forbids attendance management for engineer', function () {
+it('allows engineer to view attendance index', function () {
     $this->actingAs($this->engineer);
 
     $response = $this->get('/attendance');
 
-    $response->assertForbidden();
+    $response->assertOk();
 });
 
 it('allows assigned magasinier to manage attendance', function () {
