@@ -3,7 +3,7 @@ import React from 'react';
 import { ManagerDashboard, EngineerDashboard, WorkerDashboard } from '@/components/dashboards';
 import { UserRole } from '@/Enums/UserRole';
 
-export default function Dashboard({ stats, tasks, projects, recentActivities, materialDistribution, ...props }: any) {
+export default function Dashboard({ stats, tasks, projects, recentActivities, materialDistribution, projectDeadlineAlerts, ...props }: any) {
     const pageProps = usePage().props as any;
     const { auth } = pageProps;
     const roleValue = auth.user?.role;
@@ -27,6 +27,7 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         stats={stats} 
                         recentActivities={recentActivities}
                         materialDistribution={materialDistribution}
+                        projectDeadlineAlerts={projectDeadlineAlerts}
                     />
                 )}
                 {roleValue === UserRole.Engineer.value && (
@@ -38,6 +39,8 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceStatuses={pageProps.attendanceStatuses}
                         attendanceShifts={pageProps.attendanceShifts}
                         attendanceDate={pageProps.attendanceDate}
+                        showQuickStats={false}
+                        projectDeadlineAlerts={projectDeadlineAlerts}
                     />
                 )}
                 {roleValue === UserRole.ChefChantier.value && (
@@ -50,6 +53,7 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceShifts={pageProps.attendanceShifts}
                         attendanceDate={pageProps.attendanceDate}
                         presenceActionsEnabled={false}
+                        projectDeadlineAlerts={projectDeadlineAlerts}
                     />
                 )}
                 {roleValue === UserRole.Worker.value && (

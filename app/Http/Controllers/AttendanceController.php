@@ -101,8 +101,11 @@ class AttendanceController extends Controller
 
         $attendances = $query->orderBy('shift')->orderBy('check_in', 'desc')->get();
 
-        // Count statistics
-        $present = $attendances->filter(fn ($a) => $a->check_in && ! $a->check_out)->count();
+        // Count statistics (two shifts per day → count people, not rows, where relevant)
+        $present = $attendances
+            ->filter(fn ($a) => $a->check_in && ! $a->check_out)
+            ->unique('user_id')
+            ->count();
         $checked_out = $attendances->filter(fn ($a) => $a->check_out)->count();
 
         // Get workers based on user role
@@ -157,7 +160,11 @@ class AttendanceController extends Controller
                 ->get();
         }
 
-        $absent = $workers->count() - $attendances->filter(fn ($a) => $a->user->role === UserRole::Worker->value)->count();
+        $attendedUserIds = $attendances
+            ->filter(fn ($a) => $a->check_in !== null)
+            ->pluck('user_id')
+            ->unique();
+        $absent = $workers->filter(fn ($w) => ! $attendedUserIds->contains($w->id))->count();
 
         $projects = $projectsQuery->get();
         $assignedTasks = collect();
@@ -295,25 +302,35 @@ class AttendanceController extends Controller
             abort(403, 'Le magasinier peut pointer seulement les ouvriers et le chef de chantier de son chantier.');
         }
 
-        // Check if there is any check-in in the last 24 hours
-        $last24Hours = Attendance::where('user_id', $validated['user_id'])
-            ->where('check_in', '>=', Carbon::now()->subHours(24))
+        $dateString = Carbon::today()->toDateString();
+
+        $attendance = Attendance::query()
+            ->where('user_id', $validated['user_id'])
+            ->where('project_id', $validated['project_id'])
+            ->where('shift', $shift)
+            ->whereRaw('DATE(date) = ?', [$dateString])
             ->first();
 
-        if ($last24Hours && $last24Hours->check_in) {
-            return back()->with('error', 'Vous avez déjà été pointé(e) dans les dernières 24 heures.');
+        if ($attendance?->check_in) {
+            return back()->with('error', 'Une arrivée est déjà enregistrée pour ce créneau (matin ou soir).');
         }
 
-        $attendance = Attendance::create([
-            'user_id' => $validated['user_id'],
-            'project_id' => $validated['project_id'],
-            'date' => Carbon::today(),
-            'shift' => $shift,
+        if (! $attendance) {
+            $attendance = new Attendance([
+                'user_id' => $validated['user_id'],
+                'project_id' => $validated['project_id'],
+                'date' => $dateString,
+                'shift' => $shift,
+            ]);
+        }
+
+        $attendance->fill([
             'check_in' => Carbon::now(),
             'status' => $validated['status'] ?? 'present',
             'latitude' => $validated['latitude'] ?? null,
             'longitude' => $validated['longitude'] ?? null,
         ]);
+        $attendance->save();
 
         $attendance->load('user', 'project');
 

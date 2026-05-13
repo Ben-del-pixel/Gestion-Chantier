@@ -8,6 +8,8 @@ use App\Models\ActivityLog;
 use App\Models\Project;
 use App\Models\ProjectStep;
 use App\Models\User;
+use App\Support\ProjectDeadlineAlerts;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -50,6 +52,7 @@ class ProjectController extends Controller
         return Inertia::render('projects/index', [
             'projects' => $projects,
             'engineers' => $engineers,
+            'projectDeadlineAlerts' => ProjectDeadlineAlerts::fromProjects($projects),
         ]);
     }
 
@@ -64,15 +67,15 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'start_date' => 'nullable|date',
-            'deadline' => 'required|date|after_or_equal:start_date',
+            'start_date' => ['required', 'date', 'after_or_equal:today'],
+            'deadline' => ['required', 'date', 'after_or_equal:start_date'],
             'budget' => 'nullable|numeric|min:0',
             'progress' => 'nullable|integer|min:0|max:100',
             'status' => 'nullable|in:initialisation,planifie,en_cours,termine,suspendu',
             'engineer_id' => 'nullable|exists:users,id',
-            'steps' => 'nullable|array',
-            'steps.*.name' => 'nullable|string|max:255',
-            'steps.*.budget' => 'nullable|numeric|min:0',
+            'steps' => 'required|array|min:1',
+            'steps.*.name' => 'required|string|max:255',
+            'steps.*.budget' => 'required|numeric|min:0',
         ]);
 
         $project = Project::create([
@@ -200,6 +203,25 @@ class ProjectController extends Controller
         }
         if (isset($projectData['storekeeper_id']) && $projectData['storekeeper_id'] === '') {
             $projectData['storekeeper_id'] = null;
+        }
+
+        foreach (['start_date', 'deadline'] as $dateField) {
+            if (array_key_exists($dateField, $projectData) && $projectData[$dateField] === '') {
+                $projectData[$dateField] = null;
+            }
+        }
+
+        $mergedStart = array_key_exists('start_date', $projectData) && $projectData['start_date'] !== null
+            ? Carbon::parse($projectData['start_date'])->startOfDay()
+            : $project->start_date?->copy()->startOfDay();
+        $mergedDeadline = array_key_exists('deadline', $projectData) && $projectData['deadline'] !== null
+            ? Carbon::parse($projectData['deadline'])->startOfDay()
+            : $project->deadline?->copy()->startOfDay();
+
+        if ($mergedStart && $mergedDeadline && $mergedDeadline->lt($mergedStart)) {
+            return back()->withErrors([
+                'deadline' => 'La date limite doit être postérieure ou égale à la date de démarrage.',
+            ]);
         }
 
         if ($user->role === UserRole::Engineer) {

@@ -11,6 +11,7 @@ use App\Models\Material;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ProjectDeadlineAlerts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -43,10 +44,15 @@ class DashboardController extends Controller
                 'malade' => 0,
             ],
             'workerIncidents' => [],
+            'projectDeadlineAlerts' => [
+                'overdue' => [],
+                'ending_soon' => [],
+            ],
         ];
 
         if ($user->role === UserRole::Manager) {
             $data['projects'] = Project::with(['engineer', 'steps'])->latest()->get();
+            $data['projectDeadlineAlerts'] = ProjectDeadlineAlerts::fromProjects($data['projects']);
             $data['stats'] = [
                 'total_budget' => Project::sum('budget'),
                 'active_projects' => Project::where('status', 'en_cours')->count(),
@@ -65,6 +71,15 @@ class DashboardController extends Controller
 
             $data['engineers'] = User::whereIn('role', [UserRole::Engineer, UserRole::ChefChantier])->get(['id', 'name', 'email']);
         } elseif ($user->role === UserRole::Engineer) {
+            $chefChantierIds = User::where('engineer_id', $user->id)->pluck('id');
+            $engineerProjectsForAlerts = Project::query()
+                ->where(function ($q) use ($user, $chefChantierIds) {
+                    $q->where('engineer_id', $user->id)
+                        ->orWhereIn('chef_chantier_id', $chefChantierIds);
+                })
+                ->get(['id', 'name', 'deadline', 'status']);
+            $data['projectDeadlineAlerts'] = ProjectDeadlineAlerts::fromProjects($engineerProjectsForAlerts);
+
             $data['tasks'] = Task::whereHas('project', function ($q) use ($user) {
                 $q->where('engineer_id', $user->id);
             })->with([
@@ -111,6 +126,10 @@ class DashboardController extends Controller
                 AttendanceShift::cases()
             );
         } elseif ($user->role === UserRole::ChefChantier) {
+            $chefProjectsForAlerts = Project::where('chef_chantier_id', $user->id)
+                ->get(['id', 'name', 'deadline', 'status']);
+            $data['projectDeadlineAlerts'] = ProjectDeadlineAlerts::fromProjects($chefProjectsForAlerts);
+
             $data['tasks'] = Task::whereHas('project', function ($q) use ($user) {
                 $q->where('chef_chantier_id', $user->id);
             })->with([

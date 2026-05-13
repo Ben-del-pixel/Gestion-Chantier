@@ -98,6 +98,13 @@ return 'Non défini';
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.start_date && formData.deadline && formData.deadline < formData.start_date) {
+      alert('La date limite doit être postérieure ou égale à la date de démarrage.');
+
+      return;
+    }
+
     setIsLoading(true);
 
     router.put(`/projects/${project.id}`, formData, {
@@ -708,7 +715,7 @@ return 'Non défini';
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-xs font-black uppercase text-slate-400">Deadline</Label>
-                                        <Input type="date" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} className="h-12 rounded-xl" />
+                                        <Input type="date" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} className="h-12 rounded-xl" min={formData.start_date || undefined} />
                                     </div>
                                 </div>
                             </div>

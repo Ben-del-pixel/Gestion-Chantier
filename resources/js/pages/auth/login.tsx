@@ -63,18 +63,6 @@ export default function Login({
                             </div>
 
                             <div className="grid gap-2.5">
-                                <div className="flex items-center justify-between ml-1">
-                                    <Label htmlFor="password" title="Mot de passe" className="text-sm font-bold text-slate-800">Mot de passe</Label>
-                                    {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-                                            tabIndex={5}
-                                        >
-                                            Oublié ?
-                                        </TextLink>
-                                    )}
-                                </div>
                                 <div className="relative group">
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10">
                                         <Lock size={18} />
@@ -92,17 +80,7 @@ export default function Login({
                                 <InputError message={errors.password} className="ml-1" />
                             </div>
 
-                            <div className="flex items-center justify-between ml-1 pt-1">
-                                <div className="flex items-center space-x-2.5">
-                                    <Checkbox
-                                        id="remember"
-                                        name="remember"
-                                        tabIndex={3}
-                                        className="h-5 w-5 rounded-md border-slate-300 transition-colors"
-                                    />
-                                    <Label htmlFor="remember" className="text-xs font-medium text-slate-600 cursor-pointer">Se souvenir de moi</Label>
-                                </div>
-                            </div>
+                            
 
                             <Button
                                 type="submit"
@@ -122,29 +100,7 @@ export default function Login({
                             </Button>
                         </div>
 
-                        {canRegister && (
-                            <div className="relative mt-2">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t border-slate-100" />
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-white px-3 text-slate-400 font-bold tracking-widest">OU</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {canRegister && (
-                            <div className="text-center group">
-                                <TextLink
-                                    href={register()}
-                                    tabIndex={5}
-                                    className="inline-flex items-center gap-2 py-3 px-6 rounded-xl border border-slate-100 font-bold text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-200 transition-all no-underline"
-                                >
-                                    <UserPlus size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                    Créer un nouveau compte
-                                </TextLink>
-                            </div>
-                        )}
+                    
                     </>
                 )}
             </Form>

@@ -215,3 +215,110 @@ test('manager can update attendance status', function () {
         'status' => 'retard',
     ]);
 });
+
+test('manager can check in same worker twice same day for morning and evening shifts', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $worker = User::factory()->create(['role' => UserRole::Worker->value]);
+    $project = Project::factory()->create(['manager_id' => $manager->id]);
+    $project->workers()->sync([$worker->id]);
+
+    $this->actingAs($manager)
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'shift' => 'morning',
+            'status' => 'present',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $this->actingAs($manager)
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'shift' => 'evening',
+            'status' => 'present',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect(
+        Attendance::query()
+            ->where('user_id', $worker->id)
+            ->where('project_id', $project->id)
+            ->whereDate('date', today())
+            ->count()
+    )->toBe(2);
+});
+
+test('manager cannot record arrival twice for same shift same day', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $worker = User::factory()->create(['role' => UserRole::Worker->value]);
+    $project = Project::factory()->create(['manager_id' => $manager->id]);
+    $project->workers()->sync([$worker->id]);
+
+    $this->actingAs($manager)
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'shift' => 'morning',
+            'status' => 'present',
+        ])
+        ->assertRedirect();
+
+    $this->actingAs($manager)
+        ->from(route('attendance.index'))
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'shift' => 'morning',
+            'status' => 'present',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    expect(
+        Attendance::query()
+            ->where('user_id', $worker->id)
+            ->where('project_id', $project->id)
+            ->whereDate('date', today())
+            ->count()
+    )->toBe(1);
+});
+
+test('check in updates existing initialized attendance row without duplicate insert', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $worker = User::factory()->create(['role' => UserRole::Worker->value]);
+    $project = Project::factory()->create(['manager_id' => $manager->id]);
+    $project->workers()->sync([$worker->id]);
+
+    $row = Attendance::query()->create([
+        'user_id' => $worker->id,
+        'project_id' => $project->id,
+        'date' => today()->toDateString(),
+        'shift' => 'morning',
+        'status' => 'present',
+    ]);
+
+    expect($row->check_in)->toBeNull();
+
+    $this->actingAs($manager)
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'shift' => 'morning',
+            'status' => 'present',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $row->refresh();
+
+    expect($row->check_in)->not->toBeNull();
+    expect(
+        Attendance::query()
+            ->where('user_id', $worker->id)
+            ->whereDate('date', today())
+            ->count()
+    )->toBe(1);
+});

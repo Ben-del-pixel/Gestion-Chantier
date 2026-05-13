@@ -15,6 +15,7 @@ import {
 import React from 'react';
 
 import { destroy, show, store } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import { ProjectDeadlineAlertsBanner, type ProjectDeadlineAlertsShape } from '@/components/project-deadline-alerts-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,7 +94,15 @@ function getProgress(project: ProjectItem): number {
   return project.progress || 0;
 }
 
-export default function ProjectsIndex({ projects, engineers }: { projects: ProjectItem[], engineers: Array<{ id: number, name: string }> }) {
+export default function ProjectsIndex({
+  projects,
+  engineers,
+  projectDeadlineAlerts,
+}: {
+  projects: ProjectItem[];
+  engineers: Array<{ id: number; name: string }>;
+  projectDeadlineAlerts?: ProjectDeadlineAlertsShape | null;
+}) {
   const page = usePage().props as any;
   const canCreateProject = page?.auth?.user?.role === UserRole.Manager.value;
   const { currency, setCurrency, formatCurrency, rate, setRate } = useCurrency();
@@ -129,6 +138,8 @@ export default function ProjectsIndex({ projects, engineers }: { projects: Proje
       }),
     [projects]
   );
+
+  const todayDateMin = React.useMemo(() => new Date().toLocaleDateString('en-CA'), []);
 
   const filteredProjects = React.useMemo(() => {
     return normalizedProjects.filter((project) => {
@@ -216,8 +227,17 @@ return;
   const handleSubmitProject = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.start_date && formData.deadline && formData.deadline < formData.start_date) {
-      alert('La date de fin doit être postérieure ou égale à la date de début.');
+    if (formData.start_date < todayDateMin) {
+      alert('La date de démarrage ne peut pas être antérieure à aujourd\'hui.');
+
+      return;
+    }
+
+    const deadlineFloor =
+      formData.start_date && formData.start_date >= todayDateMin ? formData.start_date : todayDateMin;
+
+    if (formData.deadline < deadlineFloor) {
+      alert('La date limite doit être postérieure ou égale à la date de démarrage (et ne peut pas être avant aujourd\'hui).');
 
       return;
     }
@@ -337,6 +357,7 @@ return;
                       type="date"
                       value={formData.start_date}
                       onChange={handleFormChange}
+                      min={todayDateMin}
                       required
                     />
                   </div>
@@ -349,7 +370,11 @@ return;
                       type="date"
                       value={formData.deadline}
                       onChange={handleFormChange}
-                      min={formData.start_date || undefined}
+                      min={
+                        formData.start_date && formData.start_date >= todayDateMin
+                          ? formData.start_date
+                          : todayDateMin
+                      }
                       required
                     />
                   </div>
@@ -452,6 +477,8 @@ return;
               </DialogContent>
             </Dialog>}
         </div>
+
+        <ProjectDeadlineAlertsBanner alerts={projectDeadlineAlerts ?? undefined} />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
               <div className="rounded-3xl bg-blue-500 p-6 text-white shadow-xl shadow-blue-500/20 group transition-transform hover:-translate-y-1">

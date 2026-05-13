@@ -36,6 +36,7 @@ import {
     getProjectWorkers,
     initializeForProject,
 } from '@/actions/App/Http/Controllers/AttendanceInitializationController';
+import { ProjectDeadlineAlertsBanner } from '@/components/project-deadline-alerts-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -198,7 +199,13 @@ const StatCard = ({
     );
 };
 
-export const ManagerDashboard = ({ projects = [], stats = {}, recentActivities = [], materialDistribution = [] }: any) => {
+export const ManagerDashboard = ({
+    projects = [],
+    stats = {},
+    recentActivities = [],
+    materialDistribution = [],
+    projectDeadlineAlerts = null,
+}: any) => {
     const { formatCurrency } = useCurrency();
 
     const lineData = {
@@ -224,6 +231,8 @@ export const ManagerDashboard = ({ projects = [], stats = {}, recentActivities =
                 <h1 className="text-[30px] font-bold tracking-tight text-slate-900 dark:text-white">Tableau de bord</h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Vue d'ensemble des activités en temps réel</p>
             </div>
+
+            <ProjectDeadlineAlertsBanner alerts={projectDeadlineAlerts} />
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
                 <div className="rounded-[18px] border border-white/60 bg-white p-6 shadow-[0_14px_35px_-24px_rgba(15,23,42,0.35)]">
@@ -419,6 +428,8 @@ export const EngineerDashboard = ({
     attendanceShifts = [],
     attendanceDate,
     presenceActionsEnabled = true,
+    showQuickStats = true,
+    projectDeadlineAlerts = null,
 }: any) => {
     const [selectedDate, setSelectedDate] = React.useState(attendanceDate || new Date().toISOString().slice(0, 10));
     const [selectedProjectId, setSelectedProjectId] = React.useState<string>(
@@ -739,15 +750,21 @@ export const EngineerDashboard = ({
                     </Dialog>
                     )}
 
+                    {showQuickStats && (
                     <Button size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm"><PlusCircle className="mr-2 h-4 w-4" />Nouvelle Tâche</Button>
+                    )}
                 </div>
             </div>
 
+            <ProjectDeadlineAlertsBanner alerts={projectDeadlineAlerts} />
+
+            {showQuickStats && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard icon={ClipboardCheck} title="Missions Actives" value={stats?.active_tasks || 0} subValue="Processus en cours" />
                 <StatCard icon={HardHat} title="Personnel Site" value={stats?.total_workers_under || 0} subValue="Ouvriers affectés" />
                 <StatCard icon={Clock} title="Heures Chantier" value="142h" subValue="Semaine en cours" />
             </div>
+            )}
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
                 <CardHeader>
