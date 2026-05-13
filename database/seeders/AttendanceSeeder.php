@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
 class AttendanceSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Présences fictives sur les derniers jours pour chaque ouvrier affecté à un chantier.
      */
     public function run(): void
     {

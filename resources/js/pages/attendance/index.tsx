@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
+import { attendanceShiftLabel } from '@/lib/attendance-labels';
 import { cn } from '@/lib/utils';
 
 export default function AttendanceIndex({
@@ -345,7 +346,7 @@ return '-';
                                 <thead>
                                     <tr className="bg-slate-50/50">
                                         <th className="whitespace-nowrap px-8 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Ouvrier / Employé</th>
-                                        <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Shift / Horaire</th>
+                                        <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Créneau</th>
                                         <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Pointage</th>
                                         <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-bold uppercase text-slate-400 tracking-wider">Statut</th>
                                         <th className="whitespace-nowrap px-8 py-4 text-right text-xs font-bold uppercase text-slate-400 tracking-wider">Actions</th>
@@ -370,7 +371,7 @@ return '-';
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-5">
                                                 <Badge variant="outline" className="rounded-lg border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-tight px-3 py-1 text-slate-600">
-                                                    {shifts?.find((s: any) => s.value === attendance.shift)?.label || attendance.shift}
+                                                    {attendanceShiftLabel(attendance.shift, shifts)}
                                                 </Badge>
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-5">
@@ -491,7 +492,7 @@ return '-';
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-slate-400">Période (Shift)</Label>
+                                <Label className="text-xs font-bold uppercase text-slate-400">Créneau horaire</Label>
                                 <select
                                     value={checkInData.shift}
                                     onChange={(e) => setCheckInData({ ...checkInData, shift: e.target.value })}

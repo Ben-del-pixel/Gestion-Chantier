@@ -3,16 +3,17 @@
 namespace Database\Seeders;
 
 use App\Models\Material;
+use App\Models\Project;
 use Illuminate\Database\Seeder;
 
 class MaterialSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Matériaux et matériel de chantier (libellés en français).
      */
     public function run(): void
     {
-        $projects = \App\Models\Project::all();
+        $projects = Project::all();
 
         $materialTemplates = [
             // Consumables (materiaux)
@@ -46,7 +47,7 @@ class MaterialSeeder extends Seeder
                 'name' => 'Marteau Piqueur',
                 'description' => 'Bosch GSH 11 E Professional',
                 'quantity_in_stock' => 5,
-                'unit' => 'unite',
+                'unit' => 'unité',
                 'type' => 'materiel',
                 'category' => 'Outillage Électroportatif',
             ],
@@ -54,7 +55,7 @@ class MaterialSeeder extends Seeder
                 'name' => 'Bétonnière 350L',
                 'description' => 'Moteur thermique GX160',
                 'quantity_in_stock' => 2,
-                'unit' => 'unite',
+                'unit' => 'unité',
                 'type' => 'materiel',
                 'category' => 'Matériel de Chantier',
             ],
@@ -64,7 +65,7 @@ class MaterialSeeder extends Seeder
             foreach ($materialTemplates as $template) {
                 Material::create([
                     ...$template,
-                    'name' => $template['name'] . ' - ' . $project->name,
+                    'name' => $template['name'].' - '.$project->name,
                     'project_id' => $project->id,
                     'storekeeper_id' => $project->storekeeper_id,
                 ]);

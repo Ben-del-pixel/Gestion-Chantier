@@ -28,7 +28,7 @@ test('user seeder creates expected hierarchy and credentials', function () {
         User::where('role', UserRole::ChefChantier)->count()
     )->toBe(4);
 
-    $manager = User::where('email', 'manager1@example.com')->first();
+    $manager = User::where('email', 'directeur1@example.com')->first();
     $chef = User::where('role', UserRole::ChefChantier)->first();
 
     expect($manager)->not()->toBeNull();

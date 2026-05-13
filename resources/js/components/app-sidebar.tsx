@@ -10,12 +10,14 @@ import {
     BarChart3,
     Clock,
     LogOut,
-    ListChecks
+    ListChecks,
+    CalendarRange,
 } from 'lucide-react';
 import { index as activityLogsIndex } from '@/actions/App/Http/Controllers/ActivityLogController';
 import { index as materialsIndex } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { index as attendanceIndex } from '@/actions/App/Http/Controllers/AttendanceController';
+import { index as planningIndex } from '@/actions/App/Http/Controllers/PlanningController';
 import { index as reportsIndex } from '@/actions/App/Http/Controllers/ReportController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import AppLogo from '@/components/app-logo';
@@ -40,6 +42,7 @@ const roleNavItems: Record<string, NavItem[]> = {
     [UserRole.Manager.value]: [
         { title: "Vue d'ensemble", href: dashboard(), icon: LayoutGrid },
         { title: 'Chantiers & Tâches', href: projectsIndex(), icon: ListChecks },
+        { title: 'Planning', href: planningIndex(), icon: CalendarRange },
         { title: 'Matériaux', href: materialsIndex(), icon: Package },
         { title: "Main-d'oeuvre", href: usersIndex(), icon: Users },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
@@ -56,6 +59,7 @@ const roleNavItems: Record<string, NavItem[]> = {
     [UserRole.Engineer.value]: [
         { title: 'Mes Projets', href: dashboard(), icon: LayoutGrid },
         { title: 'Gestion Chantiers & Tâches', href: projectsIndex(), icon: ListChecks },
+        { title: 'Planning', href: planningIndex(), icon: CalendarRange },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
     ],

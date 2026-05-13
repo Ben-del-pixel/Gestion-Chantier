@@ -10,45 +10,48 @@ use Illuminate\Support\Facades\Hash;
 class UserSeeder extends Seeder
 {
     /**
-     * Run the database seeds with hierarchy:
-     * Manager > ChefChantier > Engineer > Worker/Magasinier
+     * Comptes de démonstration : directeurs, ingénieurs, chefs de chantier, magasiniers, ouvriers.
+     *
+     * Connexion (mot de passe : password) — e-mails en français :
+     * - directeur1@example.com, ingenieur1@example.com, chefchantier1@example.com,
+     *   magasinier1@example.com, ouvrier1@example.com, etc.
      */
     public function run(): void
     {
-        // 1. Create Managers
+        // 1. Directeurs (managers)
         $managers = [];
         for ($i = 1; $i <= 2; $i++) {
             $managers[] = User::updateOrCreate(
-                ['email' => "manager{$i}@example.com"],
+                ['email' => "directeur{$i}@example.com"],
                 [
-                    'name' => "Manager {$i}",
+                    'name' => "Directeur de projet {$i}",
                     'password' => Hash::make('password'),
                     'role' => UserRole::Manager,
                 ]
             );
         }
 
-        // 2. Create Engineers
+        // 2. Ingénieurs
         $engineers = [];
         for ($i = 1; $i <= 3; $i++) {
             $engineers[] = User::updateOrCreate(
-                ['email' => "engineer{$i}@example.com"],
+                ['email' => "ingenieur{$i}@example.com"],
                 [
-                    'name' => "Ingénieur {$i}",
+                    'name' => "Ingénieur principal {$i}",
                     'password' => Hash::make('password'),
                     'role' => UserRole::Engineer,
                 ]
             );
         }
 
-        // 3. Create Chef de Chantier and attach each one to an engineer
+        // 3. Chefs de chantier (rattachés à un ingénieur)
         $chefChantiers = [];
         for ($i = 1; $i <= 4; $i++) {
             $engineer = $engineers[($i - 1) % count($engineers)];
             $chefChantiers[] = User::updateOrCreate(
-                ['email' => "chef_chantier{$i}@example.com"],
+                ['email' => "chefchantier{$i}@example.com"],
                 [
-                    'name' => "Chef de Chantier {$i}",
+                    'name' => "Chef de chantier {$i}",
                     'password' => Hash::make('password'),
                     'role' => UserRole::ChefChantier,
                     'engineer_id' => $engineer->id,
@@ -56,28 +59,27 @@ class UserSeeder extends Seeder
             );
         }
 
-        // 4. Create Magasiniers
+        // 4. Magasiniers
         $magasiniers = [];
         for ($i = 1; $i <= 4; $i++) {
             $magasiniers[] = User::updateOrCreate(
                 ['email' => "magasinier{$i}@example.com"],
                 [
-                    'name' => "Magasinier {$i}",
+                    'name' => "Magasinier chantier {$i}",
                     'password' => Hash::make('password'),
                     'role' => UserRole::Magasinier,
                 ]
             );
         }
 
-        // 5. Create Workers and assign to Chef de Chantier
-        // Each Chef de Chantier gets 5 workers
+        // 5. Ouvriers (équipe par chef de chantier)
         foreach ($chefChantiers as $index => $chef) {
             for ($j = 1; $j <= 5; $j++) {
                 $workerIndex = ($index * 5) + $j;
                 User::updateOrCreate(
-                    ['email' => "worker{$workerIndex}@example.com"],
+                    ['email' => "ouvrier{$workerIndex}@example.com"],
                     [
-                        'name' => "Ouvrier {$workerIndex}",
+                        'name' => "Ouvrier qualifié {$workerIndex}",
                         'password' => Hash::make('password'),
                         'role' => UserRole::Worker,
                         'chef_chantier_id' => $chef->id,

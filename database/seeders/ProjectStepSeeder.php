@@ -3,12 +3,14 @@
 namespace Database\Seeders;
 
 use App\Models\Project;
-use App\Models\ProjectStep;
 use App\Models\ProjectSubStep;
 use Illuminate\Database\Seeder;
 
 class ProjectStepSeeder extends Seeder
 {
+    /**
+     * Étapes types et sous-étapes (lots) pour chaque chantier.
+     */
     public function run(): void
     {
         $projects = Project::all();
@@ -34,8 +36,8 @@ class ProjectStepSeeder extends Seeder
                 for ($i = 1; $i <= 3; $i++) {
                     $subStep = ProjectSubStep::create([
                         'project_step_id' => $step->id,
-                        'name' => "Sous-étape {$i} de {$step->name}",
-                        'description' => "Description détaillée de la sous-étape {$i}",
+                        'name' => "Lot {$i} — {$step->name}",
+                        'description' => "Travaux détaillés du lot {$i} pour l'étape « {$step->name} ».",
                         'chef_chantier_id' => $project->chef_chantier_id,
                         'planned_date' => now()->addDays($index * 5 + $i),
                         'status' => 'pending',

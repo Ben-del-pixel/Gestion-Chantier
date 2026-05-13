@@ -10,8 +10,7 @@ use Illuminate\Database\Seeder;
 class ProjectSeeder extends Seeder
 {
     /**
-     * Run the database seeds with hierarchy:
-     * Manager > ChefChantier > Engineer on projects
+     * Chantiers de démonstration (hiérarchie : directeur, ingénieur, chef de chantier, magasinier).
      */
     public function run(): void
     {

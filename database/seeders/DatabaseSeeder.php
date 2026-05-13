@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             ProjectSeeder::class,
             ProjectStepSeeder::class,
+            TaskSeeder::class,
             MaterialSeeder::class,
             AttendanceSeeder::class,
             ActivityLogSeeder::class,

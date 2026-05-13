@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { attendanceShiftLabel, attendanceStatusLabel } from '@/lib/attendance-labels';
 import { useCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
@@ -592,7 +593,7 @@ export const EngineerDashboard = ({
         }
 
         if (selectedShifts.length === 0) {
-            alert('Selectionnez au moins un shift');
+            alert('Sélectionnez au moins un créneau');
 
             return;
         }
@@ -701,15 +702,17 @@ export const EngineerDashboard = ({
                     <Dialog open={showInitializeDialog} onOpenChange={setShowInitializeDialog}>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-sm">
-                                Initialiser Presence
+                                Initialiser la présence
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
-                            <DialogTitle>Initialiser la presence du projet</DialogTitle>
+                            <DialogTitle>Initialiser la présence du projet</DialogTitle>
                             <div className="mt-4 space-y-4">
-                                <p className="text-sm text-muted-foreground">Cree des presences vides pour la date et les shifts choisis.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Crée des présences vides pour la date et les créneaux choisis.
+                                </p>
                                 <div className="space-y-2">
-                                    <Label>Shifts</Label>
+                                    <Label>Créneaux</Label>
                                     <div className="flex flex-wrap gap-4">
                                         {attendanceShifts.map((shift: any) => (
                                             <label key={shift.value} className="flex items-center gap-2 text-sm">
@@ -748,10 +751,10 @@ export const EngineerDashboard = ({
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
                 <CardHeader>
-                    <CardTitle className="text-lg font-bold">Gestion Presence Ouvriers</CardTitle>
+                    <CardTitle className="text-lg font-bold">Gestion de la présence (ouvriers)</CardTitle>
                     <CardDescription className="text-xs">
                         {presenceActionsEnabled
-                            ? 'Pilotage de la presence quotidienne par projet'
+                            ? 'Pilotage de la présence quotidienne par projet'
                             : 'Consultation de la présence (lecture seule — pointage réservé au magasinier ou au manager)'}
                     </CardDescription>
                 </CardHeader>
@@ -768,7 +771,7 @@ export const EngineerDashboard = ({
                                 onChange={(e) => setSelectedProjectId(e.target.value)}
                                 className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                             >
-                                <option value="">-- Selectionner un projet --</option>
+                                <option value="">— Sélectionner un projet —</option>
                                 {attendanceProjects.map((project: any) => (
                                     <option key={project.id} value={project.id}>
                                         {project.name}
@@ -778,7 +781,7 @@ export const EngineerDashboard = ({
                         </div>
                         <div className="flex items-end">
                             <Button type="button" variant="outline" className="w-full" onClick={refreshAttendances} disabled={isRefreshingAttendances}>
-                                {isRefreshingAttendances ? 'Actualisation...' : 'Actualiser'}
+                                {isRefreshingAttendances ? 'Actualisation…' : 'Actualiser'}
                             </Button>
                         </div>
                     </div>
@@ -788,8 +791,8 @@ export const EngineerDashboard = ({
                             <thead className="bg-muted/30">
                                 <tr>
                                     <th className="px-4 py-2 font-semibold">Ouvrier</th>
-                                    <th className="px-4 py-2 font-semibold">Shift</th>
-                                    <th className="px-4 py-2 font-semibold">Heure Arrivee</th>
+                                    <th className="px-4 py-2 font-semibold">Créneau</th>
+                                    <th className="px-4 py-2 font-semibold">Heure d&apos;arrivée</th>
                                     <th className="px-4 py-2 font-semibold">Statut</th>
                                 </tr>
                             </thead>
@@ -798,7 +801,7 @@ export const EngineerDashboard = ({
                                     attendances.map((attendance) => (
                                         <tr key={attendance.id} className="border-t">
                                             <td className="px-4 py-2 font-medium">{attendance.user?.name ?? '-'}</td>
-                                            <td className="px-4 py-2">{attendance.shift}</td>
+                                            <td className="px-4 py-2">{attendanceShiftLabel(attendance.shift, attendanceShifts)}</td>
                                             <td className="px-4 py-2">
                                                 {attendance.check_in
                                                     ? new Date(attendance.check_in).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -833,7 +836,7 @@ export const EngineerDashboard = ({
                                 ) : (
                                     <tr>
                                         <td className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>
-                                            Aucune presence pour cette selection.
+                                            Aucune présence pour cette sélection.
                                         </td>
                                     </tr>
                                 )}
@@ -899,13 +902,6 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
         details: '',
         severity: 'moyen',
     });
-
-    const attendanceStatusLabels: Record<string, string> = {
-        present: 'Present',
-        absent: 'Absent',
-        retard: 'Retard',
-        malade: 'Malade',
-    };
 
     const attendanceStatusClasses: Record<string, string> = {
         present: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -1027,7 +1023,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
             });
 
             if (!response.ok) {
-                let errorMessage = 'Impossible de declarer l\'incident.';
+                let errorMessage = 'Impossible de déclarer l\'incident.';
 
                 try {
                     const payload = await response.json();
@@ -1164,7 +1160,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm rounded-[1.5rem] overflow-hidden">
                 <CardHeader className="p-6 border-b border-border/50">
-                    <CardTitle className="text-base font-bold">Incidents recents declares</CardTitle>
+                    <CardTitle className="text-base font-bold">Incidents récents déclarés</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-2">
                     {workerIncidents.length > 0 ? (
@@ -1180,20 +1176,20 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                             </div>
                         ))
                     ) : (
-                        <p className="text-sm text-muted-foreground">Aucun incident declare pour le moment.</p>
+                        <p className="text-sm text-muted-foreground">Aucun incident déclaré pour le moment.</p>
                     )}
                 </CardContent>
             </Card>
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm rounded-[2rem] overflow-hidden">
                 <CardHeader className="p-8 border-b border-border/50">
-                    <CardTitle className="text-lg font-bold">Suivi Presence</CardTitle>
-                    <CardDescription>Consulte ton statut du jour et les jours passes.</CardDescription>
+                    <CardTitle className="text-lg font-bold">Suivi de présence</CardTitle>
+                    <CardDescription>Consultez votre statut du jour et les jours passés.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div className="rounded-xl border p-3">
-                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Present</p>
+                            <p className="text-[10px] uppercase text-muted-foreground font-bold">Présent</p>
                             <p className="text-2xl font-black">{workerAttendanceSummary?.present ?? 0}</p>
                         </div>
                         <div className="rounded-xl border p-3">
@@ -1227,7 +1223,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                 <tr>
                                     <th className="px-4 py-2 font-semibold">Date</th>
                                     <th className="px-4 py-2 font-semibold">Projet</th>
-                                    <th className="px-4 py-2 font-semibold">Shift</th>
+                                    <th className="px-4 py-2 font-semibold">Créneau</th>
                                     <th className="px-4 py-2 font-semibold">Statut</th>
                                 </tr>
                             </thead>
@@ -1239,12 +1235,12 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                                 {new Date(attendance.date).toLocaleDateString('fr-FR')}
                                             </td>
                                             <td className="px-4 py-2">{attendance.project?.name ?? '-'}</td>
-                                            <td className="px-4 py-2 capitalize">{attendance.shift ?? '-'}</td>
+                                            <td className="px-4 py-2">{attendanceShiftLabel(attendance.shift)}</td>
                                             <td className="px-4 py-2">
                                                 <span
                                                     className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${attendanceStatusClasses[attendance.status] ?? 'bg-muted text-foreground border-border'}`}
                                                 >
-                                                    {attendanceStatusLabels[attendance.status] ?? attendance.status}
+                                                    {attendanceStatusLabel(attendance.status)}
                                                 </span>
                                             </td>
                                         </tr>
@@ -1261,7 +1257,7 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                     </div>
 
                     <div>
-                        <p className="text-sm font-semibold mb-3">Historique recent</p>
+                        <p className="text-sm font-semibold mb-3">Historique récent</p>
                         <div className="space-y-2">
                             {recentAttendances.length > 0 ? (
                                 recentAttendances.map((attendance: any) => (
@@ -1270,17 +1266,17 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                                             <p className="font-semibold text-sm">
                                                 {new Date(attendance.date).toLocaleDateString('fr-FR')} - {attendance.project?.name ?? 'Sans projet'}
                                             </p>
-                                            <p className="text-xs text-muted-foreground">Shift: {attendance.shift ?? '-'}</p>
+                                            <p className="text-xs text-muted-foreground">Créneau : {attendanceShiftLabel(attendance.shift)}</p>
                                         </div>
                                         <span
                                             className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${attendanceStatusClasses[attendance.status] ?? 'bg-muted text-foreground border-border'}`}
                                         >
-                                            {attendanceStatusLabels[attendance.status] ?? attendance.status}
+                                            {attendanceStatusLabel(attendance.status)}
                                         </span>
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-sm text-muted-foreground">Aucune donnee de presence disponible.</p>
+                                <p className="text-sm text-muted-foreground">Aucune donnée de présence disponible.</p>
                             )}
                         </div>
                     </div>
