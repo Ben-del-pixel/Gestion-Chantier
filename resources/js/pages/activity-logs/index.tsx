@@ -1,13 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { 
-  User, Clock, FileText, Activity, Layers, 
+  User, Clock, Activity, Layers, 
   Trash2, Edit3, PlusCircle, ChevronRight, Info, UserCheck, Filter
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserRole } from '@/Enums/UserRole';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ActivityLogsIndex({ logs, currentFilter = 'all' }: any) {
   const page = usePage().props as { auth?: { user?: { role?: string } } };
@@ -55,7 +54,7 @@ export default function ActivityLogsIndex({ logs, currentFilter = 'all' }: any) 
     <>
       <Head title={isWorker ? 'Historique' : 'Paramètres - Historique'} />
 
-      <div className={cn('relative space-y-6 pb-10', isWorker && 'mx-auto max-w-3xl')}>
+      <div className="relative w-full space-y-6 pb-10">
         {!isWorker && (
         <div className="pointer-events-none absolute inset-x-0 -top-40 -z-10 h-[500px] bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.05),transparent_40%)]" />
         )}

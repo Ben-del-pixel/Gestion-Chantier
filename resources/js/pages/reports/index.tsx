@@ -223,7 +223,7 @@ export default function ReportsIndex({
         <>
             <Head title="Rapports" />
 
-            <div className={cn('space-y-6', isWorker && 'mx-auto max-w-3xl')}>
+            <div className="w-full space-y-6">
                 <div>
                     <h1 className={cn('font-semibold tracking-tight', isWorker ? 'text-xl' : 'text-3xl font-bold')}>
                         Rapports
@@ -371,6 +371,10 @@ export default function ReportsIndex({
                 </div>
 
                 <Card className={cn('shadow-none border-border/50 bg-card/60 backdrop-blur-sm', isWorker && 'rounded-md border')}>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Filter className="h-5 w-5" />
+                            Parametres du rapport analytique
                         </CardTitle>
                     </CardHeader>
                     <CardContent>

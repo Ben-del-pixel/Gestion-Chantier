@@ -1,6 +1,6 @@
 import { router, usePage } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 import { markExecuted } from '@/actions/App/Http/Controllers/Api/TaskController';
+import { Button } from '@/components/ui/button';
 
 export function TaskExecuteButton({ task }: { task: any }) {
     const page = usePage().props as any;

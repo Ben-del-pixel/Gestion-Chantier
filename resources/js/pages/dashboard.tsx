@@ -2,7 +2,6 @@ import { usePage, Head, router } from '@inertiajs/react';
 import React from 'react';
 import { ManagerDashboard, EngineerDashboard, WorkerDashboard } from '@/components/dashboards';
 import { UserRole } from '@/Enums/UserRole';
-import { cn } from '@/lib/utils';
 
 export default function Dashboard({ stats, tasks, projects, recentActivities, materialDistribution, projectDeadlineAlerts }: any) {
     const pageProps = usePage().props as any;
@@ -20,12 +19,7 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
         <>
             <Head title="Tableau de bord" />
 
-            <div
-                className={cn(
-                    'relative mx-auto w-full max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8',
-                    roleValue === UserRole.Worker.value && 'max-w-3xl',
-                )}
-            >
+            <div className="relative mx-auto w-full max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
                 {roleValue !== UserRole.Worker.value && (
                     <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.10),transparent_28%)]" />
                 )}

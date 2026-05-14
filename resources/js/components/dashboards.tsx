@@ -24,7 +24,6 @@ import {
     ChevronRight,
     PlusCircle,
     HardHat,
-    AlertCircle,
 } from 'lucide-react';
 import React from 'react';
 import { Doughnut, Line } from 'react-chartjs-2';
