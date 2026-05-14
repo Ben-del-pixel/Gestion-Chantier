@@ -36,6 +36,7 @@ import {
     getProjectWorkers,
     initializeForProject,
 } from '@/actions/App/Http/Controllers/AttendanceInitializationController';
+import { resolve as resolveIncident } from '@/actions/App/Http/Controllers/IncidentController';
 import { ProjectDeadlineAlertsBanner } from '@/components/project-deadline-alerts-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -434,6 +435,8 @@ export const EngineerDashboard = ({
     presenceActionsEnabled = true,
     showQuickStats = true,
     projectDeadlineAlerts = null,
+    receivedWorkerIncidents = [],
+    canResolveWorkerIncidents = false,
 }: any) => {
     const [selectedDate, setSelectedDate] = React.useState(attendanceDate || new Date().toISOString().slice(0, 10));
     const [selectedProjectId, setSelectedProjectId] = React.useState<string>(
@@ -446,6 +449,10 @@ export const EngineerDashboard = ({
     const [selectedWorkers, setSelectedWorkers] = React.useState<number[]>([]);
     const [showAssignDialog, setShowAssignDialog] = React.useState(false);
     const [showInitializeDialog, setShowInitializeDialog] = React.useState(false);
+    const [resolveIncidentDialogOpen, setResolveIncidentDialogOpen] = React.useState(false);
+    const [incidentBeingResolved, setIncidentBeingResolved] = React.useState<any | null>(null);
+    const [resolutionNote, setResolutionNote] = React.useState('');
+    const [isSubmittingIncidentResolution, setIsSubmittingIncidentResolution] = React.useState(false);
 
     const loadAssignedWorkers = React.useCallback(async () => {
         if (!selectedProjectId) {
@@ -635,6 +642,55 @@ export const EngineerDashboard = ({
         }
     };
 
+    const openResolveIncident = (incident: any) => {
+        setIncidentBeingResolved(incident);
+        setResolutionNote('');
+        setResolveIncidentDialogOpen(true);
+    };
+
+    const submitIncidentResolution = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!incidentBeingResolved?.id) {
+            return;
+        }
+
+        setIsSubmittingIncidentResolution(true);
+
+        try {
+            const routeDef = resolveIncident.post(incidentBeingResolved.id);
+            const response = await fetch(routeDef.url, {
+                method: routeDef.method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                    resolution_note: resolutionNote.trim() || null,
+                }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                alert(typeof payload?.message === 'string' ? payload.message : 'Impossible de valider la correction.');
+
+                return;
+            }
+
+            setResolveIncidentDialogOpen(false);
+            setIncidentBeingResolved(null);
+            setResolutionNote('');
+            alert(typeof payload?.message === 'string' ? payload.message : 'Correction enregistree.');
+            window.location.reload();
+        } catch {
+            alert('Erreur reseau lors de l\'enregistrement.');
+        } finally {
+            setIsSubmittingIncidentResolution(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex items-end justify-between">
@@ -734,6 +790,114 @@ export const EngineerDashboard = ({
             </div>
 
             <ProjectDeadlineAlertsBanner alerts={projectDeadlineAlerts} />
+
+            <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
+                <CardHeader>
+                    <CardTitle className="text-lg font-bold">Incidents declares par les ouvriers</CardTitle>
+                    <CardDescription className="text-xs">
+                        {canResolveWorkerIncidents
+                            ? 'Vous êtes notifié ici ; une fois le problème corrigé sur le terrain, signalez-le à l\'ouvrier.'
+                            : 'Suivi des remontées sur vos chantiers (lecture seule).'}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {receivedWorkerIncidents.length > 0 ? (
+                        receivedWorkerIncidents.map((incident: any) => {
+                            const props = incident.properties ?? {};
+                            const isResolved = props.status === 'resolved';
+
+                            return (
+                                <div key={incident.id} className="rounded-xl border border-border/60 bg-background/80 p-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0 flex-1 space-y-1">
+                                            <p className="text-sm font-bold text-foreground">{incident.description}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Par {incident.user?.name ?? 'Ouvrier'} — {props.project_name ?? 'Chantier'} —{' '}
+                                                {new Date(incident.created_at).toLocaleString('fr-FR')}
+                                            </p>
+                                            <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                                Gravite : {props.severity ?? '—'}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground line-clamp-3">{props.details}</p>
+                                            {isResolved && (
+                                                <div className="mt-2 rounded-lg border border-emerald-200/80 bg-emerald-50/60 p-2 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+                                                    <p className="font-bold">Corrige</p>
+                                                    <p>
+                                                        Par {props.resolved_by_name ?? 'Chef de chantier'}
+                                                        {props.resolved_at
+                                                            ? ` le ${new Date(props.resolved_at).toLocaleString('fr-FR')}`
+                                                            : ''}
+                                                    </p>
+                                                    {props.resolution_note ? <p className="mt-1 italic">{props.resolution_note}</p> : null}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex shrink-0 flex-col items-end gap-2">
+                                            <Badge variant={isResolved ? 'secondary' : 'destructive'} className="text-[10px] font-bold uppercase">
+                                                {isResolved ? 'Corrige' : 'A traiter'}
+                                            </Badge>
+                                            {canResolveWorkerIncidents && !isResolved && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="text-xs font-bold"
+                                                    onClick={() => openResolveIncident(incident)}
+                                                >
+                                                    Signaler corrige
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <p className="text-sm text-muted-foreground">Aucun incident remonte pour le moment sur vos chantiers.</p>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Dialog
+                open={resolveIncidentDialogOpen}
+                onOpenChange={(open) => {
+                    setResolveIncidentDialogOpen(open);
+                    if (!open) {
+                        setIncidentBeingResolved(null);
+                        setResolutionNote('');
+                    }
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogTitle>Signaler la correction a l&apos;ouvrier</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                        L&apos;ouvrier verra sur son tableau de bord que l&apos;incident a ete traite. Vous pouvez ajouter un court message (optionnel).
+                    </p>
+                    <form className="mt-4 space-y-4" onSubmit={submitIncidentResolution}>
+                        <div className="space-y-2">
+                            <Label htmlFor="resolution-note">Message pour l&apos;ouvrier (optionnel)</Label>
+                            <textarea
+                                id="resolution-note"
+                                value={resolutionNote}
+                                onChange={(event) => setResolutionNote(event.target.value)}
+                                rows={3}
+                                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                                placeholder="Ex: materiel remplace, zone securisee..."
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline">
+                                    Annuler
+                                </Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={isSubmittingIncidentResolution}>
+                                {isSubmittingIncidentResolution ? 'Envoi...' : 'Confirmer la correction'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {showQuickStats && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1154,18 +1318,34 @@ export const WorkerDashboard = ({ tasks, workerAttendances = [], workerAttendanc
                     <CardTitle className="text-base font-bold">Incidents récents déclarés</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-2">
-                    {workerIncidents.length > 0 ? (
-                        workerIncidents.map((incident: any) => (
+                        {workerIncidents.length > 0 ? (
+                        workerIncidents.map((incident: any) => {
+                            const props = incident.properties ?? {};
+                            const isResolved = props.status === 'resolved';
+
+                            return (
                             <div key={incident.id} className="rounded-lg border px-3 py-2 flex items-center justify-between gap-3">
-                                <div>
+                                <div className="min-w-0 flex-1">
                                     <p className="text-sm font-semibold">{incident.description}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {new Date(incident.created_at).toLocaleDateString('fr-FR')} - {incident.properties?.severity ?? 'moyen'}
+                                        {new Date(incident.created_at).toLocaleDateString('fr-FR')} — {props.project_name ?? 'Chantier'} — {props.severity ?? 'moyen'}
                                     </p>
+                                    {isResolved ? (
+                                        <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                                            Corrigé par {props.resolved_by_name ?? 'Chef de chantier'}
+                                            {props.resolved_at ? ` le ${new Date(props.resolved_at).toLocaleString('fr-FR')}` : ''}
+                                            {props.resolution_note ? ` — ${props.resolution_note}` : ''}
+                                        </p>
+                                    ) : (
+                                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">En cours de traitement par le chef de chantier / l&apos;ingénieur.</p>
+                                    )}
                                 </div>
-                                <Badge variant="outline" className="uppercase text-[10px]">Incident</Badge>
+                                <Badge variant={isResolved ? 'secondary' : 'outline'} className="shrink-0 uppercase text-[10px]">
+                                    {isResolved ? 'Corrigé' : 'Ouvert'}
+                                </Badge>
                             </div>
-                        ))
+                            );
+                        })
                     ) : (
                         <p className="text-sm text-muted-foreground">Aucun incident déclaré pour le moment.</p>
                     )}

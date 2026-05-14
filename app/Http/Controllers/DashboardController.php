@@ -13,6 +13,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\ProjectDeadlineAlerts;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -43,6 +44,8 @@ class DashboardController extends Controller
                 'malade' => 0,
             ],
             'workerIncidents' => [],
+            'receivedWorkerIncidents' => [],
+            'canResolveWorkerIncidents' => false,
             'projectDeadlineAlerts' => [
                 'overdue' => [],
                 'ending_soon' => [],
@@ -115,6 +118,11 @@ class DashboardController extends Controller
                 ],
                 AttendanceStatus::cases()
             );
+
+            $data['receivedWorkerIncidents'] = $this->workerDeclaredIncidentsForProjectIds(
+                Project::where('engineer_id', $user->id)->pluck('id')
+            );
+            $data['canResolveWorkerIncidents'] = false;
         } elseif ($user->role === UserRole::ChefChantier) {
             $chefProjectsForAlerts = Project::where('chef_chantier_id', $user->id)
                 ->get(['id', 'name', 'deadline', 'status']);
@@ -155,6 +163,11 @@ class DashboardController extends Controller
                 ],
                 AttendanceStatus::cases()
             );
+
+            $data['receivedWorkerIncidents'] = $this->workerDeclaredIncidentsForProjectIds(
+                Project::where('chef_chantier_id', $user->id)->pluck('id')
+            );
+            $data['canResolveWorkerIncidents'] = true;
         } elseif ($user->role === UserRole::Worker) {
             $data['tasks'] = $user->tasks()->with([
                 'project',
@@ -185,5 +198,31 @@ class DashboardController extends Controller
         }
 
         return Inertia::render('dashboard', $data);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, ActivityLog>
+     */
+    private function workerDeclaredIncidentsForProjectIds(Collection $projectIds): Collection
+    {
+        if ($projectIds->isEmpty()) {
+            return collect();
+        }
+
+        $ids = $projectIds->map(fn ($id) => (int) $id)->all();
+
+        return ActivityLog::query()
+            ->with('user:id,name')
+            ->where('action', 'incident_declared')
+            ->latest()
+            ->take(100)
+            ->get()
+            ->filter(function (ActivityLog $log) use ($ids) {
+                $pid = (int) ($log->properties['project_id'] ?? 0);
+
+                return $pid !== 0 && in_array($pid, $ids, true);
+            })
+            ->values()
+            ->take(25);
     }
 }

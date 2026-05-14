@@ -40,6 +40,8 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceDate={pageProps.attendanceDate}
                         showQuickStats={false}
                         projectDeadlineAlerts={projectDeadlineAlerts}
+                        receivedWorkerIncidents={pageProps.receivedWorkerIncidents ?? []}
+                        canResolveWorkerIncidents={pageProps.canResolveWorkerIncidents ?? false}
                     />
                 )}
                 {roleValue === UserRole.ChefChantier.value && (
@@ -51,7 +53,10 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         attendanceStatuses={pageProps.attendanceStatuses}
                         attendanceDate={pageProps.attendanceDate}
                         presenceActionsEnabled={false}
+                        showQuickStats={false}
                         projectDeadlineAlerts={projectDeadlineAlerts}
+                        receivedWorkerIncidents={pageProps.receivedWorkerIncidents ?? []}
+                        canResolveWorkerIncidents={pageProps.canResolveWorkerIncidents ?? false}
                     />
                 )}
                 {roleValue === UserRole.Worker.value && (

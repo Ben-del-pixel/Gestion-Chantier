@@ -67,6 +67,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Activity Log routes
     Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
     Route::post('incidents', [IncidentController::class, 'store'])->name('incidents.store');
+    Route::post('incidents/{activity_log}/resolve', [IncidentController::class, 'resolve'])->name('incidents.resolve');
 
     // Report routes
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
