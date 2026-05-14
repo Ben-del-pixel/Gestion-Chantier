@@ -34,6 +34,8 @@ test('manager dashboard exposes project deadline alerts', function () {
             ->component('dashboard')
             ->has('projectDeadlineAlerts.overdue', 1)
             ->has('projectDeadlineAlerts.ending_soon', 1)
+            ->has('deadlineNotifications')
+            ->where('deadlineNotifications.unread_count', fn ($c) => (int) $c >= 1)
         );
 });
 
