@@ -25,7 +25,7 @@ export default function Login({
 }: Props) {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <Head title="Connexion" />
+            <Head title="Connexion — Gestion Chantier" />
 
             {status && (
                 <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-sm font-medium text-emerald-600 text-center">
@@ -109,6 +109,6 @@ export default function Login({
 }
 
 Login.layout = {
-    title: 'Connexion Espace Chantier',
-    description: 'Accédez à vos outils de gestion de terrain et de suivi administratif.',
+    title: 'Connexion',
+    description: 'Accédez à votre espace Gestion Chantier.',
 };

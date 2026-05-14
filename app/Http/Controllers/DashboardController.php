@@ -11,6 +11,7 @@ use App\Models\Material;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\ProjectDeadlineAlertNotifier;
 use App\Support\ProjectDeadlineAlerts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -195,6 +196,13 @@ class DashboardController extends Controller
                 ->latest()
                 ->take(8)
                 ->get();
+        }
+
+        $alerts = $data['projectDeadlineAlerts'];
+        $hasDeadlineAlerts = count($alerts['overdue']) > 0 || count($alerts['ending_soon']) > 0;
+
+        if ($hasDeadlineAlerts && in_array($user->role, [UserRole::Manager, UserRole::Engineer, UserRole::ChefChantier], true)) {
+            app(ProjectDeadlineAlertNotifier::class)->notifyStakeholders($alerts);
         }
 
         return Inertia::render('dashboard', $data);

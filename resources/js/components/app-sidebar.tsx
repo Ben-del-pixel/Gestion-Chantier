@@ -6,7 +6,6 @@ import {
     Package,
     History,
     Settings,
-    HelpCircle,
     BarChart3,
     Clock,
     LogOut,
@@ -76,10 +75,7 @@ const roleNavItems: Record<string, NavItem[]> = {
     ],
 };
 
-const systemNavItems: NavItem[] = [
-    { title: 'Paramètres', href: profileEdit(), icon: Settings },
-    { title: 'Centre d\'Aide', href: '#', icon: HelpCircle },
-];
+const systemNavItems: NavItem[] = [{ title: 'Paramètres', href: profileEdit(), icon: Settings }];
 
 export function AppSidebar({ className, ...props }: React.ComponentProps<typeof Sidebar>) {
     const { auth } = usePage().props as any;

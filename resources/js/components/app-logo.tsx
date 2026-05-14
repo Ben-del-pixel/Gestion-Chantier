@@ -8,10 +8,10 @@ export default function AppLogo() {
             </div>
             <div className="grid flex-1 text-left leading-tight">
                 <span className="truncate text-[15px] font-semibold text-white">
-                    GestionChantier
+                    Gestion Chantier
                 </span>
                 <span className="truncate text-[11px] text-slate-400">
-                    Lubumbashi
+                    Suivi des projets
                 </span>
             </div>
         </div>
