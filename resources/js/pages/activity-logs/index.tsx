@@ -1,14 +1,18 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { 
   User, Clock, FileText, Activity, Layers, 
   Trash2, Edit3, PlusCircle, ChevronRight, Info, UserCheck, Filter
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { UserRole } from '@/Enums/UserRole';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ActivityLogsIndex({ logs, currentFilter = 'all' }: any) {
+  const page = usePage().props as { auth?: { user?: { role?: string } } };
+  const isWorker = page.auth?.user?.role === UserRole.Worker.value;
+
   const getActionTheme = (action: string) => {
     const themes: Record<string, { color: string, icon: any, label: string }> = {
       create_project: { color: 'blue', icon: PlusCircle, label: 'Création Projet' },
@@ -49,20 +53,25 @@ export default function ActivityLogsIndex({ logs, currentFilter = 'all' }: any) 
 
   return (
     <>
-      <Head title="Paramètres - Historique" />
+      <Head title={isWorker ? 'Historique' : 'Paramètres - Historique'} />
 
-      <div className="relative space-y-8 pb-10">
-        {/* Decorative background */}
+      <div className={cn('relative space-y-6 pb-10', isWorker && 'mx-auto max-w-3xl')}>
+        {!isWorker && (
         <div className="pointer-events-none absolute inset-x-0 -top-40 -z-10 h-[500px] bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.05),transparent_40%)]" />
+        )}
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-[42px] font-bold tracking-tight text-slate-900">Paramètres</h1>
-                <p className="text-lg text-slate-500">Transparence totale sur les modifications effectuées</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-1">
+                <h1 className={cn('font-semibold tracking-tight text-slate-900 dark:text-slate-100', isWorker ? 'text-xl' : 'text-[42px] font-bold')}>
+                    {isWorker ? 'Historique' : 'Paramètres'}
+                </h1>
+                <p className={cn('text-muted-foreground', isWorker ? 'text-sm' : 'text-lg text-slate-500')}>
+                    {isWorker ? 'Journal des actions sur la plateforme.' : 'Transparence totale sur les modifications effectuées'}
+                </p>
             </div>
             
             <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 rounded-xl border bg-white px-3 shadow-sm">
+                <div className={cn('flex items-center gap-2 border bg-background px-2 py-1 shadow-sm', isWorker ? 'rounded-md' : 'rounded-xl')}>
                     <Filter className="h-4 w-4 text-slate-400" />
                     <Select value={currentFilter} onValueChange={handleFilterChange}>
                         <SelectTrigger className="w-[200px] border-0 bg-transparent ring-offset-transparent focus:ring-0 focus:ring-offset-0">
@@ -82,8 +91,8 @@ export default function ActivityLogsIndex({ logs, currentFilter = 'all' }: any) 
             </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-            {/* Summary Statistics */}
+        <div className={cn('grid grid-cols-1 gap-6', isWorker ? '' : 'gap-8 lg:grid-cols-12')}>
+            {!isWorker && (
             <div className="lg:col-span-4 space-y-6">
                 <Card className="border-0 bg-slate-900 text-white shadow-xl overflow-hidden relative">
                     <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 rounded-full bg-white/5 blur-2xl" />
@@ -118,66 +127,103 @@ export default function ActivityLogsIndex({ logs, currentFilter = 'all' }: any) 
                     </CardContent>
                 </Card>
             </div>
+            )}
 
             {/* Main Timeline */}
-            <div className="lg:col-span-8">
-                <Card className="border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] overflow-hidden">
-                    <CardHeader className="border-b border-slate-50 pb-6 pt-6 px-8 flex flex-row items-center justify-between">
-                        <CardTitle className="text-xl font-bold flex items-center gap-2">
-                            <Activity className="h-5 w-5 text-purple-500" />
-                            File d'événements
+            <div className={cn(isWorker ? 'lg:col-span-12' : 'lg:col-span-8')}>
+                <Card
+                    className={cn(
+                        'overflow-hidden border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]',
+                        isWorker && 'rounded-md border border-border shadow-sm',
+                    )}
+                >
+                    <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 px-4 py-3 sm:px-6 sm:py-4">
+                        <CardTitle className={cn('flex items-center gap-2 font-semibold', isWorker ? 'text-sm' : 'text-xl font-bold')}>
+                            <Activity className={cn('h-4 w-4 text-muted-foreground', !isWorker && 'h-5 w-5 text-purple-500')} />
+                            {isWorker ? 'Événements' : "File d'événements"}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {logs.length > 0 ? (
-                            <div className="divide-y divide-slate-50">
+                            <div className="divide-y divide-slate-100">
                                 {logs.map((log: any) => {
                                     const theme = getActionTheme(log.action);
                                     const Icon = theme.icon;
 
                                     return (
-                                        <div key={log.id} className="group relative p-8 transition-all hover:bg-slate-50/50">
-                                            <div className="flex items-start gap-6">
-                                                <div className={cn(
-                                                    "flex h-12 w-12 items-center justify-center rounded-2xl border bg-white shadow-sm transition-transform group-hover:scale-110",
-                                                    colorVariants[theme.color]
-                                                )}>
-                                                    <Icon className="h-6 w-6" />
+                                        <div
+                                            key={log.id}
+                                            className={cn(
+                                                'group relative transition-colors hover:bg-muted/30',
+                                                isWorker ? 'p-4' : 'p-8 hover:bg-slate-50/50',
+                                            )}
+                                        >
+                                            <div className="flex items-start gap-4">
+                                                <div
+                                                    className={cn(
+                                                        'flex shrink-0 items-center justify-center border bg-white shadow-sm',
+                                                        isWorker ? 'h-9 w-9 rounded-md' : 'h-12 w-12 rounded-2xl transition-transform group-hover:scale-110',
+                                                        colorVariants[theme.color],
+                                                    )}
+                                                >
+                                                    <Icon className={cn(isWorker ? 'h-4 w-4' : 'h-6 w-6')} />
                                                 </div>
 
-                                                <div className="flex-1 space-y-2">
+                                                <div className="min-w-0 flex-1 space-y-1.5">
                                                     <div className="flex flex-wrap items-center justify-between gap-2">
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-sm font-black text-slate-900">{theme.label}</span>
-                                                            <div className="h-1 w-1 rounded-full bg-slate-300" />
-                                                            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400 capitalize">
-                                                                <Clock className="h-3 w-3" />
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <span
+                                                                className={cn(
+                                                                    'text-foreground',
+                                                                    isWorker ? 'text-sm font-medium' : 'text-sm font-black text-slate-900',
+                                                                )}
+                                                            >
+                                                                {theme.label}
+                                                            </span>
+                                                            <span className="hidden text-muted-foreground sm:inline">·</span>
+                                                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                                <Clock className="h-3 w-3 shrink-0" />
                                                                 {formatDate(log.created_at)}
                                                             </span>
                                                         </div>
                                                         {log.user && (
-                                                            <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
-                                                                <User className="h-3 w-3" />
-                                                                {log.user.name.toUpperCase()}
+                                                            <div
+                                                                className={cn(
+                                                                    'flex items-center gap-1.5 bg-muted px-2 py-0.5 text-muted-foreground',
+                                                                    isWorker ? 'rounded-md text-[11px] font-medium' : 'rounded-lg px-3 py-1 text-[11px] font-bold text-slate-600',
+                                                                )}
+                                                            >
+                                                                <User className="h-3 w-3 shrink-0" />
+                                                                {isWorker ? log.user.name : log.user.name.toUpperCase()}
                                                             </div>
                                                         )}
                                                     </div>
 
-                                                    <p className="text-sm leading-relaxed text-slate-600 font-medium">
-                                                        {log.description}
-                                                    </p>
+                                                    <p className="text-sm leading-relaxed text-muted-foreground">{log.description}</p>
 
                                                     {log.properties && Object.keys(log.properties).length > 0 && (
-                                                        <div className="mt-4">
+                                                        <div className="mt-2">
                                                             <details className="group/details">
-                                                                <summary className="flex cursor-pointer items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400 transition-colors hover:text-slate-600 list-none">
-                                                                    <div className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white transition-transform group-open/details:rotate-90">
+                                                                <summary className="flex cursor-pointer list-none items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground">
+                                                                    <div className="flex h-5 w-5 items-center justify-center rounded border border-border bg-background transition-transform group-open/details:rotate-90">
                                                                         <ChevronRight className="h-3 w-3" />
                                                                     </div>
-                                                                    Détails techniques
+                                                                    Détails
                                                                 </summary>
-                                                                <div className="mt-3 overflow-hidden rounded-2xl bg-slate-900 p-5 shadow-inner">
-                                                                    <pre className="text-[11px] font-medium leading-relaxed text-purple-200/80 whitespace-pre-wrap">
+                                                                <div
+                                                                    className={cn(
+                                                                        'mt-2 overflow-hidden bg-muted p-3',
+                                                                        isWorker ? 'rounded-md' : 'rounded-2xl bg-slate-900 p-5 shadow-inner',
+                                                                    )}
+                                                                >
+                                                                    <pre
+                                                                        className={cn(
+                                                                            'whitespace-pre-wrap text-[11px] font-mono leading-relaxed',
+                                                                            isWorker
+                                                                                ? 'text-foreground'
+                                                                                : 'text-purple-200/80',
+                                                                        )}
+                                                                    >
                                                                         {JSON.stringify(log.properties, null, 2)}
                                                                     </pre>
                                                                 </div>
@@ -191,12 +237,14 @@ export default function ActivityLogsIndex({ logs, currentFilter = 'all' }: any) 
                                 })}
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-32 px-8 text-center">
-                                <div className="rounded-full bg-slate-50 p-6 mb-4">
-                                    <Layers className="h-12 w-12 text-slate-200" />
+                            <div className="flex flex-col items-center justify-center px-6 py-16 text-center sm:py-24">
+                                <div className={cn('mb-3 bg-muted p-4', isWorker ? 'rounded-md' : 'rounded-full bg-slate-50 p-6')}>
+                                    <Layers className={cn('text-muted-foreground', isWorker ? 'h-8 w-8' : 'h-12 w-12 text-slate-200')} />
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900">Aucune activité</h3>
-                                <p className="text-slate-500 max-w-xs mx-auto mt-2 text-sm">Les événements apparaîtront ici dès qu'une action sera effectuée dans le système.</p>
+                                <h3 className="text-base font-semibold text-foreground">Aucune activité</h3>
+                                <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
+                                    Les événements apparaîtront ici dès qu&apos;une action sera enregistrée.
+                                </p>
                             </div>
                         )}
                     </CardContent>

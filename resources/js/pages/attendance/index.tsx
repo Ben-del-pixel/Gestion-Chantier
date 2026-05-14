@@ -152,13 +152,23 @@ return '-';
       <Head title="Gestion de la Présence" />
 
       <div className="relative space-y-8 pb-10">
-        {/* Abstract Background Elements */}
+        {currentRole !== 'worker' && (
         <div className="pointer-events-none absolute inset-x-0 -top-40 -z-10 h-[500px] bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_40%),radial-gradient(circle_at_top_left,rgba(16,185,129,0.05),transparent_35%)]" />
+        )}
 
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
+            {currentRole === 'worker' ? (
+              <>
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Ma présence</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Pointages et tâches sur vos chantiers.</p>
+              </>
+            ) : (
+              <>
             <h1 className="text-[42px] font-bold tracking-tight text-slate-900">Présences & Pointage</h1>
             <p className="text-lg text-slate-500">Suivi en temps réel des effectifs sur les chantiers</p>
+              </>
+            )}
           </div>
           
           <div className="flex flex-wrap gap-3">
@@ -193,6 +203,7 @@ return '-';
         </div>
 
         {/* Statistics Widgets */}
+        {currentRole !== 'worker' && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <PremiumStatCard 
             title="Effectif Total" 
@@ -223,46 +234,56 @@ return '-';
             trend="À justifier"
           />
         </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {currentRole === 'worker' && (
               <div className="lg:col-span-12">
-                <Card className="border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
-                  <CardHeader>
-                    <CardTitle className="text-lg font-bold">Mes tâches assignées</CardTitle>
-                    <CardDescription>Aperçu des tâches que vous devez exécuter</CardDescription>
+                <Card className="rounded-md border border-border bg-card shadow-sm">
+                  <CardHeader className="border-b border-border px-4 py-3">
+                    <CardTitle className="text-sm font-semibold text-foreground">Mes tâches</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Tâches qui vous sont assignées sur les chantiers.
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-4">
                     {assignedTasks.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                         {assignedTasks.map((task: any) => (
-                          <div key={task.id} className={cn(
-                            "rounded-xl border p-4",
-                            task.status === 'retard'
-                              ? 'border-red-200 bg-red-50/60'
-                              : 'border-slate-200'
-                          )}>
-                            <p className="font-bold text-slate-900">{task.name}</p>
-                            <p className="text-xs text-slate-500">{task.project?.name ?? 'Projet non défini'}</p>
-                            <p className={cn(
-                              "mt-2 text-xs font-semibold uppercase",
-                              task.status === 'retard' ? 'text-red-600' : 'text-slate-500'
-                            )}>
-                              Statut: {task.status}
+                          <div
+                            key={task.id}
+                            className={cn(
+                              'rounded-md border px-3 py-3',
+                              task.status === 'retard'
+                                ? 'border-destructive/40 bg-destructive/5'
+                                : 'border-border bg-muted/20',
+                            )}
+                          >
+                            <p className="text-sm font-medium text-foreground">{task.name}</p>
+                            <p className="text-xs text-muted-foreground">{task.project?.name ?? 'Projet non défini'}</p>
+                            <p
+                              className={cn(
+                                'mt-2 text-xs font-medium capitalize text-muted-foreground',
+                                task.status === 'retard' && 'text-destructive',
+                              )}
+                            >
+                              Statut : {task.status?.replaceAll('_', ' ')}
                             </p>
                             {task.end_date && (
-                              <p className={cn(
-                                "mt-1 text-[11px] font-medium",
-                                task.status === 'retard' ? 'text-red-600' : 'text-slate-500'
-                              )}>
-                                Échéance: {new Date(task.end_date).toLocaleDateString('fr-FR')}
+                              <p
+                                className={cn(
+                                  'mt-1 text-xs text-muted-foreground',
+                                  task.status === 'retard' && 'text-destructive',
+                                )}
+                              >
+                                Échéance : {new Date(task.end_date).toLocaleDateString('fr-FR')}
                               </p>
                             )}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500">Aucune tâche assignée pour le moment.</p>
+                      <p className="text-sm text-muted-foreground">Aucune tâche assignée pour le moment.</p>
                     )}
                   </CardContent>
                 </Card>
@@ -270,33 +291,49 @@ return '-';
             )}
             {/* Filters Sidebar */}
             <div className="lg:col-span-3">
-                <Card className="sticky top-6 border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]">
+                <Card
+                    className={cn(
+                        'sticky top-6 border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)]',
+                        currentRole === 'worker' && 'rounded-md border border-border shadow-sm',
+                    )}
+                >
                     <CardHeader className="pb-4">
-                        <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                            <Filter className="h-4 w-4 text-blue-500" />
+                        <CardTitle
+                            className={cn(
+                                'flex items-center gap-2 font-semibold text-foreground',
+                                currentRole === 'worker' ? 'text-sm' : 'text-lg font-bold',
+                            )}
+                        >
+                            <Filter className="h-4 w-4 text-muted-foreground" />
                             Filtres
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-5">
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase text-slate-400 tracking-wider">Date de pointage</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">Date de pointage</Label>
                             <div className="relative">
                                 <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="date"
                                     value={displayDate}
                                     onChange={(e) => setDisplayDate(e.target.value)}
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    className={cn(
+                                        'w-full border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20',
+                                        currentRole === 'worker' ? 'rounded-md' : 'rounded-xl',
+                                    )}
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase text-slate-400 tracking-wider">Site de construction</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">Chantier</Label>
                             <select
                                 value={displayProject}
                                 onChange={(e) => setDisplayProject(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none"
+                                className={cn(
+                                    'w-full border border-slate-200 bg-slate-50 py-2.5 px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none',
+                                    currentRole === 'worker' ? 'rounded-md' : 'rounded-xl',
+                                )}
                             >
                                 <option value="">Tous les chantiers</option>
                                 {projects.map((p: any) => (
@@ -305,11 +342,14 @@ return '-';
                             </select>
                         </div>
 
-                        <Button 
-                            onClick={handleFiltersChange} 
-                            className="w-full h-11 rounded-xl bg-slate-900 font-bold transition-all hover:bg-slate-800"
+                        <Button
+                            onClick={handleFiltersChange}
+                            className={cn(
+                                'w-full h-10 bg-slate-900 font-medium transition-all hover:bg-slate-800',
+                                currentRole === 'worker' ? 'rounded-md' : 'h-11 rounded-xl font-bold',
+                            )}
                         >
-                            Filtrer la vue
+                            Appliquer
                         </Button>
                     </CardContent>
                 </Card>
@@ -317,10 +357,17 @@ return '-';
 
             {/* Attendance Main List */}
             <div className="lg:col-span-9">
-                <Card className="border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] overflow-hidden">
+                <Card
+                    className={cn(
+                        'border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] overflow-hidden',
+                        currentRole === 'worker' && 'rounded-md border border-border shadow-sm',
+                    )}
+                >
                     <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 pb-6 pt-6 px-8">
                         <div>
-                            <CardTitle className="text-xl font-bold">Rapport de présence</CardTitle>
+                            <CardTitle className={cn(currentRole === 'worker' ? 'text-base font-semibold' : 'text-xl font-bold')}>
+                                {currentRole === 'worker' ? 'Mon pointage' : 'Rapport de présence'}
+                            </CardTitle>
                             <CardDescription>
                                 {attendances.length} personne{attendances.length > 1 ? 's' : ''} répertoriée{attendances.length > 1 ? 's' : ''}
                             </CardDescription>

@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Calendar, Download, FileText, Filter, Send, TrendingUp } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { UserRole } from '@/Enums/UserRole';
 import { useCurrency } from '@/lib/currency';
+import { cn } from '@/lib/utils';
 
 export default function ReportsIndex({
     reportTypes,
@@ -18,11 +20,17 @@ export default function ReportsIndex({
     receivedReports,
     sentReports,
 }: any) {
+    const page = usePage().props as { auth?: { user?: { role?: string } } };
+    const isWorker = page.auth?.user?.role === UserRole.Worker.value;
     const { currency, setCurrency, formatCurrency } = useCurrency();
-    const formControlClass =
-        'h-11 w-full rounded-xl border border-border/60 bg-background/90 px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
-    const formTextareaClass =
-        'min-h-[140px] w-full rounded-xl border border-border/60 bg-background/90 px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+    const formControlClass = cn(
+        'w-full border border-border/60 bg-background px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40',
+        isWorker ? 'h-10 rounded-md' : 'h-11 rounded-xl',
+    );
+    const formTextareaClass = cn(
+        'w-full border border-border/60 bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40',
+        isWorker ? 'min-h-[120px] rounded-md' : 'min-h-[140px] rounded-xl',
+    );
 
     const [selectedReport, setSelectedReport] = useState('global');
     const [startDate, setStartDate] = useState('');
@@ -215,17 +223,26 @@ export default function ReportsIndex({
         <>
             <Head title="Rapports" />
 
-            <div className="space-y-6">
+            <div className={cn('space-y-6', isWorker && 'mx-auto max-w-3xl')}>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Rapports</h1>
-                    <p className="text-sm text-muted-foreground">Generez, redigez et soumettez les rapports.</p>
+                    <h1 className={cn('font-semibold tracking-tight', isWorker ? 'text-xl' : 'text-3xl font-bold')}>
+                        Rapports
+                    </h1>
+                    <p className={cn('text-muted-foreground', isWorker ? 'text-sm' : 'text-sm')}>
+                        {isWorker
+                            ? 'Consulter, générer ou transmettre un compte rendu.'
+                            : 'Generez, redigez et soumettez les rapports.'}
+                    </p>
                 </div>
 
                 <div className="flex justify-end">
                     <select
                         value={currency}
                         onChange={(event) => setCurrency(event.target.value as 'USD' | 'CDF')}
-                        className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+                        className={cn(
+                            'border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700',
+                            isWorker ? 'h-10 rounded-md' : 'h-11 rounded-xl font-semibold',
+                        )}
                     >
                         <option value="USD">USD ($)</option>
                         <option value="CDF">FC (CDF)</option>
@@ -233,9 +250,9 @@ export default function ReportsIndex({
                 </div>
 
                 {canSubmitReport && (
-                    <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
+                    <Card className={cn('shadow-none border-border/50 bg-card/60 backdrop-blur-sm', isWorker && 'rounded-md border')}>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
+                            <CardTitle className={cn('flex items-center gap-2', isWorker ? 'text-sm font-semibold' : '')}>
                                 <FileText className="h-5 w-5" />
                                 Rediger et soumettre un rapport
                             </CardTitle>
@@ -285,7 +302,7 @@ export default function ReportsIndex({
                                 </div>
 
                                 <div className="flex gap-2">
-                                    <Button type="submit" disabled={submitLoading} className="rounded-lg gap-2">
+                                    <Button type="submit" disabled={submitLoading} className={cn('gap-2', isWorker ? 'h-9 rounded-md' : 'rounded-lg')}>
                                         <Send className="h-4 w-4" />
                                         {submitLoading ? 'Soumission...' : 'Soumettre'}
                                     </Button>
@@ -295,15 +312,18 @@ export default function ReportsIndex({
                     </Card>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <Card className={cn('shadow-none border-border/50 bg-card/60 backdrop-blur-sm', isWorker && 'rounded-md border')}>
                         <CardHeader>
                             <CardTitle>Rapports recus</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 max-h-80 overflow-y-auto">
                             {(receivedReports || []).length > 0 ? (
                                 receivedReports.map((report: any) => (
-                                    <div key={report.id} className="rounded-lg border border-border/60 p-3">
+                                    <div
+                                        key={report.id}
+                                        className={cn('border border-border/60 p-3', isWorker ? 'rounded-md' : 'rounded-lg')}
+                                    >
                                         <div className="flex items-center justify-between gap-2">
                                             <p className="font-semibold text-sm">{report.title}</p>
                                             <Badge variant="outline">{report.status}</Badge>
@@ -321,14 +341,17 @@ export default function ReportsIndex({
                         </CardContent>
                     </Card>
 
-                    <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
+                    <Card className={cn('shadow-none border-border/50 bg-card/60 backdrop-blur-sm', isWorker && 'rounded-md border')}>
                         <CardHeader>
                             <CardTitle>Rapports envoyes</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 max-h-80 overflow-y-auto">
                             {(sentReports || []).length > 0 ? (
                                 sentReports.map((report: any) => (
-                                    <div key={report.id} className="rounded-lg border border-border/60 p-3">
+                                    <div
+                                        key={report.id}
+                                        className={cn('border border-border/60 p-3', isWorker ? 'rounded-md' : 'rounded-lg')}
+                                    >
                                         <div className="flex items-center justify-between gap-2">
                                             <p className="font-semibold text-sm">{report.title}</p>
                                             <Badge variant="outline">{report.status}</Badge>
@@ -347,11 +370,7 @@ export default function ReportsIndex({
                     </Card>
                 </div>
 
-                <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Filter className="h-5 w-5" />
-                            Parametres du rapport analytique
+                <Card className={cn('shadow-none border-border/50 bg-card/60 backdrop-blur-sm', isWorker && 'rounded-md border')}>
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
