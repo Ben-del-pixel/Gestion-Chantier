@@ -650,6 +650,7 @@ export const EngineerDashboard = ({
 
     const submitIncidentResolution = async (e: React.FormEvent) => {
         e.preventDefault();
+
         if (!incidentBeingResolved?.id) {
             return;
         }
@@ -862,6 +863,7 @@ export const EngineerDashboard = ({
                 open={resolveIncidentDialogOpen}
                 onOpenChange={(open) => {
                     setResolveIncidentDialogOpen(open);
+
                     if (!open) {
                         setIncidentBeingResolved(null);
                         setResolutionNote('');

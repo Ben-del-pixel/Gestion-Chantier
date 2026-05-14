@@ -32,7 +32,9 @@ class IncidentController extends Controller
             'project_id' => ['nullable', 'exists:projects,id'],
         ]);
 
-        $projectId = $validated['project_id'] ?? $user->tasks()->orderByDesc('id')->value('project_id');
+        $projectId = $validated['project_id'] ?? $user->tasks()
+            ->orderByDesc('tasks.id')
+            ->value('tasks.project_id');
 
         $engineerId = null;
         $chefChantierId = null;
