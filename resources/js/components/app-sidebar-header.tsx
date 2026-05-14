@@ -1,7 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import { Bell, Search } from 'lucide-react';
-import markNotificationRead from '@/actions/App/Http/Controllers/DatabaseNotificationReadController';
 import { show as projectShow } from '@/actions/App/Http/Controllers/Api/ProjectController';
+import markNotificationRead from '@/actions/App/Http/Controllers/DatabaseNotificationReadController';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Button } from '@/components/ui/button';
 import {
