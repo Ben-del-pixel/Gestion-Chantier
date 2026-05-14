@@ -45,15 +45,19 @@ export function WorkerDashboard({
     workerAttendances = [],
     workerAttendanceSummary,
     workerIncidents = [],
+    workerProjects = [],
 }: {
     tasks?: any[];
     workerAttendances?: any[];
     workerAttendanceSummary?: { present?: number; absent?: number; retard?: number; malade?: number };
     workerIncidents?: any[];
+    workerProjects?: Array<{ id: number; name: string }>;
 }) {
     const page = usePage().props as any;
     const authenticatedUser = page?.auth?.user;
     const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().slice(0, 10));
+    const [displayProjectFilter, setDisplayProjectFilter] = React.useState<'all' | string>('all');
+    const [pointageProjectId, setPointageProjectId] = React.useState('');
     const [showIncidentDialog, setShowIncidentDialog] = React.useState(false);
     const [isSubmittingIncident, setIsSubmittingIncident] = React.useState(false);
     const [isSubmittingAttendance, setIsSubmittingAttendance] = React.useState(false);
@@ -64,7 +68,51 @@ export function WorkerDashboard({
     });
 
     const taskList = tasks ?? [];
-    const primaryTask = taskList[0];
+
+    const chantiersOptions = React.useMemo(() => {
+        const map = new Map<number, string>();
+        (workerProjects ?? []).forEach((p) => map.set(p.id, p.name));
+        taskList.forEach((t: any) => {
+            if (t?.project?.id) {
+                map.set(t.project.id, t.project.name ?? `Chantier #${t.project.id}`);
+            }
+        });
+
+        return Array.from(map.entries())
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    }, [workerProjects, taskList]);
+
+    React.useEffect(() => {
+        if (chantiersOptions.length === 0 || pointageProjectId) {
+            return;
+        }
+
+        setPointageProjectId(String(chantiersOptions[0].id));
+    }, [chantiersOptions, pointageProjectId]);
+
+    const filteredTasks = React.useMemo(() => {
+        if (displayProjectFilter === 'all') {
+            return taskList;
+        }
+
+        const pid = Number(displayProjectFilter);
+
+        return taskList.filter((t: any) => (t?.project?.id ?? 0) === pid);
+    }, [taskList, displayProjectFilter]);
+
+    const filteredIncidents = React.useMemo(() => {
+        const list = workerIncidents ?? [];
+        if (displayProjectFilter === 'all') {
+            return list;
+        }
+
+        const pid = Number(displayProjectFilter);
+
+        return list.filter((inc: any) => Number(inc.properties?.project_id ?? 0) === pid);
+    }, [workerIncidents, displayProjectFilter]);
+
+    const primaryTask = filteredTasks[0];
 
     const attendanceStatusClasses: Record<string, string> = {
         present: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
@@ -80,8 +128,8 @@ export function WorkerDashboard({
     });
 
     const recentAttendances = workerAttendances.slice(0, 10);
-    const currentProjectId = primaryTask?.project?.id ?? null;
     const activeAttendance = workerAttendances.find((attendance: any) => !attendance.check_out);
+    const clockProjectId = activeAttendance?.project?.id ?? (pointageProjectId ? Number(pointageProjectId) : null);
 
     const submitWorkerCheckIn = async () => {
         if (!authenticatedUser?.id) {
@@ -90,8 +138,8 @@ export function WorkerDashboard({
             return;
         }
 
-        if (!currentProjectId) {
-            alert('Aucun chantier assigné pour le pointage.');
+        if (!clockProjectId) {
+            alert('Sélectionnez le chantier pour le pointage.');
 
             return;
         }
@@ -109,7 +157,7 @@ export function WorkerDashboard({
                 },
                 body: JSON.stringify({
                     user_id: authenticatedUser?.id,
-                    project_id: currentProjectId,
+                    project_id: clockProjectId,
                     status: 'present',
                 }),
             });
@@ -176,7 +224,10 @@ export function WorkerDashboard({
                 },
                 body: JSON.stringify({
                     ...incidentForm,
-                    project_id: primaryTask?.project?.id ?? null,
+                    project_id:
+                        displayProjectFilter !== 'all'
+                            ? Number(displayProjectFilter)
+                            : (clockProjectId ?? primaryTask?.project?.id ?? null),
                 }),
             });
 
@@ -220,6 +271,52 @@ export function WorkerDashboard({
                 </div>
             </header>
 
+            {chantiersOptions.length > 0 && (
+                <div className="grid gap-4 rounded-md border border-border bg-card p-4 sm:grid-cols-2 sm:p-5">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="worker-filter-chantier" className="text-xs font-medium text-muted-foreground">
+                            Filtrer tâches et incidents
+                        </Label>
+                        <select
+                            id="worker-filter-chantier"
+                            value={displayProjectFilter}
+                            onChange={(event) =>
+                                setDisplayProjectFilter(
+                                    event.target.value === 'all' ? 'all' : event.target.value,
+                                )
+                            }
+                            className={fieldClass}
+                        >
+                            <option value="all">Tous les chantiers</option>
+                            {chantiersOptions.map((c) => (
+                                <option key={c.id} value={String(c.id)}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {!activeAttendance && (
+                        <div className="space-y-1.5">
+                            <Label htmlFor="worker-pointage-chantier" className="text-xs font-medium text-muted-foreground">
+                                Chantier pour l&apos;arrivée / la sortie
+                            </Label>
+                            <select
+                                id="worker-pointage-chantier"
+                                value={pointageProjectId}
+                                onChange={(event) => setPointageProjectId(event.target.value)}
+                                className={fieldClass}
+                            >
+                                {chantiersOptions.map((c) => (
+                                    <option key={c.id} value={String(c.id)}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className="grid gap-4 lg:grid-cols-12 lg:items-stretch lg:gap-6">
                 <section className="rounded-md border border-border bg-card p-4 sm:p-5 lg:col-span-8 xl:col-span-7">
                     {primaryTask ? (
@@ -258,7 +355,7 @@ export function WorkerDashboard({
                     <Button
                         type="button"
                         onClick={activeAttendance ? submitWorkerCheckOut : submitWorkerCheckIn}
-                        disabled={isSubmittingAttendance}
+                        disabled={isSubmittingAttendance || (!activeAttendance && !clockProjectId)}
                         className="h-10 w-full rounded-md font-medium lg:h-11"
                     >
                         {isSubmittingAttendance ? 'Traitement…' : activeAttendance ? 'Pointer la sortie' : "Pointer l'arrivée"}
@@ -454,8 +551,8 @@ export function WorkerDashboard({
                         <CardDescription className="text-xs">Suivi côté chef de chantier / ingénieur.</CardDescription>
                     </CardHeader>
                     <CardContent className="max-h-[min(28rem,55vh)] flex-1 space-y-2 overflow-y-auto p-4 lg:max-h-[min(32rem,60vh)]">
-                        {workerIncidents.length > 0 ? (
-                            workerIncidents.map((incident: any) => {
+                        {filteredIncidents.length > 0 ? (
+                            filteredIncidents.map((incident: any) => {
                                 const props = incident.properties ?? {};
                                 const isResolved = props.status === 'resolved';
 
@@ -493,6 +590,8 @@ export function WorkerDashboard({
                                     </div>
                                 );
                             })
+                        ) : workerIncidents.length > 0 ? (
+                            <p className="text-sm text-muted-foreground">Aucun incident pour ce chantier.</p>
                         ) : (
                             <p className="text-sm text-muted-foreground">Aucun incident déclaré.</p>
                         )}
@@ -506,9 +605,9 @@ export function WorkerDashboard({
                     <CardDescription className="text-xs">Confirmez l&apos;exécution lorsque le travail est terminé.</CardDescription>
                 </CardHeader>
                 <div className="p-4">
-                    {taskList.length > 0 ? (
+                    {filteredTasks.length > 0 ? (
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                            {taskList.map((t: any) => (
+                            {filteredTasks.map((t: any) => (
                                 <div
                                     key={t.id}
                                     className="flex flex-col justify-between gap-3 rounded-md border border-border bg-muted/10 p-3 sm:min-h-[112px]"
@@ -526,6 +625,10 @@ export function WorkerDashboard({
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    ) : taskList.length > 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                            Aucune tâche assignée pour le chantier sélectionné.
                         </div>
                     ) : (
                         <div className="py-8 text-center text-sm text-muted-foreground">Aucune tâche assignée.</div>

@@ -359,6 +359,12 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
+        $user = auth()->user();
+
+        if ($user->role !== UserRole::Manager) {
+            abort(403, 'Seul le manager peut supprimer un projet.');
+        }
+
         $projectName = $project->name;
 
         ActivityLog::create([

@@ -76,3 +76,26 @@ test('worker cannot access planning page', function () {
         ->get(route('planning.index'))
         ->assertForbidden();
 });
+
+test('chef de chantier sees only their projects on planning', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier]);
+    $otherChef = User::factory()->create(['role' => UserRole::ChefChantier]);
+
+    $mine = Project::factory()->create([
+        'manager_id' => $manager->id,
+        'chef_chantier_id' => $chef->id,
+    ]);
+    Project::factory()->create([
+        'manager_id' => $manager->id,
+        'chef_chantier_id' => $otherChef->id,
+    ]);
+
+    $this->actingAs($chef)
+        ->get(route('planning.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('projects', 1)
+            ->where('projects.0.id', $mine->id)
+        );
+});

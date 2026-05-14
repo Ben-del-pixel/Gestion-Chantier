@@ -106,6 +106,7 @@ export default function ProjectsIndex({
 }) {
   const page = usePage().props as any;
   const canCreateProject = page?.auth?.user?.role === UserRole.Manager.value;
+  const isManager = canCreateProject;
   const { currency, setCurrency, formatCurrency, rate, setRate } = useCurrency();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('all');
@@ -166,6 +167,10 @@ export default function ProjectsIndex({
   }, [normalizedProjects]);
 
   const handleDeleteProject = (project: ProjectItem) => {
+    if (!isManager) {
+      return;
+    }
+
     const shouldDelete = window.confirm(`Supprimer le chantier "${project.name}" ?`);
 
     if (!shouldDelete) {
@@ -671,22 +676,24 @@ return;
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className={isManager ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'}>
                   <Button asChild variant="outline" className="h-11 rounded-xl border-blue-100 bg-blue-50/50 font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">
                     <Link href={show.url({ project: project.id })}>
                       <Pencil className="mr-2 h-4 w-4" />
                       Gérer
                     </Link>
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleDeleteProject(project)}
-                    className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Supprimer
-                  </Button>
+                  {isManager && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleDeleteProject(project)}
+                      className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Supprimer
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -254,8 +254,8 @@ export default function PlanningIndex({ projects }: { projects: PlanningProject[
               Planning
             </h1>
             <p className="mt-1 max-w-2xl text-slate-600">
-              Calendrier des tâches par jour : chantier, étape, ouvriers, début et fin. Accès via le menu{' '}
-              <strong>Planning</strong> (rôles directeur et ingénieur).
+              Calendrier des tâches par jour : chantier, étape, ouvriers, début et fin. Réservé au{' '}
+              <strong>manager</strong>, à l&apos;<strong>ingénieur</strong> et au <strong>chef de chantier</strong>.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

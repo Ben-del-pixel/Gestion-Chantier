@@ -45,6 +45,7 @@ class DashboardController extends Controller
                 'malade' => 0,
             ],
             'workerIncidents' => [],
+            'workerProjects' => [],
             'receivedWorkerIncidents' => [],
             'canResolveWorkerIncidents' => false,
             'projectDeadlineAlerts' => [
@@ -175,6 +176,17 @@ class DashboardController extends Controller
                 'workers' => fn ($q) => $q->withPivot(['executed_at']),
             ])->latest()->get();
 
+            $taskProjectIds = $data['tasks']->pluck('project_id')->filter()->unique()->values();
+            $pivotProjectIds = $user->projects()->pluck('projects.id');
+            $allWorkerProjectIds = $taskProjectIds->merge($pivotProjectIds)->unique()->values();
+            $data['workerProjects'] = $allWorkerProjectIds->isNotEmpty()
+                ? Project::query()
+                    ->whereIn('id', $allWorkerProjectIds)
+                    ->select('id', 'name')
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
             $attendances = Attendance::with('project:id,name')
                 ->where('user_id', $user->id)
                 ->where('shift', AttendanceShift::Morning->value)
@@ -194,7 +206,7 @@ class DashboardController extends Controller
                 ->where('user_id', $user->id)
                 ->where('action', 'incident_declared')
                 ->latest()
-                ->take(8)
+                ->take(50)
                 ->get();
         }
 
@@ -209,7 +221,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, ActivityLog>
+     * @return Collection<int, ActivityLog>
      */
     private function workerDeclaredIncidentsForProjectIds(Collection $projectIds): Collection
     {

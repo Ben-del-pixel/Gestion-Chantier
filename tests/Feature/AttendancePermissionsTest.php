@@ -320,3 +320,47 @@ test('check in updates existing initialized attendance row without duplicate ins
             ->count()
     )->toBe(1);
 });
+
+test('worker can check in and check out on own project team', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $worker = User::factory()->create(['role' => UserRole::Worker->value]);
+    $project = Project::factory()->create(['manager_id' => $manager->id]);
+    $project->workers()->sync([$worker->id]);
+
+    $this->actingAs($worker)
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'status' => 'present',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $attendance = Attendance::query()
+        ->where('user_id', $worker->id)
+        ->where('project_id', $project->id)
+        ->whereDate('date', today())
+        ->firstOrFail();
+
+    $this->actingAs($worker)
+        ->put(route('attendance.check-out', ['attendance' => $attendance->id]))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $attendance->refresh();
+    expect($attendance->check_out)->not->toBeNull();
+});
+
+test('worker cannot check in on project they are not assigned to', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $worker = User::factory()->create(['role' => UserRole::Worker->value]);
+    $project = Project::factory()->create(['manager_id' => $manager->id]);
+
+    $this->actingAs($worker)
+        ->post(route('attendance.check-in'), [
+            'user_id' => $worker->id,
+            'project_id' => $project->id,
+            'status' => 'present',
+        ])
+        ->assertForbidden();
+});

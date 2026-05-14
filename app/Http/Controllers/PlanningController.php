@@ -16,8 +16,8 @@ class PlanningController extends Controller
     {
         $user = $request->user();
 
-        if (! in_array($user->role, [UserRole::Manager, UserRole::Engineer], true)) {
-            abort(403, 'Accès réservé au manager et à l\'ingénieur.');
+        if (! in_array($user->role, [UserRole::Manager, UserRole::Engineer, UserRole::ChefChantier], true)) {
+            abort(403, 'Accès réservé au manager, à l\'ingénieur et au chef de chantier.');
         }
 
         $projectsQuery = Project::query()
@@ -43,6 +43,8 @@ class PlanningController extends Controller
                 $query->where('engineer_id', $user->id)
                     ->orWhereIn('chef_chantier_id', $chefChantierIds);
             });
+        } elseif ($user->role === UserRole::ChefChantier) {
+            $projectsQuery->where('chef_chantier_id', $user->id);
         }
 
         $projects = $projectsQuery->get();

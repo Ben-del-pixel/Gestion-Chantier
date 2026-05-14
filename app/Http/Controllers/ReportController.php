@@ -23,14 +23,20 @@ class ReportController extends Controller
 
         // Filter projects based on user role
         if ($user->role === UserRole::ChefChantier) {
-            $engineerIds = User::where('chef_chantier_id', $user->id)->pluck('id');
             $projects = Project::select('id', 'name')
-                ->whereIn('engineer_id', $engineerIds)
+                ->where('chef_chantier_id', $user->id)
                 ->orderBy('name')
                 ->get();
         } elseif ($user->role === UserRole::Engineer) {
-            $projects = Project::select('id', 'name')
+            $chefChantierIds = User::query()
                 ->where('engineer_id', $user->id)
+                ->where('role', UserRole::ChefChantier)
+                ->pluck('id');
+            $projects = Project::select('id', 'name')
+                ->where(function ($query) use ($user, $chefChantierIds) {
+                    $query->where('engineer_id', $user->id)
+                        ->orWhereIn('chef_chantier_id', $chefChantierIds);
+                })
                 ->orderBy('name')
                 ->get();
         } else {
@@ -124,7 +130,7 @@ class ReportController extends Controller
                     return (int) $projectEngineerId;
                 }
             }
-            
+
             // If no project specified, find the engineer the chef is under
             $engineerId = User::where('id', $user->id)->value('engineer_id');
             if ($engineerId) {
@@ -169,6 +175,126 @@ class ReportController extends Controller
         return null;
     }
 
+    private function engineerHasProjectAccess(User $engineer, Project $project): bool
+    {
+        if ((int) $project->engineer_id === (int) $engineer->id) {
+            return true;
+        }
+
+        if (! $project->chef_chantier_id) {
+            return false;
+        }
+
+        $chef = User::query()->find($project->chef_chantier_id);
+
+        return $chef
+            && $chef->role === UserRole::ChefChantier
+            && (int) $chef->engineer_id === (int) $engineer->id;
+    }
+
+    private function userCanAccessProjectForReport(User $user, UserRole $role, int $projectId): bool
+    {
+        $project = Project::query()->find($projectId);
+        if (! $project) {
+            return false;
+        }
+
+        return match ($role) {
+            UserRole::Manager => true,
+            UserRole::Engineer => $this->engineerHasProjectAccess($user, $project),
+            UserRole::ChefChantier => (int) $project->chef_chantier_id === (int) $user->id,
+            UserRole::Worker => $project->workers()->where('users.id', $user->id)->exists(),
+            UserRole::Magasinier => (int) $project->storekeeper_id === (int) $user->id,
+            default => false,
+        };
+    }
+
+    private function userCanAccessWorkerForReport(User $user, UserRole $role, int $workerId): bool
+    {
+        $target = User::query()->find($workerId);
+        if (! $target) {
+            return false;
+        }
+
+        if ($role === UserRole::Worker) {
+            return (int) $workerId === (int) $user->id;
+        }
+
+        if ($role === UserRole::Engineer) {
+            $chefIds = User::query()
+                ->where('engineer_id', $user->id)
+                ->where('role', UserRole::ChefChantier)
+                ->pluck('id');
+
+            return Task::query()
+                ->whereHas('workers', function ($q) use ($workerId) {
+                    $q->where('users.id', $workerId);
+                })
+                ->whereHas('project', function ($q) use ($user, $chefIds) {
+                    $q->where('engineer_id', $user->id)
+                        ->orWhereIn('chef_chantier_id', $chefIds);
+                })
+                ->exists();
+        }
+
+        if ($role === UserRole::ChefChantier) {
+            return Task::query()
+                ->whereHas('workers', function ($q) use ($workerId) {
+                    $q->where('users.id', $workerId);
+                })
+                ->whereHas('project', function ($q) use ($user) {
+                    $q->where('chef_chantier_id', $user->id);
+                })
+                ->exists();
+        }
+
+        if ($role === UserRole::Magasinier) {
+            return Task::query()
+                ->whereHas('workers', function ($q) use ($workerId) {
+                    $q->where('users.id', $workerId);
+                })
+                ->whereHas('project', function ($q) use ($user) {
+                    $q->where('storekeeper_id', $user->id);
+                })
+                ->exists();
+        }
+
+        return false;
+    }
+
+    private function assertUserCanGenerateReport(User $user, UserRole $role, array $validated): void
+    {
+        $type = $validated['type'];
+        $projectId = isset($validated['project_id']) ? (int) $validated['project_id'] : null;
+        $workerId = isset($validated['worker_id']) ? (int) $validated['worker_id'] : null;
+
+        if ($role === UserRole::Manager) {
+            return;
+        }
+
+        if (in_array($type, ['global', 'activities'], true)) {
+            abort(403, 'Ce type de rapport est réservé au manager.');
+        }
+
+        if ($type === 'project') {
+            if (! $projectId) {
+                abort(422, 'Sélectionnez un projet pour générer ce rapport.');
+            }
+            if (! $this->userCanAccessProjectForReport($user, $role, $projectId)) {
+                abort(403, 'Accès non autorisé à ce projet.');
+            }
+        }
+
+        if ($type === 'worker') {
+            if (! $workerId) {
+                abort(422, 'Sélectionnez un ouvrier pour générer ce rapport.');
+            }
+            if (! $this->userCanAccessWorkerForReport($user, $role, $workerId)) {
+                abort(403, 'Accès non autorisé pour ce profil.');
+            }
+        }
+    }
+
     public function generate(Request $request)
     {
         $validated = $request->validate([
@@ -179,9 +305,17 @@ class ReportController extends Controller
             'worker_id' => 'nullable|exists:users,id',
         ]);
 
+        $user = $request->user();
+        $role = $user->role instanceof UserRole ? $user->role : UserRole::from((string) $user->role);
+        $this->assertUserCanGenerateReport($user, $role, $validated);
+
         $reportType = $validated['type'];
-        $startDate = $validated['start_date'] ? Carbon::parse($validated['start_date']) : null;
-        $endDate = $validated['end_date'] ? Carbon::parse($validated['end_date']) : null;
+        $startDate = isset($validated['start_date']) && $validated['start_date'] !== null && $validated['start_date'] !== ''
+            ? Carbon::parse($validated['start_date'])
+            : null;
+        $endDate = isset($validated['end_date']) && $validated['end_date'] !== null && $validated['end_date'] !== ''
+            ? Carbon::parse($validated['end_date'])
+            : null;
 
         $report = match ($reportType) {
             'global' => $this->generateGlobalReport($startDate, $endDate),
@@ -227,7 +361,7 @@ class ReportController extends Controller
         $completedProjects = $projectsQuery->where('status', 'termine')->count();
 
         $totalTasks = $tasksQuery->count();
-        $completedTasks = $tasksQuery->where('status', 'completed')->count();
+        $completedTasks = $tasksQuery->where('status', 'termine')->count();
 
         $totalBudget = $projectsQuery->sum('budget');
         $totalWorkers = User::where('role', '!=', 'manager')->count();
@@ -296,14 +430,14 @@ class ReportController extends Controller
                 'name' => $project->name,
                 'description' => $project->description,
                 'status' => $project->status,
-                'start_date' => $project->start_date->format('Y-m-d'),
-                'deadline' => $project->deadline->format('Y-m-d'),
+                'start_date' => $project->start_date?->format('Y-m-d') ?? '—',
+                'deadline' => $project->deadline?->format('Y-m-d') ?? '—',
                 'budget' => (float) $project->budget,
                 'budget_from_steps' => (float) $totalBudgetSteps,
                 'manager' => $project->manager?->name,
                 'engineer' => $project->engineer?->name,
                 'total_tasks' => $tasks->count(),
-                'completed_tasks' => $tasks->where('status', 'completed')->count(),
+                'completed_tasks' => $tasks->where('status', 'termine')->count(),
                 'total_workers' => $workers->count(),
                 'total_steps' => $project->steps->count(),
             ];
@@ -346,7 +480,7 @@ class ReportController extends Controller
                 ->unique()
                 ->count();
 
-            $tasksCompleted = $worker->tasks->where('status', 'completed')->count();
+            $tasksCompleted = $worker->tasks->where('status', 'termine')->count();
 
             return [
                 'id' => $worker->id,

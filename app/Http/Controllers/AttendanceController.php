@@ -40,6 +40,43 @@ class AttendanceController extends Controller
             ->exists();
     }
 
+    private function workerBelongsToProject(Project $project, User $worker): bool
+    {
+        if ($worker->role !== UserRole::Worker) {
+            return false;
+        }
+
+        return $project->workers()->where('users.id', $worker->id)->exists();
+    }
+
+    private function canRecordCheckIn(User $actor, Project $project, int $targetUserId): bool
+    {
+        if ($this->canManageAttendance($project, $actor)) {
+            if ($actor->role === UserRole::Magasinier) {
+                return $this->isAllowedAttendanceTargetForMagasinier($project, $targetUserId);
+            }
+
+            return true;
+        }
+
+        return $actor->role === UserRole::Worker
+            && (int) $actor->id === $targetUserId
+            && $this->workerBelongsToProject($project, $actor);
+    }
+
+    private function canRecordCheckOut(User $actor, Attendance $attendance): bool
+    {
+        $project = $attendance->project;
+
+        if ($this->canManageAttendance($project, $actor)) {
+            return true;
+        }
+
+        return $actor->role === UserRole::Worker
+            && (int) $attendance->user_id === (int) $actor->id
+            && $this->workerBelongsToProject($project, $actor);
+    }
+
     public function index(): Response
     {
         $user = request()->user();
@@ -287,12 +324,8 @@ class AttendanceController extends Controller
 
         $shift = AttendanceShift::Morning->value;
         $project = Project::findOrFail($validated['project_id']);
-        if (! $this->canManageAttendance($project, $request->user())) {
-            abort(403, 'Seuls le manager et le magasinier du chantier peuvent gérer la présence.');
-        }
-        if ($request->user()->role === UserRole::Magasinier
-            && ! $this->isAllowedAttendanceTargetForMagasinier($project, (int) $validated['user_id'])) {
-            abort(403, 'Le magasinier peut pointer seulement les ouvriers et le chef de chantier de son chantier.');
+        if (! $this->canRecordCheckIn($request->user(), $project, (int) $validated['user_id'])) {
+            abort(403, 'Vous ne pouvez pas enregistrer ce pointage pour ce chantier.');
         }
 
         $dateString = Carbon::today()->toDateString();
@@ -339,8 +372,8 @@ class AttendanceController extends Controller
 
     public function checkOut(Request $request, Attendance $attendance)
     {
-        if (! $this->canManageAttendance($attendance->project, $request->user())) {
-            abort(403, 'Seuls le manager et le magasinier du chantier peuvent gérer la présence.');
+        if (! $this->canRecordCheckOut($request->user(), $attendance)) {
+            abort(403, 'Vous ne pouvez pas enregistrer ce pointage pour ce chantier.');
         }
 
         if ($attendance->check_out) {

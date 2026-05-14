@@ -1,6 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { Calendar, Download, FileText, Filter, Send, TrendingUp } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { generate, submit } from '@/actions/App/Http/Controllers/ReportController';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,17 @@ export default function ReportsIndex({
 }: any) {
     const page = usePage().props as { auth?: { user?: { role?: string } } };
     const isWorker = page.auth?.user?.role === UserRole.Worker.value;
+    const isManager = page.auth?.user?.role === UserRole.Manager.value;
+    const analyticsReportTypes = useMemo(
+        () =>
+            isManager
+                ? reportTypes
+                : (reportTypes as Array<{ value: string; label: string }>).filter(
+                      (t) => t.value === 'project' || t.value === 'worker',
+                  ),
+        [reportTypes, isManager],
+    );
+
     const { currency, setCurrency, formatCurrency } = useCurrency();
     const formControlClass = cn(
         'w-full border border-border/60 bg-background px-3 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40',
@@ -32,7 +43,7 @@ export default function ReportsIndex({
         isWorker ? 'min-h-[120px] rounded-md' : 'min-h-[140px] rounded-xl',
     );
 
-    const [selectedReport, setSelectedReport] = useState('global');
+    const [selectedReport, setSelectedReport] = useState(isManager ? 'global' : 'project');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [projectId, setProjectId] = useState('');
@@ -86,14 +97,23 @@ export default function ReportsIndex({
             });
 
             if (!response.ok) {
-                throw new Error('Failed to generate report');
+                let message = 'Erreur lors de la generation du rapport';
+                try {
+                    const payload = await response.json();
+                    if (payload?.message) {
+                        message = payload.message;
+                    }
+                } catch {
+                    //
+                }
+                throw new Error(message);
             }
 
             const data = await response.json();
             setReportData(data);
         } catch (error) {
             console.error('Error:', error);
-            alert('Erreur lors de la generation du rapport');
+            alert(error instanceof Error ? error.message : 'Erreur lors de la generation du rapport');
         } finally {
             setLoading(false);
         }
@@ -387,7 +407,7 @@ export default function ReportsIndex({
                                         onChange={(event) => setSelectedReport(event.target.value)}
                                         className={formControlClass}
                                     >
-                                        {reportTypes.map((type: any) => (
+                                        {analyticsReportTypes.map((type: any) => (
                                             <option key={type.value} value={type.value}>{type.label}</option>
                                         ))}
                                     </select>
@@ -401,7 +421,7 @@ export default function ReportsIndex({
                                             onChange={(event) => setProjectId(event.target.value)}
                                             className={formControlClass}
                                         >
-                                            <option value="">-- Tous les projets --</option>
+                                            <option value="">{isManager ? '-- Tous les projets --' : '-- Sélectionner un projet --'}</option>
                                             {projects.map((project: any) => (
                                                 <option key={project.id} value={project.id}>{project.name}</option>
                                             ))}
