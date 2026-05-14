@@ -6,7 +6,6 @@ import {
   Clock3, AlertCircle, ChevronRight
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {

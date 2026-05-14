@@ -79,9 +79,7 @@ class MaterialController extends Controller
 
         $storekeeperAllocationGroups = $this->buildStorekeeperAllocationGroups($user);
 
-        $projects = $user->role === UserRole::Magasinier
-            ? Project::where('storekeeper_id', $user->id)->select('id', 'name')->latest()->get()
-            : Project::select('id', 'name')->latest()->get();
+        $projects = $this->projectsForMaterialsPage($user);
 
         // Filter movements by materials the user can see
         $movementsQuery = MaterialMovement::query()
@@ -118,6 +116,28 @@ class MaterialController extends Controller
             'storekeeperAllocationGroups' => $storekeeperAllocationGroups,
             'projects' => $projects,
             'movements' => $movements,
+        ]);
+    }
+
+    /**
+     * @return Collection<int, array{id: int, name: string, storekeeper_id: int|null, storekeeper_name: string|null}>
+     */
+    private function projectsForMaterialsPage(User $user): Collection
+    {
+        $query = Project::query()
+            ->with('storekeeper:id,name')
+            ->select('id', 'name', 'storekeeper_id')
+            ->orderBy('name');
+
+        if ($user->role === UserRole::Magasinier) {
+            $query->where('storekeeper_id', $user->id);
+        }
+
+        return $query->get()->map(fn (Project $project) => [
+            'id' => $project->id,
+            'name' => $project->name,
+            'storekeeper_id' => $project->storekeeper_id,
+            'storekeeper_name' => $project->storekeeper?->name,
         ]);
     }
 
@@ -213,20 +233,28 @@ class MaterialController extends Controller
             abort(403, 'Seul un magasinier ou manager peut créer des matériaux');
         }
 
-        $validated = $request->validate([
+        $user = auth()->user();
+
+        $rules = [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:255',
             'quantity_in_stock' => 'required|numeric|min:0',
             'unit' => 'required|string|max:255',
             'type' => 'required|in:materiel,materiaux',
             'category' => 'nullable|string|max:255',
-            'project_id' => 'nullable|exists:projects,id',
-        ]);
+        ];
 
-        $user = auth()->user();
+        if ($user->role === UserRole::Manager) {
+            $rules['project_id'] = 'required|exists:projects,id';
+        } else {
+            $rules['project_id'] = 'nullable|exists:projects,id';
+        }
+
+        $validated = $request->validate($rules);
 
         // If Magasinier creates material, auto-assign to their project
         if ($user->role === UserRole::Magasinier) {
+            unset($validated['project_id']);
             $userProject = Project::where('storekeeper_id', $user->id)->first();
             if (! $userProject) {
                 return back()->with('error', 'Vous n\'êtes assigné à aucun chantier. Contactez l\'administrateur.');
@@ -234,15 +262,11 @@ class MaterialController extends Controller
             $validated['storekeeper_id'] = $user->id;
             $validated['project_id'] = $userProject->id;
         } elseif ($user->role === UserRole::Manager) {
-            // Manager must specify which Magasinier and Project
-            if (! isset($validated['project_id']) || ! $validated['project_id']) {
-                return back()->with('error', 'Vous devez spécifier le chantier pour ce matériel.');
-            }
-
-            // Get storekeeper from the project
-            $project = Project::find($validated['project_id']);
-            if (! $project || ! $project->storekeeper_id) {
-                return back()->with('error', 'Ce chantier n\'a pas de magasinier assigné.');
+            $project = Project::findOrFail($validated['project_id']);
+            if (! $project->storekeeper_id) {
+                return back()->withErrors([
+                    'project_id' => 'Ce chantier n\'a pas encore de magasinier responsable. Affectez un magasinier sur la fiche du chantier (ou via l\'ingénieur), puis créez le matériau.',
+                ]);
             }
             $validated['storekeeper_id'] = $project->storekeeper_id;
         }
@@ -310,6 +334,13 @@ class MaterialController extends Controller
         if ((int) $material->project_id !== (int) $validated['project_id']) {
             return back()->with('error', 'Le matériel sélectionné n\'appartient pas au chantier choisi.');
         }
+
+        $project = Project::findOrFail($validated['project_id']);
+        if (! $project->storekeeper_id) {
+            return back()->withErrors([
+                'project_id' => 'Ce chantier n\'a pas de magasinier responsable : complétez l\'affectation du magasinier avant d\'allouer du stock.',
+            ]);
+        }
         if ((float) $material->quantity_in_stock < (float) $validated['quantity_requested']) {
             return back()->with('error', 'La quantité demandée ('.$validated['quantity_requested'].') dépasse le stock disponible ('.$material->quantity_in_stock.').');
         }
@@ -324,7 +355,6 @@ class MaterialController extends Controller
         ]);
 
         // Update material stock
-        $material = Material::find($validated['material_id']);
         if ($material) {
             $material->decrement('quantity_in_stock', $validated['quantity_requested']);
 

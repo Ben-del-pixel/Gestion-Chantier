@@ -1,8 +1,9 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Link as LinkIcon, Wrench, ChevronDown, User } from 'lucide-react';
 import React from 'react';
 
 import { allocate, destroy, returnMaterial, stockIn, stockOut, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
+import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ type MaterialItem = {
     unit: string;
     type: 'materiel' | 'materiaux';
     category: string | null;
+    project_id?: number | null;
     updated_at: string;
     allocations: {
         id: number;
@@ -65,6 +67,8 @@ type StorekeeperAllocationGroup = {
 type ProjectItem = {
     id: number;
     name: string;
+    storekeeper_id?: number | null;
+    storekeeper_name?: string | null;
 };
 
 type MaterialMovement = {
@@ -127,6 +131,7 @@ export default function MaterialsIndex({
     const page = usePage().props as any;
     const authenticatedUser = page?.auth?.user;
     const canCheckInFromMaterials = authenticatedUser?.role === UserRole.Magasinier.value;
+    const isManager = authenticatedUser?.role === UserRole.Manager.value;
     const [searchTerm, setSearchTerm] = React.useState('');
     const [openDialog, setOpenDialog] = React.useState(false);
     const [openAllocationDialog, setOpenAllocationDialog] = React.useState(false);
@@ -143,6 +148,7 @@ export default function MaterialsIndex({
         unit: 'sacs',
         type: 'materiaux' as 'materiel' | 'materiaux',
         category: '',
+        project_id: '',
     });
     const [allocationFormData, setAllocationFormData] = React.useState({
         material_id: '',
@@ -173,7 +179,6 @@ export default function MaterialsIndex({
         router.post('/attendance/check-in', {
             user_id: authenticatedUser.id,
             project_id: projects[0].id,
-            shift: 'morning',
             status: 'present',
         }, {
             onSuccess: () => {
@@ -214,6 +219,11 @@ export default function MaterialsIndex({
         });
     }, [normalizedMaterials, searchTerm]);
 
+    const projectsWithStorekeeper = React.useMemo(
+        () => projects.filter((p) => p.storekeeper_id != null && p.storekeeper_id !== ''),
+        [projects],
+    );
+
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFormData({
             ...formData,
@@ -230,17 +240,32 @@ export default function MaterialsIndex({
 
     const handleSubmitMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (isManager && !editingMaterial && !formData.project_id) {
+            alert('Sélectionnez un chantier pour lequel un magasinier responsable est déjà affecté.');
+
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
             const url = editingMaterial ? update.url({ material: editingMaterial.id }) : store.url();
             const method = editingMaterial ? 'put' : 'post';
 
+            const { project_id, ...formFieldsWithoutProject } = formData;
+
+            const payload = editingMaterial
+                ? formFieldsWithoutProject
+                : isManager
+                    ? { ...formFieldsWithoutProject, project_id: Number(project_id) }
+                    : formFieldsWithoutProject;
+
             router.visit(url, {
                 method,
-                data: formData,
+                data: payload,
                 onSuccess: () => {
-                    setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '' });
+                    setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '', project_id: '' });
                     setEditingMaterial(null);
                     setOpenDialog(false);
                     alert(editingMaterial ? 'Matériel mis à jour avec succès' : 'Matériel créé avec succès');
@@ -268,6 +293,7 @@ export default function MaterialsIndex({
             unit: material.unit,
             type: material.type || 'materiaux',
             category: material.category || '',
+            project_id: '',
         });
         setOpenDialog(true);
     };
@@ -291,12 +317,25 @@ export default function MaterialsIndex({
         setSelectedMaterialForAllocation(material);
         setAllocationFormData({
             material_id: material.id.toString(),
-            project_id: '',
+            project_id:
+                material.project_id != null && material.project_id !== undefined
+                    ? String(material.project_id)
+                    : '',
             quantity_requested: '',
             comment: '',
         });
         setOpenAllocationDialog(true);
     };
+
+    const allocationProjectChoices = React.useMemo(() => {
+        const withStorekeeper = projects.filter((p) => p.storekeeper_id != null && p.storekeeper_id !== '');
+
+        if (!selectedMaterialForAllocation?.project_id) {
+            return withStorekeeper;
+        }
+
+        return withStorekeeper.filter((p) => p.id === selectedMaterialForAllocation.project_id);
+    }, [projects, selectedMaterialForAllocation]);
 
     const handleSubmitAllocation = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -494,13 +533,58 @@ export default function MaterialsIndex({
                                     />
                                 </div>
 
+                                {isManager && !editingMaterial && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="material-project">Chantier (magasinier responsable) *</Label>
+                                        {projectsWithStorekeeper.length === 0 ? (
+                                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                                Aucun chantier n&apos;a encore de magasinier assigné.{' '}
+                                                <Link href={projectsIndex.url()} className="font-bold underline">
+                                                    Ouvrir les projets
+                                                </Link>{' '}
+                                                pour affecter un magasinier au chantier, puis créez le matériau.
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <select
+                                                    id="material-project"
+                                                    name="project_id"
+                                                    value={formData.project_id}
+                                                    onChange={handleFormChange}
+                                                    required
+                                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                                >
+                                                    <option value="">-- Choisir un chantier --</option>
+                                                    {projectsWithStorekeeper.map((project) => (
+                                                        <option key={project.id} value={project.id.toString()}>
+                                                            {project.name}
+                                                            {project.storekeeper_name ? ` — ${project.storekeeper_name}` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-slate-500">
+                                                    Le stock est enregistré sous le magasinier déjà affecté à ce chantier (comme pour l&apos;affectation terrain).
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="flex justify-end gap-2 pt-2">
                                     <DialogClose asChild>
                                         <Button type="button" variant="outline" onClick={() => {
-  setEditingMaterial(null); setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '' }); 
+  setEditingMaterial(null); setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '', project_id: '' }); 
 }}>Annuler</Button>
                                     </DialogClose>
-                                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Enregistrement...' : (editingMaterial ? 'Modifier' : 'Créer')}</Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={
+                                            isSubmitting
+                                            || (isManager && !editingMaterial && projectsWithStorekeeper.length === 0)
+                                        }
+                                    >
+                                        {isSubmitting ? 'Enregistrement...' : (editingMaterial ? 'Modifier' : 'Créer')}
+                                    </Button>
                                 </div>
                             </form>
                         </DialogContent>
@@ -524,21 +608,28 @@ export default function MaterialsIndex({
 
                                 <div>
                                     <Label htmlFor="project">Chantier/Projet *</Label>
-                                    <select
-                                        id="project"
-                                        name="project_id"
-                                        value={allocationFormData.project_id}
-                                        onChange={handleAllocationFormChange}
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                        required
-                                    >
-                                        <option value="">-- Sélectionner un chantier --</option>
-                                        {projects.map((project) => (
-                                            <option key={project.id} value={project.id.toString()}>
-                                                {project.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    {allocationProjectChoices.length === 0 ? (
+                                        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                            Aucun chantier éligible (magasinier requis). Complétez l&apos;affectation sur la fiche projet.
+                                        </p>
+                                    ) : (
+                                        <select
+                                            id="project"
+                                            name="project_id"
+                                            value={allocationFormData.project_id}
+                                            onChange={handleAllocationFormChange}
+                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                            required
+                                        >
+                                            <option value="">-- Sélectionner un chantier --</option>
+                                            {allocationProjectChoices.map((project) => (
+                                                <option key={project.id} value={project.id.toString()}>
+                                                    {project.name}
+                                                    {project.storekeeper_name ? ` — ${project.storekeeper_name}` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
 
                                 <div>

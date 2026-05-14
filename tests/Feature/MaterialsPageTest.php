@@ -57,6 +57,48 @@ test('magasinier can create a material', function () {
     ]);
 });
 
+test('manager cannot create a material without selecting a project', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+
+    $this->actingAs($manager)
+        ->from(route('materials.index'))
+        ->post(route('materials.store'), [
+            'name' => 'Sans chantier',
+            'description' => 'Test',
+            'quantity_in_stock' => 1,
+            'unit' => 'sacs',
+            'type' => 'materiaux',
+            'category' => 'test',
+        ])
+        ->assertSessionHasErrors('project_id');
+
+    $this->assertDatabaseMissing('materials', [
+        'name' => 'Sans chantier',
+    ]);
+});
+
+test('manager cannot create a material for a project without storekeeper', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $project = Project::factory()->create(['storekeeper_id' => null]);
+
+    $this->actingAs($manager)
+        ->from(route('materials.index'))
+        ->post(route('materials.store'), [
+            'name' => 'Stock orphelin',
+            'description' => 'Test',
+            'quantity_in_stock' => 1,
+            'unit' => 'sacs',
+            'type' => 'materiaux',
+            'category' => 'test',
+            'project_id' => $project->id,
+        ])
+        ->assertSessionHasErrors('project_id');
+
+    $this->assertDatabaseMissing('materials', [
+        'name' => 'Stock orphelin',
+    ]);
+});
+
 test('manager can create a material', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $storekeeper = User::factory()->create(['role' => UserRole::Magasinier]);
@@ -307,6 +349,7 @@ test('non magasinier cannot create a material', function () {
             'description' => 'Fournisseur Y',
             'quantity_in_stock' => 10,
             'unit' => 'tonnes',
+            'type' => 'materiaux',
             'category' => 'metaux',
         ])
         ->assertForbidden();

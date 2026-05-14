@@ -32,6 +32,28 @@ test('magasinier can allocate material only to own project', function () {
         ->assertRedirect(route('materials.index'));
 });
 
+test('cannot allocate material when target project has no storekeeper', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager->value]);
+    $project = Project::factory()->create(['storekeeper_id' => null]);
+    $material = Material::factory()->create([
+        'project_id' => $project->id,
+        'storekeeper_id' => null,
+        'quantity_in_stock' => 50,
+    ]);
+
+    $this->actingAs($manager)
+        ->from(route('materials.index'))
+        ->post(route('materials.allocate'), [
+            'material_id' => $material->id,
+            'project_id' => $project->id,
+            'quantity_requested' => 5,
+        ])
+        ->assertSessionHasErrors('project_id');
+
+    $material->refresh();
+    expect((float) $material->quantity_in_stock)->toBe(50.0);
+});
+
 test('cannot allocate material to a different project than its owner project', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager->value]);
     $projectA = Project::factory()->create();

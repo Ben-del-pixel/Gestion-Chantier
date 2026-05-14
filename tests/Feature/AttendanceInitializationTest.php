@@ -63,15 +63,13 @@ it('assigns workers to a project', function () {
 });
 
 it('allows engineer to assign magasinier to a project', function () {
-    $magasinier = User::factory()->create(['role' => 'magasinier']);
-
     $response = $this->postJson(
         "/api/projects/{$this->project->id}/workers",
-        ['worker_ids' => [$magasinier->id]]
+        ['worker_ids' => [$this->magasinier->id]]
     );
 
     $response->assertSuccessful();
-    $this->assertTrue($this->project->workers()->where('users.id', $magasinier->id)->exists());
+    $this->assertTrue($this->project->workers()->where('users.id', $this->magasinier->id)->exists());
 });
 
 it('forbids worker assignment by users without engineer or manager role', function () {
