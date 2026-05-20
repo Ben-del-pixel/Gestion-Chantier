@@ -145,6 +145,7 @@ function buildCalendarCells(viewYear: number, viewMonth: number): { ymd: string;
   }
 
   let next = 1;
+
   while (cells.length % 7 !== 0) {
     const d = new Date(viewYear, viewMonth + 1, next);
     cells.push({ date: d, inMonth: false, ymd: toYmd(d) });

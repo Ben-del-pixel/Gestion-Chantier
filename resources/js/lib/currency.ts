@@ -10,7 +10,9 @@ export function getStoredCurrency(): CurrencyCode {
     if (typeof window === 'undefined') {
         return 'USD';
     }
+
     const value = window.localStorage.getItem(STORAGE_KEY);
+
     return value === 'CDF' ? 'CDF' : 'USD';
 }
 
@@ -18,6 +20,7 @@ export function setStoredCurrency(currency: CurrencyCode): void {
     if (typeof window === 'undefined') {
         return;
     }
+
     window.localStorage.setItem(STORAGE_KEY, currency);
     window.dispatchEvent(new CustomEvent('app:currency-changed', { detail: currency }));
 }
@@ -26,7 +29,9 @@ export function getStoredRate(): number {
     if (typeof window === 'undefined') {
         return DEFAULT_CDF_PER_USD;
     }
+
     const value = window.localStorage.getItem(RATE_STORAGE_KEY);
+
     return value ? parseFloat(value) : DEFAULT_CDF_PER_USD;
 }
 
@@ -34,6 +39,7 @@ export function setStoredRate(rate: number): void {
     if (typeof window === 'undefined') {
         return;
     }
+
     window.localStorage.setItem(RATE_STORAGE_KEY, rate.toString());
     window.dispatchEvent(new CustomEvent('app:rate-changed', { detail: rate }));
 }
@@ -42,6 +48,7 @@ export function convertFromUsd(amount: number, currency: CurrencyCode, rate: num
     if (currency === 'CDF') {
         return amount * rate;
     }
+
     return amount;
 }
 

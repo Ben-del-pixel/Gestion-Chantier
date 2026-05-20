@@ -9,8 +9,8 @@ import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { update as updatePassword } from '@/routes/user-password';
 import { edit } from '@/routes/profile';
+import { update as updatePassword } from '@/routes/user-password';
 import { send } from '@/routes/verification';
 
 export default function Profile({

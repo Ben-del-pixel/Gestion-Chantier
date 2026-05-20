@@ -103,6 +103,7 @@ export function WorkerDashboard({
 
     const filteredIncidents = React.useMemo(() => {
         const list = workerIncidents ?? [];
+
         if (displayProjectFilter === 'all') {
             return list;
         }

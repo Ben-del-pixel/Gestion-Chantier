@@ -55,6 +55,14 @@ class ReportController extends Controller
             ->take(20)
             ->get();
 
+        $potentialRecipients = [];
+        if ($user->role === UserRole::Manager) {
+            $potentialRecipients = User::where('role', '!=', UserRole::Manager)
+                ->orderBy('role')
+                ->orderBy('name')
+                ->get(['id', 'name', 'role']);
+        }
+
         return Inertia::render('reports/index', [
             'reportTypes' => [
                 ['value' => 'global', 'label' => 'Rapport Global'],
@@ -65,11 +73,13 @@ class ReportController extends Controller
             'projects' => $projects,
             'receivedReports' => $receivedReports,
             'sentReports' => $sentReports,
+            'potentialRecipients' => $potentialRecipients,
             'canSubmitReport' => in_array($userRoleValue, [
                 UserRole::Worker->value,
                 UserRole::Magasinier->value,
                 UserRole::Engineer->value,
                 UserRole::ChefChantier->value,
+                UserRole::Manager->value,
             ], true),
             'submitTargetLabel' => $this->resolveTargetLabel($userRoleValue),
         ]);
@@ -80,7 +90,13 @@ class ReportController extends Controller
         $user = $request->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
 
-        if (! in_array($userRoleValue, [UserRole::Worker->value, UserRole::Magasinier->value, UserRole::Engineer->value, UserRole::ChefChantier->value], true)) {
+        if (! in_array($userRoleValue, [
+            UserRole::Worker->value,
+            UserRole::Magasinier->value,
+            UserRole::Engineer->value,
+            UserRole::ChefChantier->value,
+            UserRole::Manager->value,
+        ], true)) {
             abort(403, 'Ce role ne peut pas soumettre de rapport.');
         }
 
@@ -88,9 +104,10 @@ class ReportController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string', 'min:20'],
             'project_id' => ['nullable', 'exists:projects,id'],
+            'recipient_id' => ['nullable', 'exists:users,id'],
         ]);
 
-        $recipientId = $this->resolveRecipientIdForUser($user, $userRoleValue, $validated['project_id'] ?? null);
+        $recipientId = $validated['recipient_id'] ?? $this->resolveRecipientIdForUser($user, $userRoleValue, $validated['project_id'] ?? null);
 
         if (! $recipientId) {
             return back()->withErrors([
@@ -103,7 +120,7 @@ class ReportController extends Controller
             'content' => $validated['content'],
             'project_id' => $validated['project_id'] ?? null,
             'sender_id' => $user->id,
-            'recipient_id' => $recipientId,
+            'recipient_id' => (int) $recipientId,
             'status' => 'submitted',
         ]);
 
@@ -113,6 +130,7 @@ class ReportController extends Controller
     private function resolveTargetLabel(string $role): string
     {
         return match ($role) {
+            UserRole::Manager->value => 'Destinataire au choix',
             UserRole::Engineer->value => 'Manager',
             UserRole::ChefChantier->value => 'Ingénieur',
             UserRole::Worker->value, UserRole::Magasinier->value => 'Ingénieur',

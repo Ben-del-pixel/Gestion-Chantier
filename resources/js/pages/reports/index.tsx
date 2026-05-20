@@ -19,6 +19,7 @@ export default function ReportsIndex({
     submitTargetLabel,
     receivedReports,
     sentReports,
+    potentialRecipients,
 }: any) {
     const page = usePage().props as { auth?: { user?: { role?: string } } };
     const isWorker = page.auth?.user?.role === UserRole.Worker.value;
@@ -57,6 +58,7 @@ export default function ReportsIndex({
         title: '',
         content: '',
         project_id: '',
+        recipient_id: '',
     });
 
     React.useEffect(() => {
@@ -98,14 +100,17 @@ export default function ReportsIndex({
 
             if (!response.ok) {
                 let message = 'Erreur lors de la generation du rapport';
+
                 try {
                     const payload = await response.json();
+
                     if (payload?.message) {
                         message = payload.message;
                     }
                 } catch {
                     //
                 }
+
                 throw new Error(message);
             }
 
@@ -136,10 +141,11 @@ export default function ReportsIndex({
                 title: submissionForm.title,
                 content: submissionForm.content,
                 project_id: submissionForm.project_id || null,
+                recipient_id: submissionForm.recipient_id || null,
             },
             {
                 onSuccess: () => {
-                    setSubmissionForm({ title: '', content: '', project_id: '' });
+                    setSubmissionForm({ title: '', content: '', project_id: '', recipient_id: '' });
                 },
                 onError: () => {
                     alert('Erreur lors de la soumission du rapport');
@@ -319,6 +325,25 @@ export default function ReportsIndex({
                                             ))}
                                         </select>
                                     </div>
+
+                                    {isManager && (
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Destinataire</Label>
+                                            <select
+                                                value={submissionForm.recipient_id}
+                                                onChange={(event) => setSubmissionForm((prev) => ({ ...prev, recipient_id: event.target.value }))}
+                                                className={formControlClass}
+                                                required
+                                            >
+                                                <option value="">-- Choisir un destinataire --</option>
+                                                {(potentialRecipients || []).map((recipient: any) => (
+                                                    <option key={recipient.id} value={recipient.id}>
+                                                        {recipient.name} ({recipient.role})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex gap-2">
