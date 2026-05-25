@@ -8,6 +8,7 @@ use App\Models\ActivityLog;
 use App\Models\Project;
 use App\Models\ProjectStep;
 use App\Models\Task;
+use App\Support\ProjectTaskDateGuard;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
@@ -72,12 +73,18 @@ class TaskController extends Controller
 
         $this->assertWorkersAssignableToProject($project, $validated['worker_ids'] ?? []);
 
+        if (ProjectTaskDateGuard::endDateExceedsProjectDeadline($project, $validated['end_date'])) {
+            return back()->withErrors([
+                'end_date' => ProjectTaskDateGuard::validationMessage($project),
+            ]);
+        }
+
         $task = Task::create([
             'project_id' => $validated['project_id'],
             'project_step_id' => $validated['project_step_id'],
             'project_sub_step_id' => null,
             'name' => $validated['name'],
-            'description' => $validated['description'],
+            'description' => $validated['description'] ?? null,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'status' => $validated['status'],
@@ -133,11 +140,17 @@ class TaskController extends Controller
             $this->assertWorkersAssignableToProject($project, $validated['worker_ids']);
         }
 
+        if (ProjectTaskDateGuard::endDateExceedsProjectDeadline($project, $validated['end_date'])) {
+            return back()->withErrors([
+                'end_date' => ProjectTaskDateGuard::validationMessage($project),
+            ]);
+        }
+
         $task->update([
             'project_step_id' => $validated['project_step_id'],
             'project_sub_step_id' => null,
             'name' => $validated['name'],
-            'description' => $validated['description'],
+            'description' => $validated['description'] ?? null,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'status' => $validated['status'],

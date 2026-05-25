@@ -220,6 +220,10 @@ return 'Non défini';
   const tasksForStep = (stepId: number) =>
     (project.tasks || []).filter((t: any) => Number(t.project_step_id) === Number(stepId));
 
+  const projectDeadlineDate = project.deadline
+    ? String(project.deadline).split('T')[0]
+    : undefined;
+
   const selectedStepLabelForTask = useMemo(() => {
     if (!taskData.project_step_id) {
       return null;
@@ -246,6 +250,19 @@ return 'Non défini';
 
   const handleTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (
+      projectDeadlineDate
+      && taskData.end_date
+      && taskData.end_date > projectDeadlineDate
+    ) {
+      alert(
+        `La date de fin de la tâche ne peut pas dépasser la date limite du chantier (${formatDate(project.deadline)}).`,
+      );
+
+      return;
+    }
+
     setIsLoading(true);
 
     const payload = {
@@ -908,7 +925,20 @@ return 'Non défini';
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs font-black uppercase text-slate-400">Fin prévue</Label>
-                                <Input type="date" value={taskData.end_date} onChange={e => setTaskData({...taskData, end_date: e.target.value})} className="h-12 rounded-xl" required />
+                                <Input
+                                  type="date"
+                                  value={taskData.end_date}
+                                  min={taskData.start_date || undefined}
+                                  max={projectDeadlineDate}
+                                  onChange={e => setTaskData({...taskData, end_date: e.target.value})}
+                                  className="h-12 rounded-xl"
+                                  required
+                                />
+                                {projectDeadlineDate && (
+                                  <p className="text-xs text-slate-500">
+                                    Au plus tard le {formatDate(project.deadline)} (fin du chantier).
+                                  </p>
+                                )}
                             </div>
                         </div>
                         <div className="space-y-2">

@@ -10,6 +10,7 @@ use App\Models\ProjectStep;
 use App\Models\ProjectSubStep;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ProjectTaskDateGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -48,6 +49,17 @@ class ProjectSubStepController extends Controller
 
         if ($workers->count() !== count($validated['worker_ids'])) {
             return response()->json(['error' => 'Certains ouvriers ne font pas partie de votre équipe.'], 403);
+        }
+
+        $project = $step->project;
+
+        if (ProjectTaskDateGuard::endDateExceedsProjectDeadline($project, $validated['planned_date'])) {
+            return response()->json([
+                'error' => ProjectTaskDateGuard::validationMessage($project),
+                'errors' => [
+                    'planned_date' => [ProjectTaskDateGuard::validationMessage($project)],
+                ],
+            ], 422);
         }
 
         $subStep = ProjectSubStep::create([
