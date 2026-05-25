@@ -69,7 +69,7 @@ test('engineer dashboard includes attendance management props', function () {
             ->has('attendanceStatuses')
             ->has('attendanceDate')
             ->has('receivedWorkerIncidents')
-            ->where('canResolveWorkerIncidents', false)
+            ->where('canResolveWorkerIncidents', true)
         );
 });
 
@@ -113,7 +113,7 @@ test('engineer dashboard lists worker incidents for engineer projects', function
         ->assertInertia(fn (Assert $page) => $page
             ->component('dashboard')
             ->has('receivedWorkerIncidents', 1)
-            ->where('canResolveWorkerIncidents', false)
+            ->where('canResolveWorkerIncidents', true)
         );
 });
 

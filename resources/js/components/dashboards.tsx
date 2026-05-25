@@ -764,7 +764,7 @@ export const EngineerDashboard = ({
                                                 <div className="mt-2 rounded-lg border border-emerald-200/80 bg-emerald-50/60 p-2 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
                                                     <p className="font-bold">Corrige</p>
                                                     <p>
-                                                        Par {props.resolved_by_name ?? 'Chef de chantier'}
+                                                        Par {props.resolved_by_name ?? 'Responsable chantier'}
                                                         {props.resolved_at
                                                             ? ` le ${new Date(props.resolved_at).toLocaleString('fr-FR')}`
                                                             : ''}

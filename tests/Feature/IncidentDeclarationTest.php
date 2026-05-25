@@ -151,7 +151,7 @@ it('chef de chantier can resolve worker incident for own project', function () {
     expect($incident->properties['resolution_note'])->toBe('Securisation effectuee ce matin.');
 });
 
-it('engineer cannot resolve worker incident', function () {
+it('engineer can resolve worker incident for own project', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $engineer = User::factory()->create(['role' => UserRole::Engineer]);
     $chef = User::factory()->create([
@@ -192,6 +192,59 @@ it('engineer cannot resolve worker incident', function () {
         ->first();
 
     $this->actingAs($engineer)
+        ->postJson(route('incidents.resolve', $incident), [
+            'resolution_note' => 'Intervention planifiee demain matin.',
+        ])
+        ->assertOk();
+
+    $incident->refresh();
+    expect($incident->properties['status'])->toBe('resolved');
+    expect((int) $incident->properties['resolved_by_user_id'])->toBe($engineer->id);
+    expect($incident->properties['resolution_note'])->toBe('Intervention planifiee demain matin.');
+});
+
+it('engineer cannot resolve incident outside own projects', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $engineerA = User::factory()->create(['role' => UserRole::Engineer]);
+    $engineerB = User::factory()->create(['role' => UserRole::Engineer]);
+    $chef = User::factory()->create([
+        'role' => UserRole::ChefChantier,
+        'engineer_id' => $engineerB->id,
+    ]);
+    $worker = User::factory()->create([
+        'role' => UserRole::Worker,
+        'chef_chantier_id' => $chef->id,
+    ]);
+    $project = Project::factory()->create([
+        'manager_id' => $manager->id,
+        'engineer_id' => $engineerB->id,
+        'chef_chantier_id' => $chef->id,
+    ]);
+    $task = Task::create([
+        'project_id' => $project->id,
+        'name' => 'Tache',
+        'description' => null,
+        'start_date' => now(),
+        'end_date' => now()->addDay(),
+        'status' => 'planifie',
+    ]);
+    $task->workers()->attach($worker->id);
+
+    $this->actingAs($worker)
+        ->postJson(route('incidents.store'), [
+            'title' => 'Incident',
+            'details' => 'Description detaillee pour la validation du formulaire.',
+            'severity' => 'faible',
+        ])
+        ->assertOk();
+
+    $incident = ActivityLog::query()
+        ->where('user_id', $worker->id)
+        ->where('action', 'incident_declared')
+        ->latest('id')
+        ->first();
+
+    $this->actingAs($engineerA)
         ->postJson(route('incidents.resolve', $incident), [])
         ->assertForbidden();
 });

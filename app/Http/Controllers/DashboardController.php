@@ -124,7 +124,7 @@ class DashboardController extends Controller
             $data['receivedWorkerIncidents'] = $this->workerDeclaredIncidentsForProjectIds(
                 Project::where('engineer_id', $user->id)->pluck('id')
             );
-            $data['canResolveWorkerIncidents'] = false;
+            $data['canResolveWorkerIncidents'] = true;
         } elseif ($user->role === UserRole::ChefChantier) {
             $chefProjectsForAlerts = Project::where('chef_chantier_id', $user->id)
                 ->get(['id', 'name', 'deadline', 'status']);

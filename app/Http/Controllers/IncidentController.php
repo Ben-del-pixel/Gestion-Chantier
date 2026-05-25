@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\UserRole;
 use App\Models\ActivityLog;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,14 +83,14 @@ class IncidentController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || $user->role !== UserRole::ChefChantier) {
+        if (! $user || ! in_array($user->role, [UserRole::ChefChantier, UserRole::Engineer], true)) {
             if ($request->expectsJson()) {
                 return response()->json([
-                    'message' => 'Seul le chef de chantier du projet peut marquer cet incident comme corrige.',
+                    'message' => 'Seuls l\'ingenieur ou le chef de chantier du projet peuvent marquer cet incident comme corrige.',
                 ], 403);
             }
 
-            abort(403, 'Seul le chef de chantier du projet peut marquer cet incident comme corrige.');
+            abort(403, 'Seuls l\'ingenieur ou le chef de chantier du projet peuvent marquer cet incident comme corrige.');
         }
 
         if ($activityLog->action !== 'incident_declared') {
@@ -111,7 +112,7 @@ class IncidentController extends Controller
         $projectId = $properties['project_id'] ?? null;
         $project = $projectId ? Project::query()->find($projectId) : null;
 
-        if (! $project || (int) $project->chef_chantier_id !== (int) $user->id) {
+        if (! $project || ! $this->userCanResolveIncidentOnProject($user, $project)) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'message' => 'Vous ne pouvez pas traiter un incident en dehors de vos chantiers.',
@@ -143,5 +144,14 @@ class IncidentController extends Controller
         }
 
         return back()->with('success', 'Incident marque comme corrige ; l\'ouvrier en est informe sur son espace.');
+    }
+
+    private function userCanResolveIncidentOnProject(User $user, Project $project): bool
+    {
+        return match ($user->role) {
+            UserRole::ChefChantier => (int) $project->chef_chantier_id === (int) $user->id,
+            UserRole::Engineer => (int) $project->engineer_id === (int) $user->id,
+            default => false,
+        };
     }
 }

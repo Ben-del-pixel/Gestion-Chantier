@@ -114,6 +114,7 @@ test('manager cannot create a material without selecting a project', function ()
 test('manager cannot create a material for a project without storekeeper', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $project = Project::factory()->create(['storekeeper_id' => null]);
+    $step = materialTestStep($project);
 
     $this->actingAs($manager)
         ->from(route('materials.index'))
@@ -125,6 +126,7 @@ test('manager cannot create a material for a project without storekeeper', funct
             'type' => 'materiaux',
             'category' => 'test',
             'project_id' => $project->id,
+            'project_step_id' => $step->id,
         ])
         ->assertSessionHasErrors('project_id');
 
