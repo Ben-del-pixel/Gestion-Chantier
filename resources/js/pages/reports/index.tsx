@@ -214,9 +214,14 @@ export default function ReportsIndex({
 
     const generateProjectContent = (): string => {
         const selectedProjects = reportData.data;
-        let content = `Nom,Statut,Debut,Fin,Budget ${currency},Manager,Ingenieur,Taches completees,Ouvriers,Etapes\n`;
+        const header = showBudget
+            ? `Nom,Statut,Debut,Fin,Budget ${currency},Manager,Ingenieur,Taches completees,Ouvriers,Etapes\n`
+            : 'Nom,Statut,Debut,Fin,Manager,Ingenieur,Taches completees,Ouvriers,Etapes\n';
+        let content = header;
         selectedProjects.forEach((p: any) => {
-            content += `${p.name},${p.status},${p.start_date},${p.deadline},${p.budget},${p.manager || '-'},${p.engineer || '-'},${p.completed_tasks}/${p.total_tasks},${p.total_workers},${p.total_steps}\n`;
+            content += showBudget
+                ? `${p.name},${p.status},${p.start_date},${p.deadline},${p.budget},${p.manager || '-'},${p.engineer || '-'},${p.completed_tasks}/${p.total_tasks},${p.total_workers},${p.total_steps}\n`
+                : `${p.name},${p.status},${p.start_date},${p.deadline},${p.manager || '-'},${p.engineer || '-'},${p.completed_tasks}/${p.total_tasks},${p.total_workers},${p.total_steps}\n`;
         });
 
         return content;
