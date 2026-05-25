@@ -4,7 +4,7 @@ import {
   Plus, Settings, Loader, Filter, Search, ArrowRight, UserCheck, 
   Clock3, AlertCircle, ChevronRight
 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+
+type PresenceFilter = 'all' | 'present' | 'checked_out' | 'absent';
 
 export default function AttendanceIndex({
   attendances: initialAttendances,
@@ -39,6 +41,7 @@ export default function AttendanceIndex({
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [presenceFilter, setPresenceFilter] = useState<PresenceFilter>('all');
 
   useEffect(() => {
     setAttendances(initialAttendances);
@@ -84,6 +87,7 @@ params.append('project_id', displayProject);
   };
 
   const handleFiltersChange = () => {
+    setPresenceFilter('all');
     router.get(
       '/attendance',
       {
@@ -128,6 +132,59 @@ params.append('project_id', displayProject);
       preserveState: true,
       preserveScroll: true,
     });
+  };
+
+  const attendedUserIds = useMemo(
+    () =>
+      new Set(
+        attendances
+          .filter((a: { check_in?: string | null }) => a.check_in)
+          .map((a: { user_id: number }) => a.user_id),
+      ),
+    [attendances],
+  );
+
+  const absentRows = useMemo(
+    () =>
+      (workers ?? [])
+        .filter((w: { id: number }) => !attendedUserIds.has(w.id))
+        .map((w: { id: number; name: string }) => {
+          const projectForRow = displayProject
+            ? projects.find((p: { id: number }) => String(p.id) === displayProject)
+            : projects[0];
+
+          return {
+            id: `absent-${w.id}`,
+            isAbsentPlaceholder: true,
+            user_id: w.id,
+            user: { name: w.name },
+            project: projectForRow ? { name: projectForRow.name } : null,
+            status: 'absent',
+            check_in: null,
+            check_out: null,
+          };
+        }),
+    [workers, attendedUserIds, displayProject, projects],
+  );
+
+  const displayRows = useMemo(() => {
+    switch (presenceFilter) {
+      case 'present':
+        return attendances.filter(
+          (a: { check_in?: string | null; check_out?: string | null }) => a.check_in && !a.check_out,
+        );
+      case 'checked_out':
+        return attendances.filter((a: { check_out?: string | null }) => a.check_out);
+      case 'absent':
+        return absentRows;
+      case 'all':
+      default:
+        return [...attendances, ...absentRows];
+    }
+  }, [presenceFilter, attendances, absentRows]);
+
+  const togglePresenceFilter = (filter: PresenceFilter) => {
+    setPresenceFilter((current) => (current === filter ? 'all' : filter));
   };
 
   const formatTime = (time: string | null) => {
@@ -187,28 +244,40 @@ return '-';
             value={statistics.total_workers} 
             icon={Users} 
             color="blue"
-            trend="Sur le projet actif"
+            trend={presenceFilter === 'all' ? 'Filtre actif — tout l\'effectif' : 'Cliquer pour tout afficher'}
+            filterKey="all"
+            active={presenceFilter === 'all'}
+            onFilter={togglePresenceFilter}
           />
           <PremiumStatCard 
             title="Présents" 
             value={statistics.present} 
             icon={UserCheck} 
             color="emerald"
-            trend="Actuellement sur site"
+            trend={presenceFilter === 'present' ? 'Filtre actif — sur site' : 'Cliquer pour filtrer'}
+            filterKey="present"
+            active={presenceFilter === 'present'}
+            onFilter={togglePresenceFilter}
           />
           <PremiumStatCard 
             title="Retards / Sortis" 
             value={statistics.checked_out} 
             icon={Clock3} 
             color="amber"
-            trend="Pointages complétés"
+            trend={presenceFilter === 'checked_out' ? 'Filtre actif — service terminé' : 'Cliquer pour filtrer'}
+            filterKey="checked_out"
+            active={presenceFilter === 'checked_out'}
+            onFilter={togglePresenceFilter}
           />
           <PremiumStatCard 
             title="Absences" 
             value={statistics.absent} 
             icon={AlertCircle} 
             color="rose"
-            trend="À justifier"
+            trend={presenceFilter === 'absent' ? 'Filtre actif — non pointés' : 'Cliquer pour filtrer'}
+            filterKey="absent"
+            active={presenceFilter === 'absent'}
+            onFilter={togglePresenceFilter}
           />
         </div>
         )}
@@ -346,7 +415,18 @@ return '-';
                                 {currentRole === 'worker' ? 'Mon pointage' : 'Rapport de présence'}
                             </CardTitle>
                             <CardDescription>
-                                {attendances.length} personne{attendances.length > 1 ? 's' : ''} répertoriée{attendances.length > 1 ? 's' : ''}
+                                {displayRows.length} personne{displayRows.length > 1 ? 's' : ''} affichée{displayRows.length > 1 ? 's' : ''}
+                                {presenceFilter !== 'all' && (
+                                  <span className="ml-1 text-blue-600">
+                                    (filtre :{' '}
+                                    {presenceFilter === 'present'
+                                      ? 'présents'
+                                      : presenceFilter === 'checked_out'
+                                        ? 'sortis'
+                                        : 'absences'}
+                                    )
+                                  </span>
+                                )}
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-4">
@@ -371,23 +451,26 @@ return '-';
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {attendances.length > 0 ? attendances.map((attendance: any) => (
+                                    {displayRows.length > 0 ? displayRows.map((attendance: any) => (
                                         <tr key={attendance.id} className="group transition-colors hover:bg-slate-50/50">
                                             <td className="whitespace-nowrap px-8 py-5">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                                                        {attendance.user?.name.charAt(0)}
+                                                        {attendance.user?.name?.charAt(0) ?? '?'}
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-bold text-slate-900">{attendance.user?.name}</p>
                                                         <p className="text-xs text-slate-500 flex items-center gap-1">
                                                             <MapPin className="h-3 w-3" />
-                                                            {attendance.project?.name}
+                                                            {attendance.project?.name ?? '—'}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-5">
+                                                {attendance.isAbsentPlaceholder ? (
+                                                    <span className="text-xs font-bold text-rose-500">Non pointé</span>
+                                                ) : (
                                                 <div className="flex flex-col gap-1">
                                                     <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                                                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -400,8 +483,14 @@ return '-';
                                                         </div>
                                                     )}
                                                 </div>
+                                                )}
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-5">
+                                                {attendance.isAbsentPlaceholder ? (
+                                                    <span className="inline-flex items-center rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">
+                                                        Absent
+                                                    </span>
+                                                ) : (
                                                 <div className="flex items-center gap-1.5">
                                                     {statuses?.map((st: any) => (
                                                         <button
@@ -423,9 +512,29 @@ return '-';
                                                         {statuses?.find((s: any) => s.value === attendance.status)?.label || attendance.status}
                                                     </span>
                                                 </div>
+                                                )}
                                             </td>
                                             <td className="whitespace-nowrap px-8 py-5 text-right">
-                                                {canManageAttendance && !attendance.check_out ? (
+                                                {attendance.isAbsentPlaceholder ? (
+                                                    canManageAttendance ? (
+                                                        <Button
+                                                            onClick={() => {
+                                                                setCheckInData({
+                                                                    user_id: String(attendance.user_id),
+                                                                    project_id: displayProject || (projects[0] ? String(projects[0].id) : ''),
+                                                                    status: defaultStatus,
+                                                                });
+                                                                setShowCheckIn(true);
+                                                            }}
+                                                            size="sm"
+                                                            className="h-8 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold text-xs"
+                                                        >
+                                                            Pointer
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">—</span>
+                                                    )
+                                                ) : canManageAttendance && !attendance.check_out ? (
                                                     <Button
                                                         onClick={() => handleCheckOut(attendance.id)}
                                                         size="sm"
@@ -448,7 +557,21 @@ return '-';
                                                     <div className="rounded-full bg-slate-50 p-4">
                                                         <Calendar className="h-10 w-10 text-slate-200" />
                                                     </div>
-                                                    <p className="text-lg font-bold text-slate-400">Aucun pointage trouvé pour cette date</p>
+                                                    <p className="text-lg font-bold text-slate-400">
+                                                        {presenceFilter !== 'all'
+                                                          ? 'Aucune personne pour ce filtre'
+                                                          : 'Aucun pointage trouvé pour cette date'}
+                                                    </p>
+                                                    {presenceFilter !== 'all' && (
+                                                      <Button
+                                                        type="button"
+                                                        variant="link"
+                                                        className="text-blue-600 font-bold"
+                                                        onClick={() => setPresenceFilter('all')}
+                                                      >
+                                                        Afficher tout l&apos;effectif
+                                                      </Button>
+                                                    )}
                                                     {canManageAttendance && <Button onClick={() => setShowCheckIn(true)} variant="link" className="text-blue-600 font-bold">
                                                         Effectuer le premier pointage
                                                     </Button>}
@@ -533,16 +656,62 @@ return '-';
   );
 }
 
-function PremiumStatCard({ title, value, icon: Icon, color, trend }: any) {
-    const colorVariants: any = {
+function PremiumStatCard({
+    title,
+    value,
+    icon: Icon,
+    color,
+    trend,
+    filterKey,
+    active = false,
+    onFilter,
+}: {
+    title: string;
+    value: number;
+    icon: React.ComponentType<{ className?: string }>;
+    color: 'blue' | 'emerald' | 'amber' | 'rose';
+    trend: string;
+    filterKey?: PresenceFilter;
+    active?: boolean;
+    onFilter?: (filter: PresenceFilter) => void;
+}) {
+    const colorVariants: Record<string, string> = {
         blue: "bg-blue-500/10 text-blue-600",
         emerald: "bg-emerald-500/10 text-emerald-600",
         amber: "bg-amber-500/10 text-amber-600",
         rose: "bg-rose-500/10 text-rose-600",
     };
 
+    const ringVariants: Record<string, string> = {
+        blue: 'ring-blue-500',
+        emerald: 'ring-emerald-500',
+        amber: 'ring-amber-500',
+        rose: 'ring-rose-500',
+    };
+
+    const isFilter = Boolean(filterKey && onFilter);
+
     return (
-        <Card className="border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] overflow-hidden transition-all hover:shadow-[0_15px_35px_-12px_rgba(0,0,0,0.15)] group">
+        <Card
+            role={isFilter ? 'button' : undefined}
+            tabIndex={isFilter ? 0 : undefined}
+            onClick={isFilter ? () => onFilter!(filterKey!) : undefined}
+            onKeyDown={
+                isFilter
+                    ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onFilter!(filterKey!);
+                          }
+                      }
+                    : undefined
+            }
+            className={cn(
+                'border-0 bg-white shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] overflow-hidden transition-all group',
+                isFilter && 'cursor-pointer hover:shadow-[0_15px_35px_-12px_rgba(0,0,0,0.15)] hover:-translate-y-0.5',
+                active && `ring-2 ring-offset-2 ${ringVariants[color]}`,
+            )}
+        >
             <CardContent className="p-7">
                 <div className="flex items-center justify-between">
                     <div className={cn("rounded-2xl p-4 transition-transform group-hover:scale-110 duration-500", colorVariants[color])}>
