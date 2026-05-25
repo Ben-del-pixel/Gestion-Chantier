@@ -95,13 +95,33 @@ function getProgress(project: ProjectItem): number {
   return project.progress || 0;
 }
 
+type MaterialFormItem = {
+  name: string;
+  description: string;
+  quantity_in_stock: string;
+  unit: string;
+  type: 'materiel' | 'materiaux';
+  category: string;
+};
+
+const emptyMaterial = (): MaterialFormItem => ({
+  name: '',
+  description: '',
+  quantity_in_stock: '',
+  unit: 'sacs',
+  type: 'materiaux',
+  category: '',
+});
+
 export default function ProjectsIndex({
   projects,
   engineers,
+  storekeepers = [],
   projectDeadlineAlerts,
 }: {
   projects: ProjectItem[];
   engineers: Array<{ id: number; name: string }>;
+  storekeepers?: Array<{ id: number; name: string }>;
   projectDeadlineAlerts?: ProjectDeadlineAlertsShape | null;
 }) {
   const page = usePage().props as any;
@@ -116,12 +136,18 @@ export default function ProjectsIndex({
     name: '',
     description: '',
     start_date: '',
-    budget: '',
     deadline: '',
     status: 'initialisation',
     engineer_id: '',
+    storekeeper_id: '',
     steps: [{ name: '', budget: '' }],
+    materials: [] as MaterialFormItem[],
   });
+
+  const totalBudgetFromSteps = React.useMemo(
+    () => formData.steps.reduce((sum, step) => sum + (Number(step.budget) || 0), 0),
+    [formData.steps],
+  );
 
   const normalizedProjects = React.useMemo(
     () =>
@@ -198,13 +224,9 @@ export default function ProjectsIndex({
     const newSteps = [...formData.steps];
     newSteps[index] = { ...newSteps[index], [e.target.name]: e.target.value };
 
-    // Calculate new total budget
-    const totalBudget = newSteps.reduce((sum, step) => sum + (Number(step.budget) || 0), 0);
-
     setFormData((prev) => ({
       ...prev,
       steps: newSteps,
-      budget: totalBudget > 0 ? totalBudget.toString() : prev.budget,
     }));
   };
 
@@ -221,14 +243,48 @@ return;
 }
 
     const newSteps = formData.steps.filter((_, i) => i !== index);
-    const totalBudget = newSteps.reduce((sum, step) => sum + (Number(step.budget) || 0), 0);
 
     setFormData((prev) => ({
       ...prev,
       steps: newSteps,
-      budget: totalBudget > 0 ? totalBudget.toString() : prev.budget,
     }));
   };
+
+  const handleMaterialChange = (
+    index: number,
+    field: keyof MaterialFormItem,
+    value: string,
+  ) => {
+    const newMaterials = [...formData.materials];
+    newMaterials[index] = { ...newMaterials[index], [field]: value };
+    setFormData((prev) => ({ ...prev, materials: newMaterials }));
+  };
+
+  const addMaterial = () => {
+    setFormData((prev) => ({
+      ...prev,
+      materials: [...prev.materials, emptyMaterial()],
+    }));
+  };
+
+  const removeMaterial = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      materials: prev.materials.filter((_, i) => i !== index),
+    }));
+  };
+
+  const resetCreateForm = () => ({
+    name: '',
+    description: '',
+    start_date: '',
+    deadline: '',
+    status: 'initialisation',
+    engineer_id: '',
+    storekeeper_id: '',
+    steps: [{ name: '', budget: '' }],
+    materials: [] as MaterialFormItem[],
+  });
 
   const handleSubmitProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,20 +304,22 @@ return;
       return;
     }
 
+    const materialsToSubmit = formData.materials.filter((m) => m.name.trim() !== '');
+
+    if (materialsToSubmit.length > 0 && !formData.storekeeper_id) {
+      alert('Assignez un magasinier pour enregistrer des matériaux sur ce chantier.');
+
+      return;
+    }
+
     setIsSubmitting(true);
 
-    router.post(store.url(), formData, {
+    router.post(store.url(), {
+      ...formData,
+      materials: materialsToSubmit,
+    }, {
       onSuccess: () => {
-        setFormData({
-          name: '',
-          description: '',
-          start_date: '',
-          budget: '',
-          deadline: '',
-          status: 'initialisation',
-          engineer_id: '',
-          steps: [{ name: '', budget: '' }]
-        });
+        setFormData(resetCreateForm());
         setOpenDialog(false);
       },
       onError: () => {
@@ -314,7 +372,7 @@ return;
                 </Button>
               </DialogTrigger>
 
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 <DialogTitle>Créer un nouveau chantier</DialogTitle>
 
                 <form className="mt-4 space-y-4" onSubmit={handleSubmitProject}>
@@ -341,18 +399,12 @@ return;
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="budget">Budget ({currency}) *</Label>
-                    <Input
-                      id="budget"
-                      name="budget"
-                      type="number"
-                      value={formData.budget}
-                      onChange={handleFormChange}
-                      placeholder="50000"
-                      required
-                      step="0.01"
-                    />
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <p className="text-xs font-medium text-slate-500">Budget total du chantier</p>
+                    <p className="text-lg font-bold text-slate-900">{formatCurrency(totalBudgetFromSteps)}</p>
+                    <p className="text-xs text-slate-500 italic">
+                      Calculé automatiquement à partir des budgets des étapes (non modifiable).
+                    </p>
                   </div>
 
                   <div>
@@ -418,6 +470,25 @@ return;
                     </select>
                   </div>
 
+                  <div>
+                    <Label htmlFor="storekeeper_id">Magasinier responsable</Label>
+                    <select
+                      id="storekeeper_id"
+                      name="storekeeper_id"
+                      value={formData.storekeeper_id}
+                      onChange={handleFormChange}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                    >
+                      <option value="">Sélectionner un magasinier</option>
+                      {storekeepers.map((sk) => (
+                        <option key={sk.id} value={sk.id}>{sk.name}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Obligatoire si vous ajoutez des matériaux ci-dessous.
+                    </p>
+                  </div>
+
                   <div className="space-y-3 border-t pt-4">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-semibold">Étapes du projet</Label>
@@ -468,9 +539,77 @@ return;
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-slate-500 italic">
-                      Le budget total sera automatiquement calculé à partir de la somme des budgets des étapes.
-                    </p>
+                  </div>
+
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Matériaux (optionnel)</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addMaterial}>
+                        <Plus className="mr-1 h-3 w-3" />
+                        Ajouter matériau
+                      </Button>
+                    </div>
+
+                    {formData.materials.length > 0 ? (
+                      <div className="space-y-3">
+                        {formData.materials.map((material, index) => (
+                          <div key={index} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-slate-600">Matériau {index + 1}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeMaterial(index)}
+                                className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Input
+                              value={material.name}
+                              onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
+                              placeholder="Nom (ex: Ciment)"
+                              className="h-9"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={material.quantity_in_stock}
+                                onChange={(e) => handleMaterialChange(index, 'quantity_in_stock', e.target.value)}
+                                placeholder="Quantité"
+                                className="h-9"
+                              />
+                              <select
+                                value={material.unit}
+                                onChange={(e) => handleMaterialChange(index, 'unit', e.target.value)}
+                                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                              >
+                                <option value="sacs">Sacs</option>
+                                <option value="tonnes">Tonnes</option>
+                                <option value="m3">m³</option>
+                                <option value="unite">Unité</option>
+                                <option value="litres">Litres</option>
+                              </select>
+                            </div>
+                            <select
+                              value={material.type}
+                              onChange={(e) => handleMaterialChange(index, 'type', e.target.value)}
+                              className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                            >
+                              <option value="materiaux">Consommable</option>
+                              <option value="materiel">Équipement</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 italic">
+                        Ajoutez le stock initial du chantier dès la création.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2">

@@ -46,7 +46,6 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, c
   const [formData, setFormData] = useState({
     name: project.name,
     description: project.description || '',
-    budget: project.budget,
     progress: project.progress || 0,
     budget_consumed: project.budget_consumed || 0,
     start_date: project.start_date ? project.start_date.split('T')[0] : '',
@@ -61,6 +60,11 @@ export default function ProjectDetail({ project, totalWorkersCount, engineers, c
         budget: s.budget
     })) || []
   });
+
+  const totalBudgetFromSteps = useMemo(
+    () => formData.steps.reduce((sum: number, step: any) => sum + (Number(step.budget) || 0), 0),
+    [formData.steps],
+  );
 
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
@@ -777,6 +781,12 @@ return 'Non défini';
                             <Button type="button" variant="outline" size="sm" onClick={addStep} className="h-8 rounded-lg text-[11px] font-black italic">
                                 + AJOUTER ÉTAPE
                             </Button>
+                        </div>
+
+                        <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
+                            <p className="text-[10px] font-black uppercase text-emerald-700/80">Budget total (somme des étapes)</p>
+                            <p className="text-xl font-black text-emerald-900">{formatCurrency(totalBudgetFromSteps)}</p>
+                            <p className="text-[10px] text-emerald-800/70 italic">Non modifiable directement — ajustez le budget de chaque étape.</p>
                         </div>
 
                         <div className="space-y-3">

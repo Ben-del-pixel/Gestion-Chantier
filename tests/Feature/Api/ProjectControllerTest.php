@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Material;
 use App\Models\Project;
 use App\Models\User;
 
@@ -16,7 +17,6 @@ test('manager can create project with steps and synced budget from steps', funct
             'description' => 'Rénovation complète',
             'start_date' => $start,
             'deadline' => $deadline,
-            'budget' => '4500',
             'steps' => [
                 ['name' => 'Phase 1', 'budget' => 1000],
                 ['name' => 'Phase 2', 'budget' => 2000],
@@ -41,7 +41,6 @@ test('manager submitted budget is overwritten by step totals after creation', fu
             'description' => 'Budget override test',
             'start_date' => now()->toDateString(),
             'deadline' => now()->addDays(30)->toDateString(),
-            'budget' => 5500,
             'steps' => [
                 ['name' => 'Étape 1', 'budget' => 1000],
                 ['name' => 'Étape 2', 'budget' => 2000],
@@ -153,4 +152,69 @@ test('steps are created with correct order', function () {
     expect($project->steps[0]->order)->toBe(1);
     expect($project->steps[1]->order)->toBe(2);
     expect($project->steps[2]->order)->toBe(3);
+});
+
+test('manager can create project with storekeeper and materials', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+
+    $this->actingAs($manager)
+        ->from(route('projects.index'))
+        ->post(route('projects.store'), [
+            'name' => 'Chantier avec stock',
+            'start_date' => now()->toDateString(),
+            'deadline' => now()->addDays(30)->toDateString(),
+            'storekeeper_id' => $magasinier->id,
+            'steps' => [
+                ['name' => 'Phase 1', 'budget' => 2000],
+            ],
+            'materials' => [
+                [
+                    'name' => 'Ciment',
+                    'quantity_in_stock' => 50,
+                    'unit' => 'sacs',
+                    'type' => 'materiaux',
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $project = Project::firstOrFail();
+    expect($project->storekeeper_id)->toBe($magasinier->id);
+    expect(Material::where('project_id', $project->id)->count())->toBe(1);
+    expect(Material::first()->name)->toBe('Ciment');
+});
+
+test('project update recalculates budget from steps and ignores direct budget field', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $project = Project::factory()->create([
+        'manager_id' => $manager->id,
+        'budget' => 1000,
+    ]);
+    $step = $project->steps()->create([
+        'name' => 'Étape A',
+        'budget' => 1000,
+        'order' => 1,
+    ]);
+
+    $this->actingAs($manager)
+        ->from(route('projects.show', $project))
+        ->put(route('projects.update', $project), [
+            'budget' => 99999,
+            'steps' => [
+                [
+                    'id' => $step->id,
+                    'name' => 'Étape A',
+                    'budget' => 2500,
+                ],
+                [
+                    'name' => 'Étape B',
+                    'budget' => 1500,
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $project->refresh();
+    expect((float) $project->budget)->toBe(4000.0);
 });

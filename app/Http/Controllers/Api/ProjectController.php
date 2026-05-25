@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Material;
 use App\Models\Project;
 use App\Models\ProjectStep;
 use App\Models\User;
@@ -49,9 +50,14 @@ class ProjectController extends Controller
             $engineers = User::where('role', UserRole::Engineer)->get();
         }
 
+        $storekeepers = $user->role === UserRole::Manager
+            ? User::where('role', UserRole::Magasinier)->orderBy('name')->get(['id', 'name'])
+            : collect();
+
         return Inertia::render('projects/index', [
             'projects' => $projects,
             'engineers' => $engineers,
+            'storekeepers' => $storekeepers,
             'projectDeadlineAlerts' => ProjectDeadlineAlerts::fromProjects($projects),
         ]);
     }
@@ -69,28 +75,50 @@ class ProjectController extends Controller
             'description' => 'nullable|string',
             'start_date' => ['required', 'date', 'after_or_equal:today'],
             'deadline' => ['required', 'date', 'after_or_equal:start_date'],
-            'budget' => 'nullable|numeric|min:0',
             'progress' => 'nullable|integer|min:0|max:100',
             'status' => 'nullable|in:initialisation,planifie,en_cours,termine,suspendu',
             'engineer_id' => 'nullable|exists:users,id',
+            'storekeeper_id' => 'nullable|exists:users,id',
             'steps' => 'required|array|min:1',
             'steps.*.name' => 'required|string|max:255',
             'steps.*.budget' => 'required|numeric|min:0',
+            'materials' => 'nullable|array',
+            'materials.*.name' => 'required|string|max:255',
+            'materials.*.description' => 'nullable|string|max:255',
+            'materials.*.quantity_in_stock' => 'required|numeric|min:0',
+            'materials.*.unit' => 'required|string|max:255',
+            'materials.*.type' => 'required|in:materiel,materiaux',
+            'materials.*.category' => 'nullable|string|max:255',
         ]);
+
+        if (! empty($validated['materials']) && empty($validated['storekeeper_id'])) {
+            return back()->withErrors([
+                'storekeeper_id' => 'Assignez un magasinier pour enregistrer des matériaux sur ce chantier.',
+            ]);
+        }
+
+        if (! empty($validated['storekeeper_id'])) {
+            $storekeeper = User::find($validated['storekeeper_id']);
+            if (! $storekeeper || $storekeeper->role !== UserRole::Magasinier) {
+                return back()->withErrors([
+                    'storekeeper_id' => 'Le magasinier sélectionné est invalide.',
+                ]);
+            }
+        }
 
         $project = Project::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'start_date' => $validated['start_date'] ?? null,
-            'budget' => $validated['budget'] ?? 0,
+            'budget' => 0,
             'deadline' => $validated['deadline'],
             'progress' => $validated['progress'] ?? 0,
             'engineer_id' => $validated['engineer_id'] ?? null,
+            'storekeeper_id' => $validated['storekeeper_id'] ?? null,
             'manager_id' => $user->id,
             'status' => $validated['status'] ?? 'initialisation',
         ]);
 
-        // Create project steps if provided
         if (! empty($validated['steps'])) {
             foreach ($validated['steps'] as $index => $step) {
                 $project->steps()->create([
@@ -100,12 +128,26 @@ class ProjectController extends Controller
                 ]);
             }
 
-            // Sync total budget from steps
             $project->syncBudgetFromSteps();
         }
 
+        if (! empty($validated['materials'])) {
+            foreach ($validated['materials'] as $materialData) {
+                Material::create([
+                    'name' => $materialData['name'],
+                    'description' => $materialData['description'] ?? null,
+                    'quantity_in_stock' => $materialData['quantity_in_stock'],
+                    'unit' => $materialData['unit'],
+                    'type' => $materialData['type'],
+                    'category' => $materialData['category'] ?? null,
+                    'project_id' => $project->id,
+                    'storekeeper_id' => $project->storekeeper_id,
+                ]);
+            }
+        }
+
         // Note: L'équipe sera assignée par le Chef de Chantier plus tard
-        // Le Manager assigne seulement l'Ingénieur au projet
+        // Le Manager assigne l'Ingénieur et le magasinier au projet
 
         ActivityLog::create([
             'user_id' => auth()->id(),
@@ -173,7 +215,6 @@ class ProjectController extends Controller
             'description' => 'nullable|string',
             'start_date' => 'nullable|date',
             'deadline' => 'nullable|date',
-            'budget' => 'nullable|numeric|min:0',
             'progress' => 'nullable|integer|min:0|max:100',
             'budget_consumed' => 'nullable|numeric|min:0',
             'status' => 'nullable|in:initialisation,planifie,en_cours,termine,suspendu',
@@ -191,7 +232,7 @@ class ProjectController extends Controller
         $originalChefChanttierId = $project->chef_chantier_id;
 
         $projectData = $request->only([
-            'name', 'description', 'start_date', 'deadline', 'budget', 'status', 'progress', 'budget_consumed', 'engineer_id', 'chef_chantier_id', 'storekeeper_id',
+            'name', 'description', 'start_date', 'deadline', 'status', 'progress', 'budget_consumed', 'engineer_id', 'chef_chantier_id', 'storekeeper_id',
         ]);
 
         // Convert empty strings to null for IDs
