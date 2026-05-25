@@ -77,7 +77,6 @@ class UserController extends Controller
             'password' => 'required|string|min:8',
             'role' => 'required|in:'.implode(',', array_map(fn ($role) => $role->value, UserRole::cases())),
             'phone' => 'nullable|string|max:255',
-            'skills' => 'nullable|string',
             'engineer_id' => 'nullable|exists:users,id',
             'chef_chantier_id' => 'nullable|exists:users,id',
             'team_worker_ids' => 'nullable|array',
@@ -116,7 +115,6 @@ class UserController extends Controller
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
             'phone' => $validated['phone'] ?? null,
-            'skills' => $validated['skills'] ?? null,
         ];
 
         if ($role === UserRole::ChefChantier) {
@@ -152,7 +150,6 @@ class UserController extends Controller
             'password' => 'nullable|string|min:8',
             'role' => 'required|in:'.implode(',', array_map(fn ($role) => $role->value, UserRole::cases())),
             'phone' => 'nullable|string|max:255',
-            'skills' => 'nullable|string',
             'engineer_id' => 'nullable|exists:users,id',
             'chef_chantier_id' => 'nullable|exists:users,id',
             'team_worker_ids' => 'nullable|array',
@@ -198,7 +195,7 @@ class UserController extends Controller
             $validated['chef_chantier_id'] = null;
         }
 
-        unset($validated['team_worker_ids']);
+        unset($validated['team_worker_ids'], $validated['skills']);
 
         $user->update($validated);
 

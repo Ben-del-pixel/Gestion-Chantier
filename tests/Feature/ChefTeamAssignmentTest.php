@@ -18,7 +18,6 @@ test('manager can create chef de chantier with initial team', function () {
         'password' => 'password123',
         'role' => UserRole::ChefChantier->value,
         'phone' => '0990000001',
-        'skills' => 'Coordination',
         'engineer_id' => $engineer->id,
         'team_worker_ids' => [$w1->id, $w2->id],
     ])->assertRedirect();
@@ -47,7 +46,6 @@ test('manager can sync chef team via update', function () {
         'email' => $chef->email,
         'role' => UserRole::ChefChantier->value,
         'phone' => $chef->phone ?? '',
-        'skills' => $chef->skills ?? '',
         'engineer_id' => $engineer->id,
         'team_worker_ids' => [$w2->id],
     ])->assertRedirect();

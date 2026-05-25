@@ -1,5 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, History as ActivityIcon, UsersRound } from 'lucide-react';
+import { Pencil, Search, Trash2, UserPlus, Users, TrendingUp, UsersRound } from 'lucide-react';
 import React from 'react';
 
 import { destroy, store, update } from '@/actions/App/Http/Controllers/UserController';
@@ -24,8 +24,7 @@ type UserItem = {
   email: string;
   role: UserRoleValue;
   phone: string | null;
-  skills: string | null;
-  status: 'Actif' | 'Inactif' | 'Congé';
+  status: 'Actif' | 'Inactif';
   engineer_id: number | null;
   engineer?: { id: number; name: string } | null;
   chef_chantier_id: number | null;
@@ -42,8 +41,7 @@ type WorkforceRow = UserItem & {
   roleLabel: string;
   phone: string;
   salary: number;
-  status: 'Actif' | 'Congé' | 'Inactif';
-  skillsList: string[];
+  status: 'Actif' | 'Inactif';
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -60,14 +58,6 @@ const BASE_SALARY_BY_ROLE: Record<string, number> = {
   [UserRole.Worker.value]: 780,
   [UserRole.Magasinier.value]: 860,
   [UserRole.ChefChantier.value]: 1250,
-};
-
-const SKILLS_BY_ROLE: Record<string, string[]> = {
-  [UserRole.Manager.value]: ['Pilotage', 'Budget'],
-  [UserRole.Engineer.value]: ['AutoCAD', 'Structure'],
-  [UserRole.Worker.value]: ['Coffrage', 'Béton'],
-  [UserRole.Magasinier.value]: ['Stock', 'Logistique'],
-  [UserRole.ChefChantier.value]: ['Coordination', 'Sécurité'],
 };
 
 function formatPhone(userId: number): string {
@@ -111,7 +101,6 @@ export default function UsersIndex({
     password: string;
     role: UserRoleValue;
     phone: string;
-    skills: string;
     engineer_id: string;
     chef_chantier_id: string;
   }>({
@@ -120,7 +109,6 @@ export default function UsersIndex({
     password: '',
     role: UserRole.Worker.value,
     phone: '',
-    skills: '',
     engineer_id: '',
     chef_chantier_id: '',
   });
@@ -128,17 +116,12 @@ export default function UsersIndex({
   const workforce = React.useMemo<WorkforceRow[]>(() => {
     return users.map((user) => {
       const baseSalary = BASE_SALARY_BY_ROLE[user.role] ?? 850;
-      const skillsList = user.skills 
-        ? user.skills.split(',').map(s => s.trim()) 
-        : (SKILLS_BY_ROLE[user.role] ?? ['Polyvalent']);
-
       return {
         ...user,
         roleLabel: ROLE_LABELS[user.role] ?? user.role,
         phone: formatPhone(user.id),
         salary: baseSalary,
-        status: user.status as any,
-        skillsList,
+        status: user.status as WorkforceRow['status'],
       };
     });
   }, [users]);
@@ -157,7 +140,7 @@ export default function UsersIndex({
         return true;
       }
 
-      const haystack = `${row.name} ${row.email} ${row.roleLabel} ${row.phone} ${row.skillsList.join(' ')}`.toLowerCase();
+      const haystack = `${row.name} ${row.email} ${row.roleLabel} ${row.phone}`.toLowerCase();
 
       return haystack.includes(term);
     });
@@ -165,12 +148,12 @@ export default function UsersIndex({
 
   const stats = React.useMemo(() => {
     const active = workforce.filter((row) => row.status === 'Actif').length;
-    const onLeave = workforce.filter((row) => row.status === 'Congé').length;
+    const inactive = workforce.filter((row) => row.status === 'Inactif').length;
 
     return {
       total: workforce.length,
       active,
-      onLeave,
+      inactive,
     };
   }, [workforce]);
 
@@ -234,7 +217,6 @@ export default function UsersIndex({
           password: '',
           role: UserRole.Worker.value,
           phone: '',
-          skills: '',
           engineer_id: '',
           chef_chantier_id: '',
         });
@@ -259,7 +241,6 @@ export default function UsersIndex({
       password: '', // Leave empty for updates
       role: user.role,
       phone: user.phone || '',
-      skills: user.skills || '',
       engineer_id: user.engineer_id ? user.engineer_id.toString() : '',
       chef_chantier_id: user.chef_chantier_id ? user.chef_chantier_id.toString() : '',
     });
@@ -296,7 +277,6 @@ export default function UsersIndex({
         email: selectedChef.email,
         role: selectedChef.role,
         phone: selectedChef.phone ?? '',
-        skills: selectedChef.skills ?? '',
         engineer_id: selectedChef.engineer_id ? String(selectedChef.engineer_id) : '',
         chef_chantier_id: '',
         team_worker_ids: chefTeamWorkerIds,
@@ -521,17 +501,6 @@ return;
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="skills">Compétences (séparées par des virgules)</Label>
-                    <Input
-                      id="skills"
-                      name="skills"
-                      value={formData.skills}
-                      onChange={handleChange}
-                      placeholder="Ex: Maçonnerie, Plomberie"
-                    />
-                  </div>
-
                   {formData.role === UserRole.ChefChantier.value && (
                     <div>
                       <Label htmlFor="engineer_id">Ingénieur responsable *</Label>
@@ -667,7 +636,6 @@ return;
                             password: '',
                             role: UserRole.Worker.value,
                             phone: '',
-                            skills: '',
                             engineer_id: '',
                             chef_chantier_id: '',
                           });
@@ -684,7 +652,7 @@ return;
             )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="rounded-3xl bg-blue-500 p-6 text-white shadow-xl shadow-blue-500/20 group transition-transform hover:-translate-y-1">
                 <div className="flex items-center justify-between opacity-80 mb-4">
                     <p className="text-sm font-black uppercase tracking-wider">Total ouvriers</p>
@@ -699,12 +667,12 @@ return;
                 </div>
                 <p className="text-5xl font-black">{stats.active}</p>
               </div>
-              <div className="rounded-3xl bg-orange-500 p-6 text-white shadow-xl shadow-orange-500/20 group transition-transform hover:-translate-y-1">
+              <div className="rounded-3xl bg-slate-600 p-6 text-white shadow-xl shadow-slate-600/20 group transition-transform hover:-translate-y-1">
                 <div className="flex items-center justify-between opacity-80 mb-4">
-                    <p className="text-sm font-black uppercase tracking-wider">En congé</p>
-                    <ActivityIcon className="h-6 w-6" />
+                    <p className="text-sm font-black uppercase tracking-wider">Inactifs</p>
+                    <Users className="h-6 w-6" />
                 </div>
-                <p className="text-5xl font-black">{stats.onLeave}</p>
+                <p className="text-5xl font-black">{stats.inactive}</p>
               </div>
         </div>
 
@@ -792,7 +760,6 @@ return;
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Téléphone</th>
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Statut</th>
                   <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Équipe / Responsable</th>
-                  <th className="px-6 py-5 font-black uppercase tracking-wider text-slate-400 text-[10px]">Compétences</th>
                   <th className="px-6 py-5 text-right font-black uppercase tracking-wider text-slate-400 text-[10px]">Actions</th>
                 </tr>
               </thead>
@@ -825,9 +792,7 @@ return;
                           className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-black uppercase tracking-tight ${
                             row.status === 'Actif'
                               ? 'bg-emerald-100 text-emerald-700'
-                              : row.status === 'Congé'
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-slate-200 text-slate-700'
+                              : 'bg-slate-200 text-slate-700'
                           }`}
                         >
                           {row.status}
@@ -853,15 +818,6 @@ return;
                         ) : (
                           <span className="text-[11px] text-slate-400 italic">Non assigné</span>
                         )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {row.skillsList.map((skill) => (
-                            <span key={skill} className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600 uppercase border border-blue-100">
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-wrap justify-end gap-1">
@@ -1034,7 +990,7 @@ return;
                           <div className="text-xs text-slate-500">
                             {isAssignedToOther
                               ? `Assigné à ${users.find(u => u.id === worker.engineer_id)?.name || 'un autre ingénieur'}`
-                              : worker.skills || 'Polyvalent'}
+                              : worker.email}
                           </div>
                         </div>
                       </label>
