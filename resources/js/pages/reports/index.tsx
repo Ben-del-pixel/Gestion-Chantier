@@ -24,6 +24,8 @@ export default function ReportsIndex({
     const page = usePage().props as { auth?: { user?: { role?: string } } };
     const isWorker = page.auth?.user?.role === UserRole.Worker.value;
     const isManager = page.auth?.user?.role === UserRole.Manager.value;
+    const isEngineer = page.auth?.user?.role === UserRole.Engineer.value;
+    const showBudget = !isEngineer;
     const analyticsReportTypes = useMemo(
         () =>
             isManager
@@ -525,7 +527,7 @@ export default function ReportsIndex({
                         </CardHeader>
                         <CardContent>
                             {selectedReport === 'global' && <GlobalReport data={reportData.data} formatCurrency={formatCurrency} />}
-                            {selectedReport === 'project' && <ProjectReport data={reportData.data} formatCurrency={formatCurrency} />}
+                            {selectedReport === 'project' && <ProjectReport data={reportData.data} formatCurrency={formatCurrency} showBudget={showBudget} />}
                             {selectedReport === 'worker' && <WorkerReport data={reportData.data} />}
                             {selectedReport === 'activities' && <ActivitiesReport data={reportData.data} />}
                         </CardContent>
@@ -569,7 +571,7 @@ function GlobalReport({ data, formatCurrency }: any) {
     );
 }
 
-function ProjectReport({ data, formatCurrency }: any) {
+function ProjectReport({ data, formatCurrency, showBudget = true }: { data: any[]; formatCurrency: (n: number) => string; showBudget?: boolean }) {
     return (
         <div className="space-y-4">
             {data.length === 0 ? (
@@ -591,10 +593,12 @@ function ProjectReport({ data, formatCurrency }: any) {
                                     <span className="text-xs text-muted-foreground">Dates</span>
                                     <p className="text-sm mt-1">{project.start_date} a {project.deadline}</p>
                                 </div>
+                                {showBudget && (
                                 <div>
                                     <span className="text-xs text-muted-foreground">Budget</span>
                                     <p className="text-sm font-bold mt-1">{formatCurrency(project.budget)}</p>
                                 </div>
+                                )}
                                 <div>
                                     <span className="text-xs text-muted-foreground">Taches</span>
                                     <p className="text-sm mt-1">{project.completed_tasks}/{project.total_tasks}</p>

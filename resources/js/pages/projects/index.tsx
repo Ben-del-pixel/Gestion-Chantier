@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/select';
 import { UserRole } from '@/Enums/UserRole';
 import { useCurrency } from '@/lib/currency';
+import { cn } from '@/lib/utils';
 
 type ProjectStepItem = {
   id: number;
@@ -122,15 +123,18 @@ export default function ProjectsIndex({
   engineers,
   storekeepers = [],
   projectDeadlineAlerts,
+  canViewBudget = true,
 }: {
   projects: ProjectItem[];
   engineers: Array<{ id: number; name: string }>;
   storekeepers?: Array<{ id: number; name: string }>;
   projectDeadlineAlerts?: ProjectDeadlineAlertsShape | null;
+  canViewBudget?: boolean;
 }) {
   const page = usePage().props as any;
   const canCreateProject = page?.auth?.user?.role === UserRole.Manager.value;
   const isManager = canCreateProject;
+  const showBudget = canViewBudget;
   const { currency, setCurrency, formatCurrency, rate, setRate } = useCurrency();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('all');
@@ -708,7 +712,7 @@ export default function ProjectsIndex({
 
         <ProjectDeadlineAlertsBanner alerts={projectDeadlineAlerts ?? undefined} />
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <div className={cn('grid grid-cols-1 gap-4', showBudget ? 'md:grid-cols-5' : 'md:grid-cols-3')}>
               <div className="rounded-3xl bg-blue-500 p-6 text-white shadow-xl shadow-blue-500/20 group transition-transform hover:-translate-y-1">
                 <div className="flex items-center justify-between opacity-80 mb-4">
                     <p className="text-[10px] font-black uppercase tracking-wider">Total Chantiers</p>
@@ -730,6 +734,8 @@ export default function ProjectsIndex({
                 </div>
                 <p className="text-4xl font-black">{stats.completed}</p>
               </div>
+              {showBudget && (
+                <>
               <div className="rounded-3xl bg-amber-500 p-6 text-white shadow-xl shadow-amber-500/20 group transition-transform hover:-translate-y-1">
                 <div className="flex items-center justify-between opacity-80 mb-4">
                     <p className="text-[10px] font-black uppercase tracking-wider">Budget Global</p>
@@ -744,6 +750,8 @@ export default function ProjectsIndex({
                 </div>
                 <p className="text-3xl font-black">{formatCurrency(stats.totalSpent)}</p>
               </div>
+                </>
+              )}
         </div>
 
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
@@ -803,6 +811,7 @@ export default function ProjectsIndex({
                       </div>
                     </div>
 
+                    {showBudget && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[11px] font-black uppercase text-slate-400">
                         <span>Consommation Budget</span>
@@ -820,6 +829,7 @@ export default function ProjectsIndex({
                         <span className="text-slate-400">{formatCurrency(project.budget)}</span>
                       </div>
                     </div>
+                    )}
                 </div>
 
                 {/* Étapes avec validation */}
@@ -850,9 +860,11 @@ export default function ProjectsIndex({
                           <span className={`flex-1 truncate ${step.is_completed ? 'line-through opacity-60' : ''}`}>
                             {step.name}
                           </span>
+                          {showBudget && (
                           <span className="text-[10px] font-bold opacity-70">
                             {formatCurrency(Number(step.budget))}
                           </span>
+                          )}
                         </button>
                       ))}
                     </div>

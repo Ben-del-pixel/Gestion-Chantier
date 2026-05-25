@@ -59,6 +59,7 @@ class ProjectController extends Controller
             'engineers' => $engineers,
             'storekeepers' => $storekeepers,
             'projectDeadlineAlerts' => ProjectDeadlineAlerts::fromProjects($projects),
+            'canViewBudget' => $user->role !== UserRole::Engineer,
         ]);
     }
 
@@ -209,6 +210,7 @@ class ProjectController extends Controller
             'chefsChantier' => $chefsChantier,
             'storekeepers' => $storekeepers,
             'allWorkers' => $allWorkers,
+            'canViewBudget' => $viewer->role !== UserRole::Engineer,
         ]);
     }
 
@@ -280,7 +282,7 @@ class ProjectController extends Controller
         }
 
         if ($user->role === UserRole::Engineer) {
-            unset($projectData['engineer_id'], $projectData['storekeeper_id']);
+            unset($projectData['engineer_id'], $projectData['storekeeper_id'], $projectData['budget_consumed']);
             if (! empty($projectData['chef_chantier_id'])) {
                 $chef = User::find($projectData['chef_chantier_id']);
                 if (! $chef || $chef->role !== UserRole::ChefChantier || (int) $chef->engineer_id !== (int) $user->id) {
@@ -336,28 +338,39 @@ class ProjectController extends Controller
 
         if ($request->has('steps')) {
             $existingStepIds = [];
+
             foreach ($validated['steps'] as $index => $stepData) {
                 if (isset($stepData['id'])) {
                     $step = $project->steps()->find($stepData['id']);
+
                     if ($step) {
-                        $step->update([
+                        $stepPayload = [
                             'name' => $stepData['name'],
-                            'budget' => $stepData['budget'] ?? 0,
                             'order' => $index + 1,
-                        ]);
+                        ];
+
+                        if ($user->role !== UserRole::Engineer) {
+                            $stepPayload['budget'] = $stepData['budget'] ?? 0;
+                        }
+
+                        $step->update($stepPayload);
                         $existingStepIds[] = $step->id;
                     }
                 } else {
                     $newStep = $project->steps()->create([
                         'name' => $stepData['name'],
-                        'budget' => $stepData['budget'] ?? 0,
+                        'budget' => $user->role === UserRole::Engineer ? 0 : ($stepData['budget'] ?? 0),
                         'order' => $index + 1,
                     ]);
                     $existingStepIds[] = $newStep->id;
                 }
             }
+
             $project->steps()->whereNotIn('id', $existingStepIds)->delete();
-            $project->syncBudgetFromSteps();
+
+            if ($user->role !== UserRole::Engineer) {
+                $project->syncBudgetFromSteps();
+            }
         }
 
         ActivityLog::create([

@@ -20,12 +20,21 @@ import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
-export default function ProjectDetail({ project, totalWorkersCount, engineers, chefsChantier, storekeepers }: any) {
+export default function ProjectDetail({
+    project,
+    totalWorkersCount,
+    engineers,
+    chefsChantier,
+    storekeepers,
+    canViewBudget = true,
+}: any) {
     const { currency, setCurrency, formatCurrency } = useCurrency();
     const pageProps = usePage().props as any;
     const { errors }: any = pageProps;
     const user = pageProps?.auth?.user;
     const isManager = user?.role === 'manager';
+    const isEngineer = user?.role === 'engineer';
+    const showBudget = canViewBudget;
 
     const assignableForTasks = useMemo(() => {
         const list = project.workers ? [...project.workers] : [];
@@ -111,7 +120,18 @@ return 'Non défini';
 
     setIsLoading(true);
 
-    router.put(`/projects/${project.id}`, formData, {
+    const payload = isEngineer
+      ? {
+          ...formData,
+          budget_consumed: project.budget_consumed ?? 0,
+          steps: formData.steps.map((step: { id?: number; name: string; budget?: number }) => ({
+            id: step.id,
+            name: step.name,
+          })),
+        }
+      : formData;
+
+    router.put(`/projects/${project.id}`, payload, {
       onSuccess: () => {
         setIsEditing(false);
         setIsLoading(false);
@@ -317,9 +337,13 @@ return 'Non défini';
         </div>
 
         {/* Top Grid: Major Stats */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className={cn('grid grid-cols-1 gap-5 sm:grid-cols-2', showBudget ? 'lg:grid-cols-5' : 'lg:grid-cols-3')}>
+          {showBudget && (
+            <>
           <DetailStatCard title="Budget Total" value={formatCurrency(Number(project.budget || 0))} icon={Wallet} color="emerald" sub="Financement alloué" />
           <DetailStatCard title="Budget Consommé" value={formatCurrency(Number(project.budget_consumed || 0))} icon={DollarSign} color="amber" sub={`${project.progress || 0}% du budget`} />
+            </>
+          )}
           <DetailStatCard title="Main d'œuvre" value={totalWorkersCount} icon={Users} color="blue" sub="Ouvriers actifs" />
           <DetailStatCard title="Date Butoir" value={formatDate(project.deadline)} icon={Clock} color="rose" sub="Échéance prévue" />
           <DetailStatCard title="Localisation" value="Site Central" icon={MapPin} color="slate" sub="Lieu du chantier" />
@@ -465,7 +489,7 @@ return 'Non défini';
                                                 <div className="min-w-0">
                                                     <h4 className={`font-bold ${step.is_completed ? 'text-emerald-700 line-through' : 'text-slate-900'}`}>{step.name}</h4>
                                                     <p className="text-xs font-bold uppercase tracking-tighter text-slate-400">
-                                                        {step.is_completed ? 'Étape terminée' : `Budget phase ${idx + 1}`}
+                                                        {step.is_completed ? 'Étape terminée' : showBudget ? `Budget phase ${idx + 1}` : `Phase ${idx + 1}`}
                                                         {stepTasks.length > 0 && (
                                                             <span className="ml-2 normal-case text-blue-600">
                                                                 · {stepTasks.length} tâche{stepTasks.length > 1 ? 's' : ''}
@@ -491,6 +515,7 @@ return 'Non défini';
                                                     Créer tâche
                                                 </Button>
                                             )}
+                                            {showBudget ? (
                                             <div className="text-right">
                                                 <div className={`text-lg font-black ${step.is_completed ? 'text-emerald-500' : 'text-emerald-600'}`}>
                                                     {formatCurrency(Number(step.budget || 0))}
@@ -502,6 +527,11 @@ return 'Non défini';
                                                     {step.is_completed ? 'Consommé' : 'Planifié'}
                                                 </div>
                                             </div>
+                                            ) : (
+                                            <Badge variant="outline" className="text-[10px] font-bold uppercase">
+                                                {step.is_completed ? 'Terminée' : 'En cours'}
+                                            </Badge>
+                                            )}
                                         </div>
                                     </div>
                                     {isExpanded && (
@@ -766,28 +796,32 @@ return 'Non défini';
                                     <Input type="number" min="0" max="100" value={formData.progress} onChange={e => setFormData({...formData, progress: parseInt(e.target.value) || 0})} className="h-12 rounded-xl focus:ring-blue-500/20" />
                                 </div>
                             </div>
+                            {showBudget && (
                             <div className="space-y-2">
                                 <Label className="text-xs font-black uppercase text-slate-400">Budget Consommé ({currency})</Label>
                                 <Input type="number" min="0" value={formData.budget_consumed} onChange={e => setFormData({...formData, budget_consumed: parseFloat(e.target.value) || 0})} className="h-12 rounded-xl focus:ring-blue-500/20" />
                             </div>
+                            )}
                         </div>
                     </div>
 
                     <div className="space-y-6">
                         <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                             <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
-                                <LayoutGrid className="h-3 w-3" /> Étapes & Budgets
+                                <LayoutGrid className="h-3 w-3" /> {showBudget ? 'Étapes & Budgets' : 'Étapes du projet'}
                             </h3>
                             <Button type="button" variant="outline" size="sm" onClick={addStep} className="h-8 rounded-lg text-[11px] font-black italic">
                                 + AJOUTER ÉTAPE
                             </Button>
                         </div>
 
+                        {showBudget && (
                         <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
                             <p className="text-[10px] font-black uppercase text-emerald-700/80">Budget total (somme des étapes)</p>
                             <p className="text-xl font-black text-emerald-900">{formatCurrency(totalBudgetFromSteps)}</p>
                             <p className="text-[10px] text-emerald-800/70 italic">Non modifiable directement — ajustez le budget de chaque étape.</p>
                         </div>
+                        )}
 
                         <div className="space-y-3">
                             {formData.steps.map((step: any, idx: number) => (
@@ -796,10 +830,12 @@ return 'Non défini';
                                         <Label className="text-[10px] font-black uppercase text-slate-400">Titre Phase {idx + 1}</Label>
                                         <Input value={step.name} onChange={e => updateStep(idx, 'name', e.target.value)} className="h-10 border-0 bg-transparent text-sm font-black focus:ring-0 px-0 rounded-none border-b border-transparent focus:border-emerald-500" placeholder="Ex: Fondations..." />
                                     </div>
+                                    {showBudget && (
                                     <div className="w-40 space-y-2">
                                         <Label className="text-[10px] font-black uppercase text-slate-400">Budget ({currency})</Label>
                                         <Input type="number" value={step.budget} onChange={e => updateStep(idx, 'budget', e.target.value)} className="h-10 border-0 bg-transparent text-sm font-black text-emerald-600 focus:ring-0 px-0 rounded-none border-b border-transparent focus:border-emerald-500" />
                                     </div>
+                                    )}
                                     <Button type="button" variant="ghost" size="icon" onClick={() => removeStep(idx)} className="h-10 w-10 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>

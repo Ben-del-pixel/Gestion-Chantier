@@ -217,6 +217,42 @@ test('manager cannot create project material without valid step index', function
     expect(Material::where('name', 'Ciment')->exists())->toBeFalse();
 });
 
+test('engineer cannot change project or step budgets on update', function () {
+    $engineer = User::factory()->create(['role' => UserRole::Engineer]);
+    $project = Project::factory()->create([
+        'engineer_id' => $engineer->id,
+        'budget' => 8000,
+        'budget_consumed' => 500,
+    ]);
+    $step = $project->steps()->create([
+        'name' => 'Phase A',
+        'budget' => 8000,
+        'order' => 1,
+    ]);
+
+    $this->actingAs($engineer)
+        ->from(route('projects.show', $project))
+        ->put(route('projects.update', $project), [
+            'budget_consumed' => 9999,
+            'steps' => [
+                [
+                    'id' => $step->id,
+                    'name' => 'Phase A renommée',
+                    'budget' => 1,
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $project->refresh();
+    $step->refresh();
+
+    expect((float) $project->budget)->toBe(8000.0);
+    expect((float) $project->budget_consumed)->toBe(500.0);
+    expect((float) $step->budget)->toBe(8000.0);
+    expect($step->name)->toBe('Phase A renommée');
+});
+
 test('project update recalculates budget from steps and ignores direct budget field', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $project = Project::factory()->create([
