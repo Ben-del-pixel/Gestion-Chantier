@@ -37,8 +37,6 @@ export default function AttendanceIndex({
   );
   const [attendances, setAttendances] = useState(initialAttendances);
   const [showCheckIn, setShowCheckIn] = useState(false);
-  const [showAssignWorkers, setShowAssignWorkers] = useState(false);
-  const [showInitialize, setShowInitialize] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -54,8 +52,6 @@ export default function AttendanceIndex({
   const defaultStatus = statuses?.length > 0 ? statuses[0].value : 'present';
 
   const [checkInData, setCheckInData] = useState({ user_id: '', project_id: '', status: defaultStatus });
-  const [selectedProjectForAssign, setSelectedProjectForAssign] = useState('');
-  const [selectedWorkersForAssign, setSelectedWorkersForAssign] = useState<number[]>([]);
 
   const refreshAttendances = async () => {
     setRefreshing(true);
@@ -172,23 +168,6 @@ return '-';
           
           <div className="flex flex-wrap gap-3">
             {canManageAttendance && (
-              <>
-            <Button 
-                onClick={() => setShowAssignWorkers(true)} 
-                variant="outline" 
-                className="h-11 rounded-xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
-            >
-              <Users className="mr-2 h-4 w-4 text-blue-500" />
-              Assignations
-            </Button>
-            <Button 
-                onClick={() => setShowInitialize(true)} 
-                variant="outline" 
-                className="h-11 rounded-xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
-            >
-              <Calendar className="mr-2 h-4 w-4 text-emerald-500" />
-              Initialiser Journée
-            </Button>
             <Button 
                 onClick={() => setShowCheckIn(true)} 
                 className="h-11 rounded-xl bg-blue-600 px-6 font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 hover:scale-[1.02]"
@@ -196,7 +175,6 @@ return '-';
               <Plus className="mr-2 h-5 w-5" />
               Nouveau Pointage
             </Button>
-              </>
             )}
           </div>
         </div>
