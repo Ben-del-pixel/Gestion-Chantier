@@ -377,7 +377,9 @@ export const EngineerDashboard = ({
     projectDeadlineAlerts = null,
     receivedWorkerIncidents = [],
     canResolveWorkerIncidents = false,
+    canViewBudget = true,
 }: any) => {
+    const showBudget = canViewBudget;
     const [selectedDate, setSelectedDate] = React.useState(attendanceDate || new Date().toISOString().slice(0, 10));
     const [selectedProjectId, setSelectedProjectId] = React.useState<string>(
         attendanceProjects[0]?.id ? String(attendanceProjects[0].id) : ''
@@ -731,6 +733,13 @@ export const EngineerDashboard = ({
             </div>
 
             <ProjectDeadlineAlertsBanner alerts={projectDeadlineAlerts} />
+
+            {!showBudget && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <StatCard icon={ClipboardCheck} title="Missions actives" value={stats?.active_tasks || 0} subValue="Tâches en cours sur vos chantiers" />
+                <StatCard icon={HardHat} title="Personnel suivi" value={stats?.total_workers_under || 0} subValue="Ouvriers sur vos projets" />
+            </div>
+            )}
 
             <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
                 <CardHeader>

@@ -52,6 +52,18 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
+test('engineer dashboard does not expose budget visibility flag', function () {
+    $engineer = User::factory()->create(['role' => UserRole::Engineer]);
+
+    $this->actingAs($engineer)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('dashboard')
+            ->where('canViewBudget', false)
+        );
+});
+
 test('engineer dashboard includes attendance management props', function () {
     $engineer = User::factory()->create(['role' => 'engineer']);
     $magasinier = User::factory()->create(['role' => 'magasinier']);

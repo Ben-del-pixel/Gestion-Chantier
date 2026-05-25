@@ -29,6 +29,32 @@ test('chef de chantier sees their projects on reports index', function () {
         );
 });
 
+test('engineer projects index hides budget fields', function () {
+    $engineer = User::factory()->create(['role' => UserRole::Engineer]);
+    $project = Project::factory()->create([
+        'engineer_id' => $engineer->id,
+        'budget' => 75000,
+        'budget_consumed' => 12000,
+    ]);
+    $project->steps()->create([
+        'name' => 'Fondations',
+        'budget' => 75000,
+        'order' => 1,
+    ]);
+
+    $this->actingAs($engineer)
+        ->get(route('projects.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/index')
+            ->where('canViewBudget', false)
+            ->has('projects', 1)
+            ->missing('projects.0.budget')
+            ->missing('projects.0.budget_consumed')
+            ->missing('projects.0.steps.0.budget')
+        );
+});
+
 test('engineer cannot delete a project', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $engineer = User::factory()->create(['role' => UserRole::Engineer]);

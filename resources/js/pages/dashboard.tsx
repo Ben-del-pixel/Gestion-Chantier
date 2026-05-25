@@ -44,6 +44,7 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         projectDeadlineAlerts={projectDeadlineAlerts}
                         receivedWorkerIncidents={pageProps.receivedWorkerIncidents ?? []}
                         canResolveWorkerIncidents={pageProps.canResolveWorkerIncidents ?? false}
+                        canViewBudget={pageProps.canViewBudget ?? false}
                     />
                 )}
                 {roleValue === UserRole.ChefChantier.value && (

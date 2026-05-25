@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\ProjectDeadlineAlerts;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -53,6 +54,10 @@ class ProjectController extends Controller
         $storekeepers = $user->role === UserRole::Manager
             ? User::where('role', UserRole::Magasinier)->orderBy('name')->get(['id', 'name'])
             : collect();
+
+        if ($user->role === UserRole::Engineer) {
+            $projects = $this->concealBudgetFromProjects($projects);
+        }
 
         return Inertia::render('projects/index', [
             'projects' => $projects,
@@ -202,6 +207,10 @@ class ProjectController extends Controller
 
         // Calculate total unique workers for the project (from workers relation or tasks)
         $totalWorkersCount = $project->workers->count();
+
+        if ($viewer->role === UserRole::Engineer) {
+            $this->concealBudgetFromProject($project);
+        }
 
         return Inertia::render('projects/show', [
             'project' => $project,
@@ -447,5 +456,24 @@ class ProjectController extends Controller
         $project->delete();
 
         return redirect()->route('projects.index')->with('success', 'Projet supprimé avec succès');
+    }
+
+    /**
+     * @param  Collection<int, Project>  $projects
+     * @return Collection<int, Project>
+     */
+    private function concealBudgetFromProjects(Collection $projects): Collection
+    {
+        return $projects->map(function (Project $project) {
+            $this->concealBudgetFromProject($project);
+
+            return $project;
+        });
+    }
+
+    private function concealBudgetFromProject(Project $project): void
+    {
+        $project->makeHidden(['budget', 'budget_consumed']);
+        $project->steps->each(fn (ProjectStep $step) => $step->makeHidden(['budget']));
     }
 }

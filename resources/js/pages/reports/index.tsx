@@ -24,8 +24,7 @@ export default function ReportsIndex({
     const page = usePage().props as { auth?: { user?: { role?: string } } };
     const isWorker = page.auth?.user?.role === UserRole.Worker.value;
     const isManager = page.auth?.user?.role === UserRole.Manager.value;
-    const isEngineer = page.auth?.user?.role === UserRole.Engineer.value;
-    const showBudget = !isEngineer;
+    const showBudget = page.canViewBudget ?? page.auth?.user?.role !== UserRole.Engineer.value;
     const analyticsReportTypes = useMemo(
         () =>
             isManager

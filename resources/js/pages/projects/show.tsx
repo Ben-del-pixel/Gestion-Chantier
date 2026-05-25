@@ -34,7 +34,7 @@ export default function ProjectDetail({
     const user = pageProps?.auth?.user;
     const isManager = user?.role === 'manager';
     const isEngineer = user?.role === 'engineer';
-    const showBudget = canViewBudget;
+    const showBudget = canViewBudget ?? pageProps?.canViewBudget ?? true;
 
     const assignableForTasks = useMemo(() => {
         const list = project.workers ? [...project.workers] : [];

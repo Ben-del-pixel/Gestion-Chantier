@@ -134,7 +134,7 @@ export default function ProjectsIndex({
   const page = usePage().props as any;
   const canCreateProject = page?.auth?.user?.role === UserRole.Manager.value;
   const isManager = canCreateProject;
-  const showBudget = canViewBudget;
+  const showBudget = canViewBudget ?? page?.canViewBudget ?? true;
   const { currency, setCurrency, formatCurrency, rate, setRate } = useCurrency();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('all');
