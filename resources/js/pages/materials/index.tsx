@@ -64,11 +64,17 @@ type StorekeeperAllocationGroup = {
     projects: ProjectAllocationDetail[];
 };
 
+type ProjectStepOption = {
+    id: number;
+    name: string;
+};
+
 type ProjectItem = {
     id: number;
     name: string;
     storekeeper_id?: number | null;
     storekeeper_name?: string | null;
+    steps?: ProjectStepOption[];
 };
 
 type MaterialMovement = {
@@ -149,6 +155,7 @@ export default function MaterialsIndex({
         type: 'materiaux' as 'materiel' | 'materiaux',
         category: '',
         project_id: '',
+        project_step_id: '',
     });
     const [allocationFormData, setAllocationFormData] = React.useState({
         material_id: '',
@@ -220,15 +227,36 @@ export default function MaterialsIndex({
     }, [normalizedMaterials, searchTerm]);
 
     const projectsWithStorekeeper = React.useMemo(
-        () => projects.filter((p) => p.storekeeper_id != null && p.storekeeper_id !== ''),
+        () => projects.filter(
+            (p) => p.storekeeper_id != null && p.storekeeper_id !== '' && (p.steps?.length ?? 0) > 0,
+        ),
         [projects],
     );
 
+    const stepsForMaterialForm = React.useMemo(() => {
+        if (editingMaterial) {
+            return [];
+        }
+
+        if (isManager) {
+            const project = projectsWithStorekeeper.find(
+                (p) => p.id.toString() === formData.project_id,
+            );
+
+            return project?.steps ?? [];
+        }
+
+        return projects[0]?.steps ?? [];
+    }, [editingMaterial, isManager, formData.project_id, projects, projectsWithStorekeeper]);
+
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
+        const { name, value } = e.target;
+
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+            ...(name === 'project_id' ? { project_step_id: '' } : {}),
+        }));
     };
 
     const handleAllocationFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -243,6 +271,12 @@ export default function MaterialsIndex({
 
         if (isManager && !editingMaterial && !formData.project_id) {
             alert('Sélectionnez un chantier pour lequel un magasinier responsable est déjà affecté.');
+
+            return;
+        }
+
+        if (!editingMaterial && !formData.project_step_id) {
+            alert('Sélectionnez une étape du chantier pour ce matériau.');
 
             return;
         }
@@ -265,7 +299,16 @@ export default function MaterialsIndex({
                 method,
                 data: payload,
                 onSuccess: () => {
-                    setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '', project_id: '' });
+                    setFormData({
+                        name: '',
+                        description: '',
+                        quantity_in_stock: '',
+                        unit: 'sacs',
+                        type: 'materiaux',
+                        category: '',
+                        project_id: '',
+                        project_step_id: '',
+                    });
                     setEditingMaterial(null);
                     setOpenDialog(false);
                     alert(editingMaterial ? 'Matériel mis à jour avec succès' : 'Matériel créé avec succès');
@@ -294,6 +337,7 @@ export default function MaterialsIndex({
             type: material.type || 'materiaux',
             category: material.category || '',
             project_id: '',
+            project_step_id: '',
         });
         setOpenDialog(true);
     };
@@ -538,11 +582,10 @@ export default function MaterialsIndex({
                                         <Label htmlFor="material-project">Chantier (magasinier responsable) *</Label>
                                         {projectsWithStorekeeper.length === 0 ? (
                                             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                                Aucun chantier n&apos;a encore de magasinier assigné.{' '}
+                                                Aucun chantier prêt : il faut un magasinier assigné et au moins une étape.{' '}
                                                 <Link href={projectsIndex.url()} className="font-bold underline">
                                                     Ouvrir les projets
-                                                </Link>{' '}
-                                                pour affecter un magasinier au chantier, puis créez le matériau.
+                                                </Link>
                                             </div>
                                         ) : (
                                             <>
@@ -563,9 +606,38 @@ export default function MaterialsIndex({
                                                     ))}
                                                 </select>
                                                 <p className="text-xs text-slate-500">
-                                                    Le stock est enregistré sous le magasinier déjà affecté à ce chantier (comme pour l&apos;affectation terrain).
+                                                    Le stock est enregistré sous le magasinier déjà affecté à ce chantier.
                                                 </p>
                                             </>
+                                        )}
+                                    </div>
+                                )}
+
+                                {!editingMaterial && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="material-step">Étape du chantier *</Label>
+                                        {stepsForMaterialForm.length === 0 ? (
+                                            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                                {isManager && !formData.project_id
+                                                    ? 'Choisissez d\'abord un chantier.'
+                                                    : 'Ce chantier n\'a pas encore d\'étape. Ajoutez-en une sur la fiche du chantier.'}
+                                            </p>
+                                        ) : (
+                                            <select
+                                                id="material-step"
+                                                name="project_step_id"
+                                                value={formData.project_step_id}
+                                                onChange={handleFormChange}
+                                                required
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                            >
+                                                <option value="">-- Choisir une étape --</option>
+                                                {stepsForMaterialForm.map((step) => (
+                                                    <option key={step.id} value={step.id.toString()}>
+                                                        {step.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         )}
                                     </div>
                                 )}
@@ -573,7 +645,7 @@ export default function MaterialsIndex({
                                 <div className="flex justify-end gap-2 pt-2">
                                     <DialogClose asChild>
                                         <Button type="button" variant="outline" onClick={() => {
-  setEditingMaterial(null); setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '', project_id: '' }); 
+  setEditingMaterial(null); setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '', project_id: '', project_step_id: '' }); 
 }}>Annuler</Button>
                                     </DialogClose>
                                     <Button
@@ -581,6 +653,7 @@ export default function MaterialsIndex({
                                         disabled={
                                             isSubmitting
                                             || (isManager && !editingMaterial && projectsWithStorekeeper.length === 0)
+                                            || (!editingMaterial && stepsForMaterialForm.length === 0)
                                         }
                                     >
                                         {isSubmitting ? 'Enregistrement...' : (editingMaterial ? 'Modifier' : 'Créer')}

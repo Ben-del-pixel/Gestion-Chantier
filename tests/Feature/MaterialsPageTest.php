@@ -3,9 +3,19 @@
 use App\Enums\UserRole;
 use App\Models\Material;
 use App\Models\Project;
+use App\Models\ProjectStep;
 use App\Models\ResourceRequest;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+
+function materialTestStep(Project $project, string $name = 'Phase 1'): ProjectStep
+{
+    return $project->steps()->create([
+        'name' => $name,
+        'budget' => 1000,
+        'order' => 1,
+    ]);
+}
 
 test('guests are redirected to login when visiting materials page', function () {
     $this->get(route('materials.index'))->assertRedirect(route('login'));
@@ -36,6 +46,7 @@ test('authenticated users can view materials page', function () {
 test('magasinier can create a material', function () {
     $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
     $project = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
+    $step = materialTestStep($project);
 
     $this->actingAs($magasinier)
         ->post(route('materials.store'), [
@@ -45,6 +56,7 @@ test('magasinier can create a material', function () {
             'unit' => 'sacs',
             'type' => 'materiaux',
             'category' => 'construction',
+            'project_step_id' => $step->id,
         ])
         ->assertRedirect(route('materials.index'));
 
@@ -54,6 +66,28 @@ test('magasinier can create a material', function () {
         'unit' => 'sacs',
         'project_id' => $project->id,
         'storekeeper_id' => $magasinier->id,
+    ]);
+});
+
+test('cannot create a material without project step', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $storekeeper = User::factory()->create(['role' => UserRole::Magasinier]);
+    $project = Project::factory()->create(['storekeeper_id' => $storekeeper->id]);
+    materialTestStep($project);
+
+    $this->actingAs($manager)
+        ->from(route('materials.index'))
+        ->post(route('materials.store'), [
+            'name' => 'Sans étape',
+            'quantity_in_stock' => 1,
+            'unit' => 'sacs',
+            'type' => 'materiaux',
+            'project_id' => $project->id,
+        ])
+        ->assertSessionHasErrors('project_step_id');
+
+    $this->assertDatabaseMissing('materials', [
+        'name' => 'Sans étape',
     ]);
 });
 
@@ -103,6 +137,7 @@ test('manager can create a material', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $storekeeper = User::factory()->create(['role' => UserRole::Magasinier]);
     $project = Project::factory()->create(['storekeeper_id' => $storekeeper->id]);
+    $step = materialTestStep($project);
 
     $this->actingAs($manager)
         ->post(route('materials.store'), [
@@ -113,6 +148,7 @@ test('manager can create a material', function () {
             'type' => 'materiaux',
             'category' => 'construction',
             'project_id' => $project->id,
+            'project_step_id' => $step->id,
         ])
         ->assertRedirect(route('materials.index'));
 

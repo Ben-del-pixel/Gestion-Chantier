@@ -587,13 +587,30 @@ export default function ProjectsIndex({
                   </div>
 
                   <div className="space-y-3 border-t pt-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">Matériaux (optionnel)</Label>
-                      <Button type="button" variant="outline" size="sm" onClick={addMaterial}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <Label className="text-base font-semibold">Matériaux (optionnel)</Label>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          Chaque matériau doit être rattaché à une étape.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addMaterial}
+                        disabled={!canAddMaterial}
+                      >
                         <Plus className="mr-1 h-3 w-3" />
                         Ajouter matériau
                       </Button>
                     </div>
+
+                    {!canAddMaterial && (
+                      <p className="text-xs text-amber-700 italic">
+                        Définissez au moins une étape nommée pour pouvoir ajouter des matériaux.
+                      </p>
+                    )}
 
                     {formData.materials.length > 0 ? (
                       <div className="space-y-3">
@@ -611,11 +628,29 @@ export default function ProjectsIndex({
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
+                            <div>
+                              <Label className="text-xs text-slate-500">Étape *</Label>
+                              <select
+                                value={material.step_index}
+                                onChange={(e) => handleMaterialChange(index, 'step_index', e.target.value)}
+                                className="mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                                required
+                              >
+                                {formData.steps.map((step, stepIndex) =>
+                                  step.name.trim() ? (
+                                    <option key={stepIndex} value={String(stepIndex)}>
+                                      {step.name.trim()}
+                                    </option>
+                                  ) : null,
+                                )}
+                              </select>
+                            </div>
                             <Input
                               value={material.name}
                               onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
                               placeholder="Nom (ex: Ciment)"
                               className="h-9"
+                              required
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <Input
@@ -652,17 +687,20 @@ export default function ProjectsIndex({
                       </div>
                     ) : (
                       <p className="text-xs text-slate-500 italic">
-                        Ajoutez le stock initial du chantier dès la création.
+                        Ajoutez le stock initial du chantier après avoir défini les étapes.
                       </p>
                     )}
                   </div>
+                  </div>
 
-                  <div className="flex justify-end gap-2 pt-2">
+                  <DialogFooter className="shrink-0 gap-2 border-t bg-background px-6 py-4">
                     <DialogClose asChild>
                       <Button type="button" variant="outline">Annuler</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Création...' : 'Créer'}</Button>
-                  </div>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? 'Création...' : 'Créer'}
+                    </Button>
+                  </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>}

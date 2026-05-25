@@ -174,6 +174,7 @@ test('manager can create project with storekeeper and materials', function () {
                     'quantity_in_stock' => 50,
                     'unit' => 'sacs',
                     'type' => 'materiaux',
+                    'step_index' => 0,
                 ],
             ],
         ])
@@ -182,7 +183,38 @@ test('manager can create project with storekeeper and materials', function () {
     $project = Project::firstOrFail();
     expect($project->storekeeper_id)->toBe($magasinier->id);
     expect(Material::where('project_id', $project->id)->count())->toBe(1);
-    expect(Material::first()->name)->toBe('Ciment');
+    $material = Material::first();
+    expect($material->name)->toBe('Ciment');
+    expect($material->project_step_id)->toBe($project->steps()->first()->id);
+});
+
+test('manager cannot create project material without valid step index', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+
+    $this->actingAs($manager)
+        ->from(route('projects.index'))
+        ->post(route('projects.store'), [
+            'name' => 'Chantier invalide',
+            'start_date' => now()->toDateString(),
+            'deadline' => now()->addDays(30)->toDateString(),
+            'storekeeper_id' => $magasinier->id,
+            'steps' => [
+                ['name' => 'Phase 1', 'budget' => 2000],
+            ],
+            'materials' => [
+                [
+                    'name' => 'Ciment',
+                    'quantity_in_stock' => 50,
+                    'unit' => 'sacs',
+                    'type' => 'materiaux',
+                    'step_index' => 5,
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors('materials');
+
+    expect(Material::where('name', 'Ciment')->exists())->toBeFalse();
 });
 
 test('project update recalculates budget from steps and ignores direct budget field', function () {
