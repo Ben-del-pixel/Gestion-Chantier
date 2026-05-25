@@ -1,5 +1,5 @@
 import { usePage } from '@inertiajs/react';
-import { AlertCircle, Calendar, CheckCircle2, Clock, MapPin } from 'lucide-react';
+import { AlertCircle, Calendar, Clock, MapPin } from 'lucide-react';
 import React from 'react';
 import { StatusBadge } from '@/components/tasks/status-badge';
 import { TaskExecuteButton } from '@/components/tasks/task-execute-button';
@@ -57,10 +57,8 @@ export function WorkerDashboard({
     const authenticatedUser = page?.auth?.user;
     const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().slice(0, 10));
     const [displayProjectFilter, setDisplayProjectFilter] = React.useState<'all' | string>('all');
-    const [pointageProjectId, setPointageProjectId] = React.useState('');
     const [showIncidentDialog, setShowIncidentDialog] = React.useState(false);
     const [isSubmittingIncident, setIsSubmittingIncident] = React.useState(false);
-    const [isSubmittingAttendance, setIsSubmittingAttendance] = React.useState(false);
     const [incidentForm, setIncidentForm] = React.useState({
         title: '',
         details: '',
@@ -82,14 +80,6 @@ export function WorkerDashboard({
             .map(([id, name]) => ({ id, name }))
             .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     }, [workerProjects, taskList]);
-
-    React.useEffect(() => {
-        if (chantiersOptions.length === 0 || pointageProjectId) {
-            return;
-        }
-
-        setPointageProjectId(String(chantiersOptions[0].id));
-    }, [chantiersOptions, pointageProjectId]);
 
     const filteredTasks = React.useMemo(() => {
         if (displayProjectFilter === 'all') {
@@ -129,86 +119,11 @@ export function WorkerDashboard({
     });
 
     const recentAttendances = workerAttendances.slice(0, 10);
-    const activeAttendance = workerAttendances.find((attendance: any) => !attendance.check_out);
-    const clockProjectId = activeAttendance?.project?.id ?? (pointageProjectId ? Number(pointageProjectId) : null);
 
-    const submitWorkerCheckIn = async () => {
-        if (!authenticatedUser?.id) {
-            alert('Utilisateur non authentifié.');
-
-            return;
-        }
-
-        if (!clockProjectId) {
-            alert('Sélectionnez le chantier pour le pointage.');
-
-            return;
-        }
-
-        setIsSubmittingAttendance(true);
-
-        try {
-            const response = await fetch('/attendance/check-in', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-                body: JSON.stringify({
-                    user_id: authenticatedUser?.id,
-                    project_id: clockProjectId,
-                    status: 'present',
-                }),
-            });
-
-            if (!response.ok) {
-                alert("Erreur lors du pointage d'arrivée.");
-
-                return;
-            }
-
-            window.location.reload();
-        } catch {
-            alert("Erreur réseau pendant le pointage d'arrivée.");
-        } finally {
-            setIsSubmittingAttendance(false);
-        }
-    };
-
-    const submitWorkerCheckOut = async () => {
-        if (!activeAttendance?.id) {
-            alert('Aucun pointage actif trouvé pour enregistrer la sortie.');
-
-            return;
-        }
-
-        setIsSubmittingAttendance(true);
-
-        try {
-            const response = await fetch(`/attendance/${activeAttendance.id}/check-out`, {
-                method: 'PUT',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            if (!response.ok) {
-                alert('Erreur lors du pointage de sortie.');
-
-                return;
-            }
-
-            window.location.reload();
-        } catch {
-            alert('Erreur réseau pendant le pointage de sortie.');
-        } finally {
-            setIsSubmittingAttendance(false);
-        }
-    };
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayAttendance = workerAttendances.find(
+        (attendance: { date?: string }) => String(attendance.date).slice(0, 10) === todayIso,
+    );
 
     const submitIncident = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -228,7 +143,7 @@ export function WorkerDashboard({
                     project_id:
                         displayProjectFilter !== 'all'
                             ? Number(displayProjectFilter)
-                            : (clockProjectId ?? primaryTask?.project?.id ?? null),
+                            : (primaryTask?.project?.id ?? null),
                 }),
             });
 
@@ -268,12 +183,41 @@ export function WorkerDashboard({
             <header className="flex flex-col gap-1 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight text-foreground">Ma mission</h1>
-                    <p className="text-sm text-muted-foreground">Pointage, tâches et signalements sur le terrain.</p>
+                    <p className="text-sm text-muted-foreground">Consultation de votre présence, tâches et signalements.</p>
                 </div>
             </header>
 
+            <div className="rounded-md border border-border bg-card p-4 sm:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-xs font-medium text-muted-foreground">Présence aujourd&apos;hui</p>
+                        {todayAttendance ? (
+                            <p className="mt-1 text-sm font-semibold text-foreground">
+                                {attendanceStatusLabel(todayAttendance.status)}
+                                {todayAttendance.project?.name ? ` — ${todayAttendance.project.name}` : ''}
+                            </p>
+                        ) : (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Aucun pointage enregistré pour aujourd&apos;hui (géré par le magasinier ou le manager).
+                            </p>
+                        )}
+                    </div>
+                    {todayAttendance && (
+                        <span
+                            className={cn(
+                                'inline-flex w-fit rounded-md border px-3 py-1.5 text-xs font-semibold',
+                                attendanceStatusClasses[todayAttendance.status] ??
+                                    'border-border bg-muted text-foreground',
+                            )}
+                        >
+                            {attendanceStatusLabel(todayAttendance.status)}
+                        </span>
+                    )}
+                </div>
+            </div>
+
             {chantiersOptions.length > 0 && (
-                <div className="grid gap-4 rounded-md border border-border bg-card p-4 sm:grid-cols-2 sm:p-5">
+                <div className="rounded-md border border-border bg-card p-4 sm:max-w-md sm:p-5">
                     <div className="space-y-1.5">
                         <Label htmlFor="worker-filter-chantier" className="text-xs font-medium text-muted-foreground">
                             Filtrer tâches et incidents
@@ -296,25 +240,6 @@ export function WorkerDashboard({
                             ))}
                         </select>
                     </div>
-                    {!activeAttendance && (
-                        <div className="space-y-1.5">
-                            <Label htmlFor="worker-pointage-chantier" className="text-xs font-medium text-muted-foreground">
-                                Chantier pour l&apos;arrivée / la sortie
-                            </Label>
-                            <select
-                                id="worker-pointage-chantier"
-                                value={pointageProjectId}
-                                onChange={(event) => setPointageProjectId(event.target.value)}
-                                className={fieldClass}
-                            >
-                                {chantiersOptions.map((c) => (
-                                    <option key={c.id} value={String(c.id)}>
-                                        {c.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -342,10 +267,12 @@ export function WorkerDashboard({
                                     </span>
                                 </div>
                             </div>
-                            <span className="inline-flex w-fit shrink-0 items-center gap-1.5 self-start rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
-                                <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
-                                En service
-                            </span>
+                            {todayAttendance?.status === 'present' && !todayAttendance?.check_out && (
+                                <span className="inline-flex w-fit shrink-0 items-center gap-1.5 self-start rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
+                                    <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+                                    Pointé présent
+                                </span>
+                            )}
                         </div>
                     ) : (
                         <p className="text-sm text-muted-foreground">Aucune mission assignée pour le moment.</p>
@@ -353,15 +280,6 @@ export function WorkerDashboard({
                 </section>
 
                 <div className="flex flex-col gap-3 lg:col-span-4 xl:col-span-5">
-                    <Button
-                        type="button"
-                        onClick={activeAttendance ? submitWorkerCheckOut : submitWorkerCheckIn}
-                        disabled={isSubmittingAttendance || (!activeAttendance && !clockProjectId)}
-                        className="h-10 w-full rounded-md font-medium lg:h-11"
-                    >
-                        {isSubmittingAttendance ? 'Traitement…' : activeAttendance ? 'Pointer la sortie' : "Pointer l'arrivée"}
-                        <CheckCircle2 className="ml-2 size-4" aria-hidden />
-                    </Button>
                     <Dialog open={showIncidentDialog} onOpenChange={setShowIncidentDialog}>
                         <DialogTrigger asChild>
                             <Button type="button" variant="outline" className="h-10 w-full rounded-md font-medium lg:h-11">
@@ -437,7 +355,9 @@ export function WorkerDashboard({
                 <Card className="flex min-h-0 flex-col rounded-md border border-border shadow-none">
                     <CardHeader className="space-y-0 border-b border-border px-4 py-3">
                         <CardTitle className="text-sm font-semibold">Présence</CardTitle>
-                        <CardDescription className="text-xs">Statistiques, détail par date et historique récent.</CardDescription>
+                        <CardDescription className="text-xs">
+                            Consultation seule — le pointage est enregistré par le magasinier ou le manager.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden p-4">
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

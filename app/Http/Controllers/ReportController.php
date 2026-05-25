@@ -21,6 +21,10 @@ class ReportController extends Controller
         $user = request()->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
 
+        if ($user->role === UserRole::Worker) {
+            abort(403, 'Les ouvriers ne peuvent pas accéder aux rapports.');
+        }
+
         // Filter projects based on user role
         if ($user->role === UserRole::ChefChantier) {
             $projects = Project::select('id', 'name')
@@ -75,7 +79,6 @@ class ReportController extends Controller
             'sentReports' => $sentReports,
             'potentialRecipients' => $potentialRecipients,
             'canSubmitReport' => in_array($userRoleValue, [
-                UserRole::Worker->value,
                 UserRole::Magasinier->value,
                 UserRole::Engineer->value,
                 UserRole::ChefChantier->value,
@@ -91,7 +94,6 @@ class ReportController extends Controller
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
 
         if (! in_array($userRoleValue, [
-            UserRole::Worker->value,
             UserRole::Magasinier->value,
             UserRole::Engineer->value,
             UserRole::ChefChantier->value,
@@ -285,6 +287,10 @@ class ReportController extends Controller
         $type = $validated['type'];
         $projectId = isset($validated['project_id']) ? (int) $validated['project_id'] : null;
         $workerId = isset($validated['worker_id']) ? (int) $validated['worker_id'] : null;
+
+        if ($role === UserRole::Worker) {
+            abort(403, 'Les ouvriers ne peuvent pas générer de rapports.');
+        }
 
         if ($role === UserRole::Manager) {
             return;

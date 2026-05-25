@@ -40,15 +40,6 @@ class AttendanceController extends Controller
             ->exists();
     }
 
-    private function workerBelongsToProject(Project $project, User $worker): bool
-    {
-        if ($worker->role !== UserRole::Worker) {
-            return false;
-        }
-
-        return $project->workers()->where('users.id', $worker->id)->exists();
-    }
-
     private function canRecordCheckIn(User $actor, Project $project, int $targetUserId): bool
     {
         if ($this->canManageAttendance($project, $actor)) {
@@ -59,22 +50,14 @@ class AttendanceController extends Controller
             return true;
         }
 
-        return $actor->role === UserRole::Worker
-            && (int) $actor->id === $targetUserId
-            && $this->workerBelongsToProject($project, $actor);
+        return false;
     }
 
     private function canRecordCheckOut(User $actor, Attendance $attendance): bool
     {
         $project = $attendance->project;
 
-        if ($this->canManageAttendance($project, $actor)) {
-            return true;
-        }
-
-        return $actor->role === UserRole::Worker
-            && (int) $attendance->user_id === (int) $actor->id
-            && $this->workerBelongsToProject($project, $actor);
+        return $this->canManageAttendance($project, $actor);
     }
 
     public function index(): Response

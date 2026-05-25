@@ -213,7 +213,7 @@ return '-';
             {currentRole === 'worker' ? (
               <>
                 <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Ma présence</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Pointages et tâches sur vos chantiers.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Consultation de votre présence et de vos tâches (lecture seule).</p>
               </>
             ) : (
               <>

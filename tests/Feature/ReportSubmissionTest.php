@@ -5,11 +5,15 @@ use App\Models\Project;
 use App\Models\ReportSubmission;
 use App\Models\User;
 
-it('worker submits report to engineer', function () {
+it('worker cannot access reports or submit', function () {
     $engineer = User::factory()->create(['role' => UserRole::Engineer]);
     $worker = User::factory()->create(['role' => UserRole::Worker]);
     $project = Project::factory()->create(['engineer_id' => $engineer->id]);
     $project->workers()->sync([$worker->id]);
+
+    $this->actingAs($worker)
+        ->get(route('reports.index'))
+        ->assertForbidden();
 
     $this->actingAs($worker)
         ->post(route('reports.submit'), [
@@ -17,14 +21,9 @@ it('worker submits report to engineer', function () {
             'content' => 'Progression du coffrage et verification des materiaux sur site.',
             'project_id' => $project->id,
         ])
-        ->assertRedirect(route('reports.index'));
+        ->assertForbidden();
 
-    $report = ReportSubmission::query()->latest('id')->first();
-
-    expect($report)->not->toBeNull();
-    expect($report->sender_id)->toBe($worker->id);
-    expect($report->recipient_id)->toBe($engineer->id);
-    expect($report->project_id)->toBe($project->id);
+    expect(ReportSubmission::query()->count())->toBe(0);
 });
 
 it('magasinier submits report to engineer', function () {

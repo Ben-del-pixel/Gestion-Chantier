@@ -154,27 +154,18 @@ test('chef cannot generate project report without project id', function () {
         ->assertStatus(422);
 });
 
-test('worker can generate project report for own project only', function () {
+test('worker cannot generate reports', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $worker = User::factory()->create(['role' => UserRole::Worker]);
     $project = Project::factory()->create(['manager_id' => $manager->id]);
     $project->workers()->sync([$worker->id]);
-
-    $other = Project::factory()->create(['manager_id' => $manager->id]);
-
-    $this->actingAs($worker)
-        ->postJson(route('reports.generate'), [
-            'type' => 'project',
-            'project_id' => $other->id,
-        ])
-        ->assertForbidden();
 
     $this->actingAs($worker)
         ->postJson(route('reports.generate'), [
             'type' => 'project',
             'project_id' => $project->id,
         ])
-        ->assertOk();
+        ->assertForbidden();
 });
 
 test('chef can generate worker report for worker on their project', function () {
