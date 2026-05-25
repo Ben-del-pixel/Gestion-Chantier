@@ -31,6 +31,11 @@ class ProjectStep extends Model
         return $this->hasMany(Task::class, 'project_step_id');
     }
 
+    public function materials(): HasMany
+    {
+        return $this->hasMany(Material::class, 'project_step_id');
+    }
+
     /**
      * Check if all sub-steps assigned to workers are completed
      */

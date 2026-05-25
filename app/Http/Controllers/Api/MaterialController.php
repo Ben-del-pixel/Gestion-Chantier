@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Material;
 use App\Models\MaterialMovement;
 use App\Models\Project;
+use App\Models\ProjectStep;
 use App\Models\ResourceRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -125,7 +126,10 @@ class MaterialController extends Controller
     private function projectsForMaterialsPage(User $user): Collection
     {
         $query = Project::query()
-            ->with('storekeeper:id,name')
+            ->with([
+                'storekeeper:id,name',
+                'steps' => fn ($q) => $q->select('id', 'project_id', 'name', 'order')->orderBy('order'),
+            ])
             ->select('id', 'name', 'storekeeper_id')
             ->orderBy('name');
 
@@ -138,6 +142,10 @@ class MaterialController extends Controller
             'name' => $project->name,
             'storekeeper_id' => $project->storekeeper_id,
             'storekeeper_name' => $project->storekeeper?->name,
+            'steps' => $project->steps->map(fn (ProjectStep $step) => [
+                'id' => $step->id,
+                'name' => $step->name,
+            ])->values()->all(),
         ]);
     }
 
@@ -242,6 +250,7 @@ class MaterialController extends Controller
             'unit' => 'required|string|max:255',
             'type' => 'required|in:materiel,materiaux',
             'category' => 'nullable|string|max:255',
+            'project_step_id' => 'required|exists:project_steps,id',
         ];
 
         if ($user->role === UserRole::Manager) {
@@ -269,6 +278,21 @@ class MaterialController extends Controller
                 ]);
             }
             $validated['storekeeper_id'] = $project->storekeeper_id;
+        }
+
+        $step = ProjectStep::query()->findOrFail($validated['project_step_id']);
+
+        if ((int) $step->project_id !== (int) $validated['project_id']) {
+            return back()->withErrors([
+                'project_step_id' => 'L\'étape sélectionnée n\'appartient pas à ce chantier.',
+            ]);
+        }
+
+        if ($user->role === UserRole::Magasinier && ! ProjectStep::query()
+            ->where('id', $step->id)
+            ->where('project_id', $validated['project_id'])
+            ->exists()) {
+            abort(403, 'Étape invalide pour votre chantier.');
         }
 
         $material = Material::create($validated);

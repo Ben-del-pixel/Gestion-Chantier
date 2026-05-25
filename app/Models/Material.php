@@ -22,6 +22,7 @@ class Material extends Model
         'category',
         'storekeeper_id',
         'project_id',
+        'project_step_id',
     ];
 
     protected $casts = [
@@ -41,5 +42,10 @@ class Material extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function projectStep(): BelongsTo
+    {
+        return $this->belongsTo(ProjectStep::class, 'project_step_id');
     }
 }

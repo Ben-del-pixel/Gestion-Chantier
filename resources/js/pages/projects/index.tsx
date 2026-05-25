@@ -24,6 +24,8 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
@@ -102,15 +104,17 @@ type MaterialFormItem = {
   unit: string;
   type: 'materiel' | 'materiaux';
   category: string;
+  step_index: string;
 };
 
-const emptyMaterial = (): MaterialFormItem => ({
+const emptyMaterial = (stepIndex = '0'): MaterialFormItem => ({
   name: '',
   description: '',
   quantity_in_stock: '',
   unit: 'sacs',
   type: 'materiaux',
   category: '',
+  step_index: stepIndex,
 });
 
 export default function ProjectsIndex({
@@ -148,6 +152,13 @@ export default function ProjectsIndex({
     () => formData.steps.reduce((sum, step) => sum + (Number(step.budget) || 0), 0),
     [formData.steps],
   );
+
+  const firstNamedStepIndex = React.useMemo(
+    () => formData.steps.findIndex((step) => step.name.trim() !== ''),
+    [formData.steps],
+  );
+
+  const canAddMaterial = firstNamedStepIndex >= 0;
 
   const normalizedProjects = React.useMemo(
     () =>
@@ -239,14 +250,25 @@ export default function ProjectsIndex({
 
   const removeStep = (index: number) => {
     if (formData.steps.length <= 1) {
-return;
-}
+      return;
+    }
 
     const newSteps = formData.steps.filter((_, i) => i !== index);
 
     setFormData((prev) => ({
       ...prev,
       steps: newSteps,
+      materials: prev.materials
+        .filter((material) => Number(material.step_index) !== index)
+        .map((material) => {
+          const stepIndex = Number(material.step_index);
+
+          if (stepIndex > index) {
+            return { ...material, step_index: String(stepIndex - 1) };
+          }
+
+          return material;
+        }),
     }));
   };
 
@@ -261,9 +283,15 @@ return;
   };
 
   const addMaterial = () => {
+    if (!canAddMaterial) {
+      alert('Ajoutez au moins une étape nommée avant d\'ajouter des matériaux.');
+
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      materials: [...prev.materials, emptyMaterial()],
+      materials: [...prev.materials, emptyMaterial(String(firstNamedStepIndex))],
     }));
   };
 
@@ -312,11 +340,25 @@ return;
       return;
     }
 
+    for (const material of materialsToSubmit) {
+      const stepIndex = Number(material.step_index);
+      const step = formData.steps[stepIndex];
+
+      if (!step?.name.trim()) {
+        alert('Chaque matériau doit être rattaché à une étape du chantier.');
+
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     router.post(store.url(), {
       ...formData,
-      materials: materialsToSubmit,
+      materials: materialsToSubmit.map((material) => ({
+        ...material,
+        step_index: Number(material.step_index),
+      })),
     }, {
       onSuccess: () => {
         setFormData(resetCreateForm());
@@ -372,10 +414,13 @@ return;
                 </Button>
               </DialogTrigger>
 
-              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-                <DialogTitle>Créer un nouveau chantier</DialogTitle>
+              <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden p-0 sm:max-w-2xl">
+                <DialogHeader className="shrink-0 border-b px-6 py-4">
+                  <DialogTitle>Créer un nouveau chantier</DialogTitle>
+                </DialogHeader>
 
-                <form className="mt-4 space-y-4" onSubmit={handleSubmitProject}>
+                <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmitProject}>
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
                   <div>
                     <Label htmlFor="name">Nom du chantier *</Label>
                     <Input
