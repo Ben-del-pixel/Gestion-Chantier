@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectStep;
 use App\Models\ResourceRequest;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -33,10 +34,21 @@ class MaterialController extends Controller
         );
     }
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         $user = auth()->user();
-        $projectFilter = $request->query('project_id');
+        $projectFilter = $request->query('project_id') ? (int) $request->query('project_id') : null;
+
+        if ($user->role === UserRole::Magasinier && ! $projectFilter) {
+            $managedProjects = Project::query()
+                ->where('storekeeper_id', $user->id)
+                ->orderBy('name')
+                ->get();
+
+            if ($managedProjects->count() === 1) {
+                return redirect()->route('materials.index', ['project_id' => $managedProjects->first()->id]);
+            }
+        }
 
         // Manager sees all materials (optionally filtered by project)
         if ($user->role === UserRole::Manager) {
@@ -44,18 +56,20 @@ class MaterialController extends Controller
                 $q->where('project_id', $projectFilter);
             })->latest('updated_at');
         } elseif ($user->role === UserRole::Magasinier) {
-            // Magasinier sees only materials of their assigned project
-            // Find project where this user is the storekeeper
-            $userProject = Project::where('storekeeper_id', $user->id)->first();
-            if (! $userProject) {
-                // No project assigned, show empty materials
-                $materialsQuery = Material::where('id', null);
+            $managedProjectIds = $this->magasinierProjectIds($user);
+
+            if ($projectFilter && ! in_array($projectFilter, $managedProjectIds, true)) {
+                abort(403, 'Vous n\'avez pas accès à ce chantier.');
+            }
+
+            if ($projectFilter) {
+                $materialsQuery = Material::where('project_id', $projectFilter)->latest('updated_at');
             } else {
-                $materialsQuery = Material::where('project_id', $userProject->id)->latest('updated_at');
+                $materialsQuery = Material::whereRaw('0 = 1');
             }
         } else {
             // Other roles see no materials
-            $materialsQuery = Material::where('id', null);
+            $materialsQuery = Material::whereRaw('0 = 1');
         }
 
         $materials = $materialsQuery->get()
@@ -78,19 +92,39 @@ class MaterialController extends Controller
                 return $material;
             });
 
-        $storekeeperAllocationGroups = $this->buildStorekeeperAllocationGroups($user);
+        $storekeeperAllocationGroups = $this->buildStorekeeperAllocationGroups($user, $projectFilter);
 
         $projects = $this->projectsForMaterialsPage($user);
+
+        $selectedProject = null;
+        if ($projectFilter) {
+            $selectedProject = $projects->firstWhere('id', $projectFilter);
+        }
 
         // Filter movements by materials the user can see
         $movementsQuery = MaterialMovement::query()
             ->with(['material:id,name,unit', 'user:id,name']);
 
         if ($user->role === UserRole::Magasinier) {
-            $userProject = Project::where('storekeeper_id', $user->id)->first();
-            if ($userProject) {
-                $movementsQuery->whereIn('material_id', Material::where('project_id', $userProject->id)->pluck('id'));
+            $managedProjectIds = $this->magasinierProjectIds($user);
+            if ($projectFilter) {
+                $movementsQuery->whereIn(
+                    'material_id',
+                    Material::where('project_id', $projectFilter)->pluck('id'),
+                );
+            } elseif ($managedProjectIds !== []) {
+                $movementsQuery->whereIn(
+                    'material_id',
+                    Material::whereIn('project_id', $managedProjectIds)->pluck('id'),
+                );
+            } else {
+                $movementsQuery->whereRaw('0 = 1');
             }
+        } elseif ($user->role === UserRole::Manager && $projectFilter) {
+            $movementsQuery->whereIn(
+                'material_id',
+                Material::where('project_id', $projectFilter)->pluck('id'),
+            );
         }
 
         $movements = $movementsQuery->latest('occurred_at')
@@ -117,7 +151,56 @@ class MaterialController extends Controller
             'storekeeperAllocationGroups' => $storekeeperAllocationGroups,
             'projects' => $projects,
             'movements' => $movements,
+            'selectedProjectId' => $projectFilter,
+            'selectedProjectName' => $selectedProject['name'] ?? null,
         ]);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function magasinierProjectIds(User $user): array
+    {
+        return Project::query()
+            ->where('storekeeper_id', $user->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    private function assertMagasinierOwnsProject(User $user, int $projectId): void
+    {
+        if (! in_array($projectId, $this->magasinierProjectIds($user), true)) {
+            abort(403, 'Vous n\'avez pas accès à ce chantier.');
+        }
+    }
+
+    private function authorizeMaterialAccess(User $user, Material $material): void
+    {
+        if ($user->role === UserRole::Manager) {
+            return;
+        }
+
+        if ($user->role === UserRole::Magasinier) {
+            $this->assertMagasinierOwnsProject($user, (int) $material->project_id);
+
+            return;
+        }
+
+        abort(403);
+    }
+
+    private function materialsIndexRedirect(?int $projectId = null, ?string $success = null): RedirectResponse
+    {
+        $params = ($projectId !== null && $projectId > 0) ? ['project_id' => $projectId] : [];
+
+        $redirect = redirect()->route('materials.index', $params);
+
+        if ($success !== null) {
+            $redirect->with('success', $success);
+        }
+
+        return $redirect;
     }
 
     /**
@@ -130,6 +213,7 @@ class MaterialController extends Controller
                 'storekeeper:id,name',
                 'steps' => fn ($q) => $q->select('id', 'project_id', 'name', 'order')->orderBy('order'),
             ])
+            ->withCount('materials')
             ->select('id', 'name', 'storekeeper_id')
             ->orderBy('name');
 
@@ -142,6 +226,7 @@ class MaterialController extends Controller
             'name' => $project->name,
             'storekeeper_id' => $project->storekeeper_id,
             'storekeeper_name' => $project->storekeeper?->name,
+            'materials_count' => (int) $project->materials_count,
             'steps' => $project->steps->map(fn (ProjectStep $step) => [
                 'id' => $step->id,
                 'name' => $step->name,
@@ -152,7 +237,7 @@ class MaterialController extends Controller
     /**
      * @return list<array{storekeeper_id: int|null, storekeeper_name: string, storekeeper_email: string|null, projects: list<array<string, mixed>>}>
      */
-    private function buildStorekeeperAllocationGroups(User $user): array
+    private function buildStorekeeperAllocationGroups(User $user, ?int $projectFilter = null): array
     {
         if ($user->role !== UserRole::Manager && $user->role !== UserRole::Magasinier) {
             return [];
@@ -167,9 +252,14 @@ class MaterialController extends Controller
             ]);
 
         if ($user->role === UserRole::Magasinier) {
-            $query->whereHas('project', function ($q) use ($user) {
+            $query->whereHas('project', function ($q) use ($user, $projectFilter) {
                 $q->where('storekeeper_id', $user->id);
+                if ($projectFilter) {
+                    $q->where('id', $projectFilter);
+                }
             });
+        } elseif ($projectFilter) {
+            $query->where('project_id', $projectFilter);
         }
 
         /** @var Collection<int, ResourceRequest> $rows */
@@ -255,21 +345,19 @@ class MaterialController extends Controller
 
         if ($user->role === UserRole::Manager) {
             $rules['project_id'] = 'required|exists:projects,id';
+        } elseif ($user->role === UserRole::Magasinier) {
+            $rules['project_id'] = 'required|exists:projects,id';
         } else {
             $rules['project_id'] = 'nullable|exists:projects,id';
         }
 
         $validated = $request->validate($rules);
 
-        // If Magasinier creates material, auto-assign to their project
         if ($user->role === UserRole::Magasinier) {
-            unset($validated['project_id']);
-            $userProject = Project::where('storekeeper_id', $user->id)->first();
-            if (! $userProject) {
-                return back()->with('error', 'Vous n\'êtes assigné à aucun chantier. Contactez l\'administrateur.');
-            }
+            $projectId = (int) $validated['project_id'];
+            $this->assertMagasinierOwnsProject($user, $projectId);
             $validated['storekeeper_id'] = $user->id;
-            $validated['project_id'] = $userProject->id;
+            $validated['project_id'] = $projectId;
         } elseif ($user->role === UserRole::Manager) {
             $project = Project::findOrFail($validated['project_id']);
             if (! $project->storekeeper_id) {
@@ -297,7 +385,10 @@ class MaterialController extends Controller
 
         $material = Material::create($validated);
 
-        return redirect()->route('materials.index')->with('success', 'Matériau créé avec succès');
+        return $this->materialsIndexRedirect(
+            (int) $validated['project_id'],
+            'Matériau créé avec succès',
+        );
     }
 
     public function update(Request $request, Material $material)
@@ -305,6 +396,8 @@ class MaterialController extends Controller
         if (! $this->canManageMaterials()) {
             abort(403, 'Seul un magasinier ou manager peut modifier des matériaux');
         }
+
+        $this->authorizeMaterialAccess(auth()->user(), $material);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -317,7 +410,10 @@ class MaterialController extends Controller
 
         $material->update($validated);
 
-        return redirect()->route('materials.index')->with('success', 'Matériau mis à jour avec succès');
+        return $this->materialsIndexRedirect(
+            (int) $material->project_id,
+            'Matériau mis à jour avec succès',
+        );
     }
 
     public function destroy(Material $material)
@@ -326,9 +422,12 @@ class MaterialController extends Controller
             abort(403, 'Seul un magasinier ou manager peut supprimer des matériaux');
         }
 
+        $this->authorizeMaterialAccess(auth()->user(), $material);
+
+        $projectId = (int) $material->project_id;
         $material->delete();
 
-        return redirect()->route('materials.index')->with('success', 'Matériau supprimé avec succès');
+        return $this->materialsIndexRedirect($projectId, 'Matériau supprimé avec succès');
     }
 
     public function allocate(Request $request)
@@ -347,14 +446,12 @@ class MaterialController extends Controller
         $user = auth()->user();
 
         if ($user->role === UserRole::Magasinier) {
-            $managedProjectId = Project::where('storekeeper_id', $user->id)->value('id');
-            if (! $managedProjectId || (int) $validated['project_id'] !== (int) $managedProjectId) {
-                abort(403, 'Le magasinier ne peut affecter du matériel qu\'à son chantier.');
-            }
+            $this->assertMagasinierOwnsProject($user, (int) $validated['project_id']);
         }
 
         // Check stock availability
         $material = Material::findOrFail($validated['material_id']);
+        $this->authorizeMaterialAccess($user, $material);
         if ((int) $material->project_id !== (int) $validated['project_id']) {
             return back()->with('error', 'Le matériel sélectionné n\'appartient pas au chantier choisi.');
         }
@@ -393,7 +490,10 @@ class MaterialController extends Controller
             ]);
         }
 
-        return redirect()->route('materials.index')->with('success', 'Matériau affecté au projet avec succès');
+        return $this->materialsIndexRedirect(
+            (int) $validated['project_id'],
+            'Matériau affecté au projet avec succès',
+        );
     }
 
     public function stockIn(Request $request)
@@ -410,6 +510,7 @@ class MaterialController extends Controller
         ]);
 
         $material = Material::findOrFail($validated['material_id']);
+        $this->authorizeMaterialAccess(auth()->user(), $material);
 
         if (($validated['reason'] ?? '') === 'retour_chantier' && $material->type !== 'materiel') {
             return back()->with('error', 'Seul le matériel (équipement) peut faire l\'objet d\'un retour de chantier.');
@@ -427,7 +528,10 @@ class MaterialController extends Controller
             'occurred_at' => now(),
         ]);
 
-        return redirect()->route('materials.index')->with('success', 'Entrée de stock enregistrée avec succès');
+        return $this->materialsIndexRedirect(
+            (int) $material->project_id,
+            'Entrée de stock enregistrée avec succès',
+        );
     }
 
     public function stockOut(Request $request)
@@ -444,6 +548,7 @@ class MaterialController extends Controller
         ]);
 
         $material = Material::findOrFail($validated['material_id']);
+        $this->authorizeMaterialAccess(auth()->user(), $material);
 
         if ((float) $material->quantity_in_stock < (float) $validated['quantity']) {
             return back()->with('error', 'La quantité demandée dépasse le stock disponible.');
@@ -461,7 +566,10 @@ class MaterialController extends Controller
             'occurred_at' => now(),
         ]);
 
-        return redirect()->route('materials.index')->with('success', 'Sortie de stock enregistrée avec succès');
+        return $this->materialsIndexRedirect(
+            (int) $material->project_id,
+            'Sortie de stock enregistrée avec succès',
+        );
     }
 
     public function returnMaterial(Request $request, ResourceRequest $resourceRequest)
@@ -471,6 +579,7 @@ class MaterialController extends Controller
         }
 
         $material = $resourceRequest->material;
+        $this->authorizeMaterialAccess(auth()->user(), $material);
 
         if ($material->type !== 'materiel') {
             abort(403, 'Seul le matériel (équipement) peut être remis en stock après utilisation.');
@@ -493,6 +602,9 @@ class MaterialController extends Controller
         // Mark as returned
         $resourceRequest->update(['status' => 'rendu']);
 
-        return redirect()->route('materials.index')->with('success', 'Matériel remis en stock avec succès');
+        return $this->materialsIndexRedirect(
+            (int) $material->project_id,
+            'Matériel remis en stock avec succès',
+        );
     }
 }

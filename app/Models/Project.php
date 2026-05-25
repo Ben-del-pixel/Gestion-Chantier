@@ -73,6 +73,11 @@ class Project extends Model
         return $this->hasMany(ProjectStep::class)->orderBy('order');
     }
 
+    public function materials()
+    {
+        return $this->hasMany(Material::class);
+    }
+
     public function projectWorkers()
     {
         return $this->hasMany(ProjectWorker::class);

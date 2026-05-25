@@ -56,9 +56,10 @@ test('magasinier can create a material', function () {
             'unit' => 'sacs',
             'type' => 'materiaux',
             'category' => 'construction',
+            'project_id' => $project->id,
             'project_step_id' => $step->id,
         ])
-        ->assertRedirect(route('materials.index'));
+        ->assertRedirect(route('materials.index', ['project_id' => $project->id]));
 
     $this->assertDatabaseHas('materials', [
         'name' => 'Ciment rapide',
@@ -152,7 +153,7 @@ test('manager can create a material', function () {
             'project_id' => $project->id,
             'project_step_id' => $step->id,
         ])
-        ->assertRedirect(route('materials.index'));
+        ->assertRedirect(route('materials.index', ['project_id' => $project->id]));
 
     $this->assertDatabaseHas('materials', [
         'name' => 'Gravier premium',
@@ -221,7 +222,7 @@ test('manager can allocate material to project', function () {
             'quantity_requested' => 15,
             'comment' => 'Allocation manager',
         ])
-        ->assertRedirect(route('materials.index'));
+        ->assertRedirect(route('materials.index', ['project_id' => $project->id]));
 
     $this->assertDatabaseHas('resource_requests', [
         'material_id' => $material->id,
@@ -342,6 +343,7 @@ test('magasinier only sees own storekeeper allocation group', function () {
     $magA = User::factory()->create(['role' => UserRole::Magasinier, 'name' => 'Magasinier A']);
     $magB = User::factory()->create(['role' => UserRole::Magasinier, 'name' => 'Magasinier B']);
     $projectA = Project::factory()->create(['storekeeper_id' => $magA->id]);
+    Project::factory()->create(['storekeeper_id' => $magA->id, 'name' => 'Second chantier A']);
     $projectB = Project::factory()->create(['storekeeper_id' => $magB->id]);
     $matA = Material::factory()->create([
         'project_id' => $projectA->id,
@@ -376,6 +378,98 @@ test('magasinier only sees own storekeeper allocation group', function () {
             ->has('storekeeperAllocationGroups', 1)
             ->where('storekeeperAllocationGroups.0.storekeeper_name', 'Magasinier A')
         );
+});
+
+test('magasinier with multiple projects sees chantier picker without materials until project selected', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $projectA = Project::factory()->create(['storekeeper_id' => $magasinier->id, 'name' => 'ESIS Maintenant']);
+    $projectB = Project::factory()->create(['storekeeper_id' => $magasinier->id, 'name' => 'Chantier Sud']);
+    Material::factory()->create(['project_id' => $projectA->id, 'storekeeper_id' => $magasinier->id]);
+    Material::factory()->create(['project_id' => $projectB->id, 'storekeeper_id' => $magasinier->id]);
+
+    $this->actingAs($magasinier)
+        ->get(route('materials.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('materials/index')
+            ->where('selectedProjectId', null)
+            ->has('materials', 0)
+            ->has('projects', 2)
+        );
+});
+
+test('magasinier sees only materials for selected chantier', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $projectA = Project::factory()->create(['storekeeper_id' => $magasinier->id, 'name' => 'ESIS Maintenant']);
+    $projectB = Project::factory()->create(['storekeeper_id' => $magasinier->id, 'name' => 'Chantier Sud']);
+    Material::factory()->create([
+        'project_id' => $projectA->id,
+        'storekeeper_id' => $magasinier->id,
+        'name' => 'Ciment A',
+    ]);
+    Material::factory()->create([
+        'project_id' => $projectB->id,
+        'storekeeper_id' => $magasinier->id,
+        'name' => 'Ciment B',
+    ]);
+
+    $this->actingAs($magasinier)
+        ->get(route('materials.index', ['project_id' => $projectA->id]))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('materials/index')
+            ->where('selectedProjectId', $projectA->id)
+            ->where('selectedProjectName', 'ESIS Maintenant')
+            ->has('materials', 1)
+            ->where('materials.0.name', 'Ciment A')
+        );
+});
+
+test('magasinier with single project is redirected to that project stock view', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $project = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
+
+    $this->actingAs($magasinier)
+        ->get(route('materials.index'))
+        ->assertRedirect(route('materials.index', ['project_id' => $project->id]));
+});
+
+test('magasinier cannot access another storekeepers project materials', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $otherMagasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $ownProject = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
+    $otherProject = Project::factory()->create(['storekeeper_id' => $otherMagasinier->id]);
+
+    $this->actingAs($magasinier)
+        ->get(route('materials.index', ['project_id' => $otherProject->id]))
+        ->assertForbidden();
+});
+
+test('magasinier creates material on the selected chantier only', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $projectA = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
+    $projectB = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
+    $stepB = materialTestStep($projectB, 'Phase B');
+
+    $this->actingAs($magasinier)
+        ->post(route('materials.store'), [
+            'name' => 'Gravier chantier B',
+            'quantity_in_stock' => 10,
+            'unit' => 'm3',
+            'type' => 'materiaux',
+            'project_id' => $projectB->id,
+            'project_step_id' => $stepB->id,
+        ])
+        ->assertRedirect(route('materials.index', ['project_id' => $projectB->id]));
+
+    $this->assertDatabaseHas('materials', [
+        'name' => 'Gravier chantier B',
+        'project_id' => $projectB->id,
+    ]);
+    $this->assertDatabaseMissing('materials', [
+        'name' => 'Gravier chantier B',
+        'project_id' => $projectA->id,
+    ]);
 });
 
 test('non magasinier cannot create a material', function () {

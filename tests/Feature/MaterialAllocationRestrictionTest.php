@@ -29,7 +29,7 @@ test('magasinier can allocate material only to own project', function () {
             'project_id' => $ownProject->id,
             'quantity_requested' => 10,
         ])
-        ->assertRedirect(route('materials.index'));
+        ->assertRedirect(route('materials.index', ['project_id' => $ownProject->id]));
 });
 
 test('cannot allocate material when target project has no storekeeper', function () {

@@ -1,8 +1,8 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Link as LinkIcon, Wrench, ChevronDown, User } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronRight, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Link as LinkIcon, Wrench, ChevronDown, User } from 'lucide-react';
 import React from 'react';
 
-import { allocate, destroy, returnMaterial, stockIn, stockOut, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
+import { allocate, destroy, index as materialsIndex, returnMaterial, stockIn, stockOut, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,6 +74,7 @@ type ProjectItem = {
     name: string;
     storekeeper_id?: number | null;
     storekeeper_name?: string | null;
+    materials_count?: number;
     steps?: ProjectStepOption[];
 };
 
@@ -128,16 +129,35 @@ export default function MaterialsIndex({
     storekeeperAllocationGroups = [],
     projects = [],
     movements = [],
+    selectedProjectId = null,
+    selectedProjectName = null,
 }: { 
     materials: MaterialItem[]; 
     storekeeperAllocationGroups?: StorekeeperAllocationGroup[];
     projects?: ProjectItem[];
     movements?: MaterialMovement[];
+    selectedProjectId?: number | null;
+    selectedProjectName?: string | null;
 }) {
     const page = usePage().props as any;
     const authenticatedUser = page?.auth?.user;
     const canCheckInFromMaterials = authenticatedUser?.role === UserRole.Magasinier.value;
+    const isMagasinier = authenticatedUser?.role === UserRole.Magasinier.value;
     const isManager = authenticatedUser?.role === UserRole.Manager.value;
+    const showChantierPicker = isMagasinier && !selectedProjectId;
+    const activeChantierId = selectedProjectId ?? null;
+    const activeChantierName =
+        selectedProjectName ??
+        projects.find((p) => p.id === activeChantierId)?.name ??
+        null;
+
+    const openChantier = (projectId: number) => {
+        router.get(materialsIndex.url({ query: { project_id: projectId } }));
+    };
+
+    const backToChantiers = () => {
+        router.get(materialsIndex.url());
+    };
     const [searchTerm, setSearchTerm] = React.useState('');
     const [openDialog, setOpenDialog] = React.useState(false);
     const [openAllocationDialog, setOpenAllocationDialog] = React.useState(false);
@@ -177,7 +197,9 @@ export default function MaterialsIndex({
             return;
         }
 
-        if (projects.length === 0) {
+        const checkInProjectId = activeChantierId ?? projects[0]?.id;
+
+        if (!checkInProjectId) {
             alert('Aucun chantier assigné pour enregistrer la présence.');
 
             return;
@@ -185,7 +207,7 @@ export default function MaterialsIndex({
 
         router.post('/attendance/check-in', {
             user_id: authenticatedUser.id,
-            project_id: projects[0].id,
+            project_id: checkInProjectId,
             status: 'present',
         }, {
             onSuccess: () => {
@@ -246,8 +268,14 @@ export default function MaterialsIndex({
             return project?.steps ?? [];
         }
 
+        if (isMagasinier && activeChantierId) {
+            const project = projects.find((p) => p.id === activeChantierId);
+
+            return project?.steps ?? [];
+        }
+
         return projects[0]?.steps ?? [];
-    }, [editingMaterial, isManager, formData.project_id, projects, projectsWithStorekeeper]);
+    }, [activeChantierId, editingMaterial, isMagasinier, isManager, formData.project_id, projects, projectsWithStorekeeper]);
 
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -293,7 +321,9 @@ export default function MaterialsIndex({
                 ? formFieldsWithoutProject
                 : isManager
                     ? { ...formFieldsWithoutProject, project_id: Number(project_id) }
-                    : formFieldsWithoutProject;
+                    : isMagasinier && activeChantierId
+                        ? { ...formFieldsWithoutProject, project_id: activeChantierId }
+                        : formFieldsWithoutProject;
 
             router.visit(url, {
                 method,
@@ -359,12 +389,15 @@ export default function MaterialsIndex({
 
     const handleOpenAllocationDialog = (material: MaterialItem) => {
         setSelectedMaterialForAllocation(material);
+        const defaultProjectId =
+            isMagasinier && activeChantierId
+                ? String(activeChantierId)
+                : material.project_id != null && material.project_id !== undefined
+                    ? String(material.project_id)
+                    : '';
         setAllocationFormData({
             material_id: material.id.toString(),
-            project_id:
-                material.project_id != null && material.project_id !== undefined
-                    ? String(material.project_id)
-                    : '',
+            project_id: defaultProjectId,
             quantity_requested: '',
             comment: '',
         });
@@ -374,12 +407,16 @@ export default function MaterialsIndex({
     const allocationProjectChoices = React.useMemo(() => {
         const withStorekeeper = projects.filter((p) => p.storekeeper_id != null && p.storekeeper_id !== '');
 
+        if (isMagasinier && activeChantierId) {
+            return withStorekeeper.filter((p) => p.id === activeChantierId);
+        }
+
         if (!selectedMaterialForAllocation?.project_id) {
             return withStorekeeper;
         }
 
         return withStorekeeper.filter((p) => p.id === selectedMaterialForAllocation.project_id);
-    }, [projects, selectedMaterialForAllocation]);
+    }, [activeChantierId, isMagasinier, projects, selectedMaterialForAllocation]);
 
     const handleSubmitAllocation = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -463,24 +500,96 @@ export default function MaterialsIndex({
         submitStockMovement(stockOut.url(), () => setOpenStockOutDialog(false));
     };
 
+    if (showChantierPicker) {
+        return (
+            <>
+                <Head title="Mes chantiers — Matériaux" />
+                <div className="space-y-8">
+                    <div>
+                        <h1 className="text-4xl font-black tracking-tight text-slate-900">Mes chantiers</h1>
+                        <p className="mt-1 font-medium text-slate-500">
+                            Choisissez un chantier pour gérer le stock, les entrées et les sorties de matériaux.
+                        </p>
+                    </div>
+
+                    {projects.length === 0 ? (
+                        <Card className="rounded-3xl border-amber-200 bg-amber-50">
+                            <CardContent className="p-8 text-center text-amber-900">
+                                <p className="font-bold">Aucun chantier ne vous est assigné pour le moment.</p>
+                                <p className="mt-2 text-sm">Contactez le manager ou l&apos;ingénieur responsable.</p>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {projects.map((project) => (
+                                <button
+                                    key={project.id}
+                                    type="button"
+                                    onClick={() => openChantier(project.id)}
+                                    className="group rounded-[32px] border border-slate-200 bg-white p-6 text-left shadow-xl shadow-slate-200/40 transition-all hover:-translate-y-1 hover:border-blue-200 hover:shadow-blue-500/10"
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                                            <Package className="h-7 w-7" />
+                                        </div>
+                                        <ChevronRight className="h-6 w-6 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-blue-500" />
+                                    </div>
+                                    <h2 className="mt-4 text-2xl font-black text-slate-900">{project.name}</h2>
+                                    <p className="mt-2 text-sm font-bold text-slate-500">
+                                        {(project.materials_count ?? 0) === 1
+                                            ? '1 article en inventaire'
+                                            : `${project.materials_count ?? 0} articles en inventaire`}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-400">
+                                        {(project.steps?.length ?? 0) > 0
+                                            ? `${project.steps?.length} étape(s) — stock dédié à ce chantier`
+                                            : 'Ajoutez des étapes sur la fiche chantier pour créer des matériaux'}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </>
+        );
+    }
+
     return (
         <>
-            <Head title="Matériaux" />
+            <Head title={activeChantierName ? `Stock — ${activeChantierName}` : 'Matériaux'} />
 
       <div className="space-y-6">
-        <div className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <h1 className="text-4xl font-black tracking-tight text-slate-900">Magasin & Stock</h1>
-              <p className="mt-1 text-slate-500 font-medium">Gestion des matériaux et inventaire Lubumbashi</p>
+        <div className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              {isMagasinier && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={backToChantiers}
+                  className="mt-1 h-11 shrink-0 rounded-xl"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Chantiers
+                </Button>
+              )}
+              <div>
+              <h1 className="text-4xl font-black tracking-tight text-slate-900">
+                {activeChantierName ? `Stock — ${activeChantierName}` : 'Magasin & Stock'}
+              </h1>
+              <p className="mt-1 text-slate-500 font-medium">
+                {isMagasinier && activeChantierName
+                  ? 'Matériaux, entrées et sorties pour ce chantier uniquement'
+                  : 'Gestion des matériaux et inventaire Lubumbashi'}
+              </p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {canCheckInFromMaterials && (
+            <div className="flex flex-wrap items-center gap-2">
+              {canCheckInFromMaterials && activeChantierId && (
                 <Button onClick={handleStorekeeperCheckIn} variant="outline" className="h-12 rounded-xl">
                   Pointer ma présence
                 </Button>
               )}
-            </div>
 
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
