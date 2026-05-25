@@ -55,7 +55,7 @@ class ProjectController extends Controller
             ? User::where('role', UserRole::Magasinier)->orderBy('name')->get(['id', 'name'])
             : collect();
 
-        if ($user->role === UserRole::Engineer) {
+        if (! UserRole::canViewBudgetFor($user->role)) {
             $projects = $this->concealBudgetFromProjects($projects);
         }
 
@@ -64,7 +64,7 @@ class ProjectController extends Controller
             'engineers' => $engineers,
             'storekeepers' => $storekeepers,
             'projectDeadlineAlerts' => ProjectDeadlineAlerts::fromProjects($projects),
-            'canViewBudget' => $user->role !== UserRole::Engineer,
+            'canViewBudget' => UserRole::canViewBudgetFor($user->role),
         ]);
     }
 
@@ -208,7 +208,7 @@ class ProjectController extends Controller
         // Calculate total unique workers for the project (from workers relation or tasks)
         $totalWorkersCount = $project->workers->count();
 
-        if ($viewer->role === UserRole::Engineer) {
+        if (! UserRole::canViewBudgetFor($viewer->role)) {
             $this->concealBudgetFromProject($project);
         }
 
@@ -219,7 +219,7 @@ class ProjectController extends Controller
             'chefsChantier' => $chefsChantier,
             'storekeepers' => $storekeepers,
             'allWorkers' => $allWorkers,
-            'canViewBudget' => $viewer->role !== UserRole::Engineer,
+            'canViewBudget' => UserRole::canViewBudgetFor($viewer->role),
         ]);
     }
 

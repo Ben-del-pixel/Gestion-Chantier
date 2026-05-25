@@ -64,6 +64,18 @@ test('engineer dashboard does not expose budget visibility flag', function () {
         );
 });
 
+test('chef de chantier dashboard does not expose budget visibility flag', function () {
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier]);
+
+    $this->actingAs($chef)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('dashboard')
+            ->where('canViewBudget', false)
+        );
+});
+
 test('engineer dashboard includes attendance management props', function () {
     $engineer = User::factory()->create(['role' => 'engineer']);
     $magasinier = User::factory()->create(['role' => 'magasinier']);

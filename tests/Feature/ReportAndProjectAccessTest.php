@@ -29,6 +29,32 @@ test('chef de chantier sees their projects on reports index', function () {
         );
 });
 
+test('chef de chantier projects index hides budget fields', function () {
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier]);
+    $project = Project::factory()->create([
+        'chef_chantier_id' => $chef->id,
+        'budget' => 50000,
+        'budget_consumed' => 8000,
+    ]);
+    $project->steps()->create([
+        'name' => 'Gros œuvre',
+        'budget' => 50000,
+        'order' => 1,
+    ]);
+
+    $this->actingAs($chef)
+        ->get(route('projects.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('projects/index')
+            ->where('canViewBudget', false)
+            ->has('projects', 1)
+            ->missing('projects.0.budget')
+            ->missing('projects.0.budget_consumed')
+            ->missing('projects.0.steps.0.budget')
+        );
+});
+
 test('engineer projects index hides budget fields', function () {
     $engineer = User::factory()->create(['role' => UserRole::Engineer]);
     $project = Project::factory()->create([
@@ -69,6 +95,26 @@ test('engineer cannot delete a project', function () {
         ->assertForbidden();
 
     expect(Project::query()->whereKey($project->id)->exists())->toBeTrue();
+});
+
+test('chef project report api omits budget fields', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier]);
+    $project = Project::factory()->create([
+        'manager_id' => $manager->id,
+        'chef_chantier_id' => $chef->id,
+        'budget' => 99000,
+    ]);
+
+    $response = $this->actingAs($chef)
+        ->postJson(route('reports.generate'), [
+            'type' => 'project',
+            'project_id' => $project->id,
+        ])
+        ->assertOk()
+        ->json('data');
+
+    expect($response[0])->not->toHaveKeys(['budget', 'budget_from_steps']);
 });
 
 test('chef cannot generate global report', function () {

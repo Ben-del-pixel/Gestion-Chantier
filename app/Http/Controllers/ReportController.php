@@ -343,6 +343,10 @@ class ReportController extends Controller
             default => [],
         };
 
+        if (! $role->canViewBudget()) {
+            $report = $this->stripBudgetFromReportData($report, $reportType);
+        }
+
         return response()->json([
             'type' => $reportType,
             'period' => [
@@ -351,6 +355,25 @@ class ReportController extends Controller
             ],
             'data' => $report,
         ]);
+    }
+
+    private function stripBudgetFromReportData(mixed $report, string $reportType): mixed
+    {
+        if ($reportType === 'global' && is_array($report)) {
+            unset($report['summary']['total_budget']);
+
+            return $report;
+        }
+
+        if ($reportType === 'project' && is_array($report)) {
+            return array_map(function (array $project) {
+                unset($project['budget'], $project['budget_from_steps']);
+
+                return $project;
+            }, $report);
+        }
+
+        return $report;
     }
 
     private function generateGlobalReport(?Carbon $startDate, ?Carbon $endDate): array
