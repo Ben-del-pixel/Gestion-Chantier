@@ -12,7 +12,6 @@ import {
     ListChecks,
     CalendarRange,
 } from 'lucide-react';
-import { index as activityLogsIndex } from '@/actions/App/Http/Controllers/ActivityLogController';
 import { index as materialsIndex } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { index as attendanceIndex } from '@/actions/App/Http/Controllers/AttendanceController';
@@ -46,7 +45,6 @@ const roleNavItems: Record<string, NavItem[]> = {
         { title: "Main-d'oeuvre", href: usersIndex(), icon: Users },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
         { title: 'Rapports', href: reportsIndex(), icon: BarChart3 },
-        { title: 'Historique', href: activityLogsIndex(), icon: History },
     ],
     [UserRole.ChefChantier.value]: [
         { title: 'Mes Chantiers', href: dashboard(), icon: LayoutGrid },
@@ -66,7 +64,6 @@ const roleNavItems: Record<string, NavItem[]> = {
     [UserRole.Worker.value]: [
         { title: 'Ma Mission', href: dashboard(), icon: CalendarDays },
         { title: 'Présence', href: attendanceIndex(), icon: Clock },
-        { title: 'Historique', href: activityLogsIndex(), icon: History },
     ],
     [UserRole.Magasinier.value]: [
         { title: 'Mes chantiers', href: materialsIndex(), icon: Package },

@@ -82,7 +82,6 @@ class ReportController extends Controller
                 UserRole::Magasinier->value,
                 UserRole::Engineer->value,
                 UserRole::ChefChantier->value,
-                UserRole::Manager->value,
             ], true),
             'submitTargetLabel' => $this->resolveTargetLabel($userRoleValue),
         ]);
@@ -93,11 +92,14 @@ class ReportController extends Controller
         $user = $request->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
 
+        if ($userRoleValue === UserRole::Manager->value) {
+            abort(403, 'Le manager ne soumet pas de rapport opérationnel.');
+        }
+
         if (! in_array($userRoleValue, [
             UserRole::Magasinier->value,
             UserRole::Engineer->value,
             UserRole::ChefChantier->value,
-            UserRole::Manager->value,
         ], true)) {
             abort(403, 'Ce role ne peut pas soumettre de rapport.');
         }

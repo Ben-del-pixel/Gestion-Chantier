@@ -188,6 +188,40 @@ test('manager can create project with storekeeper and materials', function () {
     expect($material->project_step_id)->toBe($project->steps()->first()->id);
 });
 
+test('manager can create project materials without step index (auto first step)', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+
+    $this->actingAs($manager)
+        ->from(route('projects.index'))
+        ->post(route('projects.store'), [
+            'name' => 'Chantier stock auto étape',
+            'start_date' => now()->toDateString(),
+            'deadline' => now()->addDays(30)->toDateString(),
+            'storekeeper_id' => $magasinier->id,
+            'steps' => [
+                ['name' => 'Phase 1', 'budget' => 2000],
+                ['name' => 'Phase 2', 'budget' => 1000],
+            ],
+            'materials' => [
+                [
+                    'name' => 'Sable',
+                    'quantity_in_stock' => 12,
+                    'unit' => 'm3',
+                    'type' => 'materiaux',
+                    // step_index omitted intentionally
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    $project = Project::query()->where('name', 'Chantier stock auto étape')->firstOrFail();
+    $firstStep = $project->steps()->orderBy('order')->firstOrFail();
+    $material = Material::query()->where('project_id', $project->id)->where('name', 'Sable')->firstOrFail();
+
+    expect((int) $material->project_step_id)->toBe((int) $firstStep->id);
+});
+
 test('manager cannot create project material without valid step index', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);

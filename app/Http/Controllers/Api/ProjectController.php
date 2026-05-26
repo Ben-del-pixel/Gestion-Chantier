@@ -95,7 +95,7 @@ class ProjectController extends Controller
             'materials.*.unit' => 'required|string|max:255',
             'materials.*.type' => 'required|in:materiel,materiaux',
             'materials.*.category' => 'nullable|string|max:255',
-            'materials.*.step_index' => 'required|integer|min:0',
+            'materials.*.step_index' => 'nullable|integer|min:0',
         ]);
 
         if (! empty($validated['materials']) && empty($validated['storekeeper_id'])) {
@@ -144,11 +144,11 @@ class ProjectController extends Controller
             $stepCount = count($validated['steps'] ?? []);
 
             foreach ($validated['materials'] as $materialData) {
-                $stepIndex = (int) $materialData['step_index'];
+                $stepIndex = isset($materialData['step_index']) ? (int) $materialData['step_index'] : 0;
 
                 if ($stepIndex < 0 || $stepIndex >= $stepCount || ! isset($stepsByIndex[$stepIndex])) {
                     return back()->withErrors([
-                        'materials' => 'Chaque matériau doit être rattaché à une étape du chantier.',
+                        'materials' => 'Étape invalide pour un matériau : choisissez une étape existante.',
                     ]);
                 }
 

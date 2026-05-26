@@ -105,10 +105,10 @@ type MaterialFormItem = {
   unit: string;
   type: 'materiel' | 'materiaux';
   category: string;
-  step_index: string;
+  step_index: string; // '' => auto (première étape)
 };
 
-const emptyMaterial = (stepIndex = '0'): MaterialFormItem => ({
+const emptyMaterial = (stepIndex = ''): MaterialFormItem => ({
   name: '',
   description: '',
   quantity_in_stock: '',
@@ -263,8 +263,12 @@ export default function ProjectsIndex({
       ...prev,
       steps: newSteps,
       materials: prev.materials
-        .filter((material) => Number(material.step_index) !== index)
+        .filter((material) => material.step_index === '' || Number(material.step_index) !== index)
         .map((material) => {
+          if (material.step_index === '') {
+            return material;
+          }
+
           const stepIndex = Number(material.step_index);
 
           if (stepIndex > index) {
@@ -295,7 +299,7 @@ export default function ProjectsIndex({
 
     setFormData((prev) => ({
       ...prev,
-      materials: [...prev.materials, emptyMaterial(String(firstNamedStepIndex))],
+      materials: [...prev.materials, emptyMaterial('')],
     }));
   };
 
@@ -345,13 +349,15 @@ export default function ProjectsIndex({
     }
 
     for (const material of materialsToSubmit) {
-      const stepIndex = Number(material.step_index);
-      const step = formData.steps[stepIndex];
+      if (material.step_index !== '') {
+        const stepIndex = Number(material.step_index);
+        const step = formData.steps[stepIndex];
 
-      if (!step?.name.trim()) {
-        alert('Chaque matériau doit être rattaché à une étape du chantier.');
+        if (!step?.name.trim()) {
+          alert('Étape invalide pour un matériau. Choisissez une étape existante.');
 
-        return;
+          return;
+        }
       }
     }
 
@@ -361,7 +367,7 @@ export default function ProjectsIndex({
       ...formData,
       materials: materialsToSubmit.map((material) => ({
         ...material,
-        step_index: Number(material.step_index),
+        step_index: material.step_index === '' ? null : Number(material.step_index),
       })),
     }, {
       onSuccess: () => {
@@ -595,7 +601,7 @@ export default function ProjectsIndex({
                       <div>
                         <Label className="text-base font-semibold">Matériaux (optionnel)</Label>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          Chaque matériau doit être rattaché à une étape.
+                          Vous pouvez rattacher un matériau à une étape, ou laisser vide (auto : 1ère étape).
                         </p>
                       </div>
                       <Button
@@ -633,13 +639,13 @@ export default function ProjectsIndex({
                               </Button>
                             </div>
                             <div>
-                              <Label className="text-xs text-slate-500">Étape *</Label>
+                              <Label className="text-xs text-slate-500">Étape (optionnel)</Label>
                               <select
                                 value={material.step_index}
                                 onChange={(e) => handleMaterialChange(index, 'step_index', e.target.value)}
                                 className="mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
-                                required
                               >
+                                <option value="">-- Ne pas affecter (auto : 1ère étape) --</option>
                                 {formData.steps.map((step, stepIndex) =>
                                   step.name.trim() ? (
                                     <option key={stepIndex} value={String(stepIndex)}>

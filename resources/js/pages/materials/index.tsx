@@ -615,17 +615,6 @@ export default function MaterialsIndex({
                                     />
                                 </div>
 
-                                <div>
-                                    <Label htmlFor="description">Fournisseur / Description</Label>
-                                    <Input
-                                        id="description"
-                                        name="description"
-                                        value={formData.description}
-                                        onChange={handleFormChange}
-                                        placeholder="Ex: Fournisseur A"
-                                    />
-                                </div>
-
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <Label htmlFor="quantity_in_stock">Quantité *</Label>
@@ -973,6 +962,7 @@ export default function MaterialsIndex({
                         </DialogContent>
                     </Dialog>
                 </div>
+        </div>
 
         {/* Premium Stats Row */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">

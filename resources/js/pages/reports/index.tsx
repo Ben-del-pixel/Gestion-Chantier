@@ -164,19 +164,41 @@ export default function ReportsIndex({
         }
 
         const content = generateReportContent();
+        const bom = '\uFEFF'; // Excel-friendly UTF-8 BOM
+        const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+
         const element = document.createElement('a');
-        element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(content));
-        element.setAttribute('download', `rapport_${selectedReport}_${new Date().toISOString().split('T')[0]}.csv`);
+        element.href = url;
+        element.download = `rapport_${selectedReport}_${new Date().toISOString().split('T')[0]}.csv`;
         element.style.display = 'none';
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
+        URL.revokeObjectURL(url);
     };
 
+    const csvSeparator = ';';
+
+    const csvCell = (value: unknown): string => {
+        const raw = value === null || value === undefined ? '' : String(value);
+        const normalized = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+        const escaped = normalized.replaceAll('"', '""');
+
+        return `"${escaped}"`;
+    };
+
+    const csvRow = (cells: unknown[]): string => cells.map(csvCell).join(csvSeparator) + '\n';
+
     const generateReportContent = (): string => {
-        let content = `Rapport ${reportData.type}\n`;
-        content += `Genere le,${new Date().toLocaleString('fr-FR')}\n`;
-        content += `Periode,${reportData.period.start_date || 'Debut'} a ${reportData.period.end_date || 'Fin'}\n\n`;
+        let content = '';
+        content += csvRow([`Rapport ${reportData.type}`]);
+        content += csvRow(['Généré le', new Date().toLocaleString('fr-FR')]);
+        content += csvRow([
+            'Période',
+            `${reportData.period.start_date || 'Début'} à ${reportData.period.end_date || 'Fin'}`,
+        ]);
+        content += '\n';
 
         if (reportData.type === 'global') {
             content += generateGlobalContent();
@@ -193,19 +215,23 @@ export default function ReportsIndex({
 
     const generateGlobalContent = (): string => {
         const d = reportData.data;
-        let content = 'Resume Global\n';
-        content += `Projets totaux,${d.summary.total_projects}\n`;
-        content += `Projets actifs,${d.summary.active_projects}\n`;
-        content += `Projets completes,${d.summary.completed_projects}\n`;
-        content += `Taches totales,${d.summary.total_tasks}\n`;
-        content += `Taches completees,${d.summary.completed_tasks}\n`;
-        content += `Budget total ${currency},${d.summary.total_budget}\n`;
-        content += `Ouvriers,${d.summary.total_workers}\n`;
-        content += `Heures travaillees,${d.summary.total_working_hours}\n\n`;
+        let content = '';
+        content += csvRow(['Résumé global']);
+        content += csvRow(['Projets totaux', d.summary.total_projects]);
+        content += csvRow(['Projets actifs', d.summary.active_projects]);
+        content += csvRow(['Projets complétés', d.summary.completed_projects]);
+        content += csvRow(['Tâches totales', d.summary.total_tasks]);
+        content += csvRow(['Tâches complétées', d.summary.completed_tasks]);
+        if (showBudget) {
+            content += csvRow([`Budget total (${currency})`, d.summary.total_budget]);
+        }
+        content += csvRow(['Ouvriers', d.summary.total_workers]);
+        content += csvRow(['Heures travaillées', d.summary.total_working_hours]);
+        content += '\n';
 
-        content += 'Projets par statut\n';
+        content += csvRow(['Projets par statut']);
         Object.entries(d.projects_by_status).forEach(([status, count]: any) => {
-            content += `${status},${count}\n`;
+            content += csvRow([status, count]);
         });
 
         return content;
@@ -213,14 +239,39 @@ export default function ReportsIndex({
 
     const generateProjectContent = (): string => {
         const selectedProjects = reportData.data;
-        const header = showBudget
-            ? `Nom,Statut,Debut,Fin,Budget ${currency},Manager,Ingenieur,Taches completees,Ouvriers,Etapes\n`
-            : 'Nom,Statut,Debut,Fin,Manager,Ingenieur,Taches completees,Ouvriers,Etapes\n';
-        let content = header;
+        let content = '';
+        content += csvRow(
+            showBudget
+                ? ['Nom', 'Statut', 'Début', 'Fin', `Budget (${currency})`, 'Manager', 'Ingénieur', 'Tâches', 'Ouvriers', 'Étapes']
+                : ['Nom', 'Statut', 'Début', 'Fin', 'Manager', 'Ingénieur', 'Tâches', 'Ouvriers', 'Étapes'],
+        );
         selectedProjects.forEach((p: any) => {
-            content += showBudget
-                ? `${p.name},${p.status},${p.start_date},${p.deadline},${p.budget},${p.manager || '-'},${p.engineer || '-'},${p.completed_tasks}/${p.total_tasks},${p.total_workers},${p.total_steps}\n`
-                : `${p.name},${p.status},${p.start_date},${p.deadline},${p.manager || '-'},${p.engineer || '-'},${p.completed_tasks}/${p.total_tasks},${p.total_workers},${p.total_steps}\n`;
+            content += csvRow(
+                showBudget
+                    ? [
+                          p.name,
+                          p.status,
+                          p.start_date,
+                          p.deadline,
+                          p.budget,
+                          p.manager || '-',
+                          p.engineer || '-',
+                          `${p.completed_tasks}/${p.total_tasks}`,
+                          p.total_workers,
+                          p.total_steps,
+                      ]
+                    : [
+                          p.name,
+                          p.status,
+                          p.start_date,
+                          p.deadline,
+                          p.manager || '-',
+                          p.engineer || '-',
+                          `${p.completed_tasks}/${p.total_tasks}`,
+                          p.total_workers,
+                          p.total_steps,
+                      ],
+            );
         });
 
         return content;
@@ -228,9 +279,19 @@ export default function ReportsIndex({
 
     const generateWorkerContent = (): string => {
         const selectedWorkers = reportData.data;
-        let content = 'Nom,Email,Role,Taches completees,Projets,Jours presents,Heures totales,Moyenne/jour\n';
+        let content = '';
+        content += csvRow(['Nom', 'Email', 'Rôle', 'Tâches', 'Projets', 'Jours présents', 'Heures totales', 'Moyenne/jour']);
         selectedWorkers.forEach((w: any) => {
-            content += `${w.name},${w.email},${w.role},${w.completed_tasks}/${w.total_tasks},${w.projects_worked_on},${w.attendance_days},${w.total_working_hours},${w.avg_hours_per_day}\n`;
+            content += csvRow([
+                w.name,
+                w.email,
+                w.role,
+                `${w.completed_tasks}/${w.total_tasks}`,
+                w.projects_worked_on,
+                w.attendance_days,
+                w.total_working_hours,
+                w.avg_hours_per_day,
+            ]);
         });
 
         return content;
@@ -238,14 +299,17 @@ export default function ReportsIndex({
 
     const generateActivitiesContent = (): string => {
         const d = reportData.data;
-        let content = `Activites totales,${d.total_activities}\n\n`;
-        content += 'Par action\n';
+        let content = '';
+        content += csvRow(['Activités totales', d.total_activities]);
+        content += '\n';
+        content += csvRow(['Par action']);
         Object.entries(d.action_statistics).forEach(([action, count]: any) => {
-            content += `${action},${count}\n`;
+            content += csvRow([action, count]);
         });
-        content += '\nPar utilisateur\n';
+        content += '\n';
+        content += csvRow(['Par utilisateur']);
         d.user_statistics.forEach((s: any) => {
-            content += `${s.user_name || 'Inconnu'},${s.count}\n`;
+            content += csvRow([s.user_name || 'Inconnu', s.count]);
         });
 
         return content;
