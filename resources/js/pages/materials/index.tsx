@@ -621,6 +621,32 @@ export default function MaterialsIndex({
                 </Button>
               )}
 
+              {(isMagasinier || isManager) && activeChantierId && (
+                <>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setStockMovementData((prev) => ({ ...prev, material_id: '' }));
+                      setOpenStockInDialog(true);
+                    }}
+                    className="h-12 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white hover:bg-emerald-700"
+                  >
+                    + Entrée stock
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setStockMovementData((prev) => ({ ...prev, material_id: '' }));
+                      setOpenStockOutDialog(true);
+                    }}
+                    className="h-12 rounded-xl border-slate-200 px-5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    - Sortie stock
+                  </Button>
+                </>
+              )}
+
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
                 <Button className="h-12 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all hover:scale-105 active:scale-95">
@@ -827,7 +853,7 @@ export default function MaterialsIndex({
 
                     <Dialog open={openStockInDialog} onOpenChange={setOpenStockInDialog}>
                         <DialogContent>
-                            <DialogTitle>Entrée de matériel</DialogTitle>
+                            <DialogTitle>Entrée de stock</DialogTitle>
                             <form className="mt-4 space-y-4" onSubmit={handleStockInSubmit}>
                                 <div>
                                     <Label htmlFor="material-in">Matériau *</Label>
@@ -885,7 +911,7 @@ export default function MaterialsIndex({
 
                     <Dialog open={openStockOutDialog} onOpenChange={setOpenStockOutDialog}>
                         <DialogContent>
-                            <DialogTitle>Sortie de matériel</DialogTitle>
+                            <DialogTitle>Sortie de stock</DialogTitle>
                             <form className="mt-4 space-y-4" onSubmit={handleStockOutSubmit}>
                                 <div>
                                     <Label htmlFor="material-out">Matériau *</Label>

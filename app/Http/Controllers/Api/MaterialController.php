@@ -446,7 +446,7 @@ class MaterialController extends Controller
         }
 
         if (auth()->user()?->role === UserRole::Magasinier) {
-            abort(403, 'Le magasinier ne peut pas supprimer les matériels.');
+            abort(403, 'Le magasinier ne peut pas supprimer de matériau.');
         }
 
         $this->authorizeMaterialAccess(auth()->user(), $material);

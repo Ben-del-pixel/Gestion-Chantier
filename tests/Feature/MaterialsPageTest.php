@@ -210,6 +210,7 @@ test('magasinier cannot delete a material', function () {
     $material = Material::factory()->create([
         'project_id' => $project->id,
         'storekeeper_id' => $magasinier->id,
+        'type' => 'materiel',
     ]);
 
     $this->actingAs($magasinier)
@@ -219,6 +220,37 @@ test('magasinier cannot delete a material', function () {
     $this->assertDatabaseHas('materials', [
         'id' => $material->id,
     ]);
+});
+
+test('magasinier can record stock entry and exit for consumable material', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $project = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
+    $material = Material::factory()->create([
+        'project_id' => $project->id,
+        'storekeeper_id' => $magasinier->id,
+        'type' => 'materiaux',
+        'quantity_in_stock' => 50,
+    ]);
+
+    $this->actingAs($magasinier)
+        ->post(route('materials.stock-in'), [
+            'material_id' => $material->id,
+            'quantity' => 10,
+            'reason' => 'restock',
+        ])
+        ->assertRedirect(route('materials.index', ['project_id' => $project->id]));
+
+    expect((float) $material->fresh()->quantity_in_stock)->toBe(60.0);
+
+    $this->actingAs($magasinier)
+        ->post(route('materials.stock-out'), [
+            'material_id' => $material->id,
+            'quantity' => 5,
+            'reason' => 'perte',
+        ])
+        ->assertRedirect(route('materials.index', ['project_id' => $project->id]));
+
+    expect((float) $material->fresh()->quantity_in_stock)->toBe(55.0);
 });
 
 test('manager can allocate material to project', function () {
