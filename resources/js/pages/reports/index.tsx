@@ -21,7 +21,11 @@ export default function ReportsIndex({
     sentReports,
     potentialRecipients,
 }: any) {
-    const page = usePage().props as { auth?: { user?: { role?: string } } };
+    const page = usePage().props as {
+        auth?: { user?: { role?: string } };
+        errors?: Record<string, string>;
+    };
+    const formErrors = page.errors ?? {};
     const isWorker = page.auth?.user?.role === UserRole.Worker.value;
     const isManager = page.auth?.user?.role === UserRole.Manager.value;
     const showBudget = page.canViewBudget ?? true;
@@ -134,28 +138,42 @@ export default function ReportsIndex({
             return;
         }
 
+        if (submissionForm.content.trim().length < 20) {
+            alert('Le contenu doit contenir au moins 20 caracteres.');
+
+            return;
+        }
+
         setSubmitLoading(true);
 
-        router.post(
-            submit.url(),
-            {
-                title: submissionForm.title,
-                content: submissionForm.content,
-                project_id: submissionForm.project_id || null,
-                recipient_id: submissionForm.recipient_id || null,
+        const payload: Record<string, string | null> = {
+            title: submissionForm.title.trim(),
+            content: submissionForm.content.trim(),
+            project_id: submissionForm.project_id || null,
+        };
+
+        if (isManager && submissionForm.recipient_id) {
+            payload.recipient_id = submissionForm.recipient_id;
+        }
+
+        router.post(submit.url(), payload, {
+            onSuccess: () => {
+                setSubmissionForm({ title: '', content: '', project_id: '', recipient_id: '' });
             },
-            {
-                onSuccess: () => {
-                    setSubmissionForm({ title: '', content: '', project_id: '', recipient_id: '' });
-                },
-                onError: () => {
-                    alert('Erreur lors de la soumission du rapport');
-                },
-                onFinish: () => {
-                    setSubmitLoading(false);
-                },
-            }
-        );
+            onError: (errors) => {
+                const firstError =
+                    errors.content ||
+                    errors.title ||
+                    errors.recipient_id ||
+                    errors.recipient ||
+                    errors.project_id;
+
+                alert(firstError || 'Erreur lors de la soumission du rapport');
+            },
+            onFinish: () => {
+                setSubmitLoading(false);
+            },
+        });
     };
 
     const handleDownloadReport = () => {
@@ -380,8 +398,18 @@ export default function ReportsIndex({
                                             className={formTextareaClass}
                                             rows={6}
                                             placeholder="Detaillez les points importants du jour..."
+                                            minLength={20}
                                             required
                                         />
+                                        <p className="text-xs text-muted-foreground">
+                                            Minimum 20 caracteres ({submissionForm.content.trim().length}/20)
+                                        </p>
+                                        {formErrors.content && (
+                                            <p className="text-xs text-rose-600">{formErrors.content}</p>
+                                        )}
+                                        {formErrors.recipient && (
+                                            <p className="text-xs text-rose-600">{formErrors.recipient}</p>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">

@@ -1180,6 +1180,9 @@ export default function MaterialsIndex({
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                            ))}
+                                    </div>
                                 </CollapsibleContent>
                             </Collapsible>
                         ))

@@ -29,14 +29,17 @@ it('worker cannot access reports or submit', function () {
 it('magasinier submits report to engineer', function () {
     $engineer = User::factory()->create(['role' => UserRole::Engineer]);
     $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
-    $project = Project::factory()->create(['engineer_id' => $engineer->id]);
-    $project->workers()->sync([$magasinier->id]);
+    $project = Project::factory()->create([
+        'engineer_id' => $engineer->id,
+        'storekeeper_id' => $magasinier->id,
+    ]);
 
     $this->actingAs($magasinier)
         ->post(route('reports.submit'), [
             'title' => 'Rapport stock',
             'content' => 'Inventaire mis a jour, sorties de stock enregistrees et ecarts verifies.',
             'project_id' => $project->id,
+            'recipient_id' => '',
         ])
         ->assertRedirect(route('reports.index'));
 
@@ -44,6 +47,28 @@ it('magasinier submits report to engineer', function () {
 
     expect($report)->not->toBeNull();
     expect($report->sender_id)->toBe($magasinier->id);
+    expect($report->recipient_id)->toBe($engineer->id);
+});
+
+it('magasinier without project still submits to an engineer', function () {
+    $engineer = User::factory()->create(['role' => UserRole::Engineer]);
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    Project::factory()->create([
+        'engineer_id' => $engineer->id,
+        'storekeeper_id' => $magasinier->id,
+    ]);
+
+    $this->actingAs($magasinier)
+        ->post(route('reports.submit'), [
+            'title' => 'Rapport stock hebdomadaire',
+            'content' => 'Etat des stocks, mouvements et alertes pour la semaine en cours.',
+            'recipient_id' => '',
+        ])
+        ->assertRedirect(route('reports.index'));
+
+    $report = ReportSubmission::query()->latest('id')->first();
+
+    expect($report)->not->toBeNull();
     expect($report->recipient_id)->toBe($engineer->id);
 });
 

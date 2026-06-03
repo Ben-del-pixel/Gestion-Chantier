@@ -43,6 +43,11 @@ class ReportController extends Controller
                 })
                 ->orderBy('name')
                 ->get();
+        } elseif ($user->role === UserRole::Magasinier) {
+            $projects = Project::select('id', 'name')
+                ->where('storekeeper_id', $user->id)
+                ->orderBy('name')
+                ->get();
         } else {
             $projects = Project::select('id', 'name')->orderBy('name')->get();
         }
@@ -126,7 +131,13 @@ class ReportController extends Controller
             }
         }
 
-        $recipientId = $validated['recipient_id'] ?? $this->resolveRecipientIdForUser($user, $userRoleValue, $validated['project_id'] ?? null);
+        $projectId = isset($validated['project_id']) && $validated['project_id'] !== null
+            ? (int) $validated['project_id']
+            : null;
+
+        $recipientId = filled($validated['recipient_id'] ?? null)
+            ? (int) $validated['recipient_id']
+            : $this->resolveRecipientIdForUser($user, $userRoleValue, $projectId);
 
         if (! $recipientId) {
             return back()->withErrors([
@@ -188,7 +199,26 @@ class ReportController extends Controller
             return User::where('role', UserRole::Manager->value)->value('id');
         }
 
-        if (in_array($userRoleValue, [UserRole::Worker->value, UserRole::Magasinier->value], true)) {
+        if ($userRoleValue === UserRole::Magasinier->value) {
+            $engineerId = null;
+            if ($projectId) {
+                $engineerId = Project::where('id', $projectId)->value('engineer_id');
+            }
+            if (! $engineerId) {
+                $engineerId = Project::query()
+                    ->where('storekeeper_id', $user->id)
+                    ->whereNotNull('engineer_id')
+                    ->value('engineer_id');
+            }
+
+            if ($engineerId) {
+                return (int) $engineerId;
+            }
+
+            return User::where('role', UserRole::Engineer->value)->value('id');
+        }
+
+        if ($userRoleValue === UserRole::Worker->value) {
             $engineerId = null;
             if ($projectId) {
                 $engineerId = Project::where('id', $projectId)->value('engineer_id');
