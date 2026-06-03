@@ -262,7 +262,10 @@ export default function MaterialsIndex({
             storekeeper_name: string;
             projects: Record<number, {
                 project_name: string;
-                materials: MaterialItem[];
+                categories: Record<string, {
+                    category_name: string;
+                    materials: MaterialItem[];
+                }>;
             }>;
         }> = {};
 
@@ -270,6 +273,7 @@ export default function MaterialsIndex({
             const storekeeperName = material.project?.storekeeper?.name || 'Stock Principal';
             const projectId = material.project_id || 0;
             const projectName = material.project?.name || 'Général';
+            const categoryName = material.category || (material.type === 'materiel' ? 'Équipement' : 'Divers');
 
             if (!groups[storekeeperName]) {
                 groups[storekeeperName] = {
@@ -281,11 +285,18 @@ export default function MaterialsIndex({
             if (!groups[storekeeperName].projects[projectId]) {
                 groups[storekeeperName].projects[projectId] = {
                     project_name: projectName,
+                    categories: {},
+                };
+            }
+
+            if (!groups[storekeeperName].projects[projectId].categories[categoryName]) {
+                groups[storekeeperName].projects[projectId].categories[categoryName] = {
+                    category_name: categoryName,
                     materials: [],
                 };
             }
 
-            groups[storekeeperName].projects[projectId].materials.push(material);
+            groups[storekeeperName].projects[projectId].categories[categoryName].materials.push(material);
         });
 
         // Convert nested objects to sorted arrays
@@ -293,7 +304,12 @@ export default function MaterialsIndex({
             .sort((a, b) => a.storekeeper_name.localeCompare(b.storekeeper_name))
             .map(group => ({
                 ...group,
-                projects: Object.values(group.projects).sort((a, b) => a.project_name.localeCompare(b.project_name))
+                projects: Object.values(group.projects)
+                    .sort((a, b) => a.project_name.localeCompare(b.project_name))
+                    .map(project => ({
+                        ...project,
+                        categories: Object.values(project.categories).sort((a, b) => a.category_name.localeCompare(b.category_name))
+                    }))
             }));
     }, [filteredMaterials]);
 
@@ -1028,10 +1044,21 @@ export default function MaterialsIndex({
                                                     <div className="h-1.5 w-10 rounded-full bg-blue-500 shadow-sm shadow-blue-500/20"></div>
                                                     <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500">Chantier : {project.project_name}</h3>
                                                 </div>
-                                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                                    {project.materials.map((material) => (
-                                                        <Card key={material.id} className="group relative rounded-[32px] border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 overflow-hidden">
-                                                            <CardHeader className="space-y-4 p-6 pb-0">
+                                                
+                                                <div className="space-y-8">
+                                                    {project.categories.map((category) => (
+                                                        <div key={category.category_name} className="space-y-4">
+                                                            <div className="flex items-center gap-2 px-1">
+                                                                <Badge variant="secondary" className="bg-slate-200 text-slate-700 font-bold px-3 py-1 text-[10px] uppercase tracking-wider rounded-lg">
+                                                                    {category.category_name}
+                                                                </Badge>
+                                                                <div className="h-[1px] flex-1 bg-slate-200"></div>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                                                {category.materials.map((material) => (
+                                                                    <Card key={material.id} className="group relative rounded-[32px] border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 overflow-hidden">
+                                                                        <CardHeader className="space-y-4 p-6 pb-0">
                                                                 <div className="flex items-start justify-between">
                                                                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors duration-500 ${material.type === 'materiel' ? 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600' : 'bg-amber-100 text-amber-600 group-hover:bg-amber-600'} group-hover:text-white`}>
                                                                         {material.type === 'materiel' ? <Wrench className="h-6 w-6" /> : <Package className="h-6 w-6" />}
