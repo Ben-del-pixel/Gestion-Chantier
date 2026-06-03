@@ -192,6 +192,8 @@ export default function ReportsIndex({
 
     const generateReportContent = (): string => {
         let content = '';
+        // Hint Excel to use semicolon separator and avoid column disorder on open.
+        content += `sep=${csvSeparator}\n`;
         content += csvRow([`Rapport ${reportData.type}`]);
         content += csvRow(['Généré le', new Date().toLocaleString('fr-FR')]);
         content += csvRow([
@@ -485,98 +487,100 @@ export default function ReportsIndex({
                     </Card>
                 </div>
 
-                <Card className={cn('shadow-none border-border/50 bg-card/60 backdrop-blur-sm', isWorker && 'rounded-md border')}>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Filter className="h-5 w-5" />
-                            Parametres du rapport analytique
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleGenerateReport} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type de rapport</Label>
-                                    <select
-                                        value={selectedReport}
-                                        onChange={(event) => setSelectedReport(event.target.value)}
-                                        className={formControlClass}
-                                    >
-                                        {analyticsReportTypes.map((type: any) => (
-                                            <option key={type.value} value={type.value}>{type.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {selectedReport === 'project' && (
+                {isManager && (
+                    <Card className={cn('shadow-none border-border/50 bg-card/60 backdrop-blur-sm', isWorker && 'rounded-md border')}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Filter className="h-5 w-5" />
+                                Parametres du rapport analytique
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={handleGenerateReport} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Projet</Label>
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type de rapport</Label>
                                         <select
-                                            value={projectId}
-                                            onChange={(event) => setProjectId(event.target.value)}
+                                            value={selectedReport}
+                                            onChange={(event) => setSelectedReport(event.target.value)}
                                             className={formControlClass}
                                         >
-                                            <option value="">{isManager ? '-- Tous les projets --' : '-- Sélectionner un projet --'}</option>
-                                            {projects.map((project: any) => (
-                                                <option key={project.id} value={project.id}>{project.name}</option>
+                                            {analyticsReportTypes.map((type: any) => (
+                                                <option key={type.value} value={type.value}>{type.label}</option>
                                             ))}
                                         </select>
                                     </div>
-                                )}
 
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                                        <Calendar className="h-4 w-4" />
-                                        Date debut
-                                    </Label>
-                                    <Input
-                                        type="date"
-                                        value={startDate}
-                                        onChange={(event) => setStartDate(event.target.value)}
-                                        className={formControlClass}
-                                    />
-                                </div>
+                                    {selectedReport === 'project' && (
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Projet</Label>
+                                            <select
+                                                value={projectId}
+                                                onChange={(event) => setProjectId(event.target.value)}
+                                                className={formControlClass}
+                                            >
+                                                <option value="">{isManager ? '-- Tous les projets --' : '-- Sélectionner un projet --'}</option>
+                                                {projects.map((project: any) => (
+                                                    <option key={project.id} value={project.id}>{project.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
 
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                                        <Calendar className="h-4 w-4" />
-                                        Date fin
-                                    </Label>
-                                    <Input
-                                        type="date"
-                                        value={endDate}
-                                        onChange={(event) => setEndDate(event.target.value)}
-                                        className={formControlClass}
-                                    />
-                                </div>
-
-                                {selectedReport === 'worker' && (
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ouvrier</Label>
-                                        <select
-                                            value={workerId}
-                                            onChange={(event) => setWorkerId(event.target.value)}
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" />
+                                            Date debut
+                                        </Label>
+                                        <Input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(event) => setStartDate(event.target.value)}
                                             className={formControlClass}
-                                        >
-                                            <option value="">-- Tous --</option>
-                                            {workers.map((worker: any) => (
-                                                <option key={worker.id} value={worker.id}>{worker.name}</option>
-                                            ))}
-                                        </select>
+                                        />
                                     </div>
-                                )}
-                            </div>
 
-                            <div className="flex gap-2">
-                                <Button type="submit" disabled={loading} className="rounded-lg">
-                                    {loading ? 'Generation...' : 'Generer le rapport'}
-                                </Button>
-                            </div>
-                        </form>
-                    </CardContent>
-                </Card>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" />
+                                            Date fin
+                                        </Label>
+                                        <Input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(event) => setEndDate(event.target.value)}
+                                            className={formControlClass}
+                                        />
+                                    </div>
 
-                {reportData && (
+                                    {selectedReport === 'worker' && (
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ouvrier</Label>
+                                            <select
+                                                value={workerId}
+                                                onChange={(event) => setWorkerId(event.target.value)}
+                                                className={formControlClass}
+                                            >
+                                                <option value="">-- Tous --</option>
+                                                {workers.map((worker: any) => (
+                                                    <option key={worker.id} value={worker.id}>{worker.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <Button type="submit" disabled={loading} className="rounded-lg">
+                                        {loading ? 'Generation...' : 'Generer le rapport'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {isManager && reportData && (
                     <Card className="shadow-none border-border/50 bg-card/60 backdrop-blur-sm">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0">
                             <div>

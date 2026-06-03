@@ -9,10 +9,12 @@ use App\Models\ActivityLog;
 use App\Models\Attendance;
 use App\Models\Material;
 use App\Models\Project;
+use App\Models\ProjectStep;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\ProjectDeadlineAlertNotifier;
 use App\Support\ProjectDeadlineAlerts;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,42 @@ class DashboardController extends Controller
         ];
 
         if ($user->role === UserRole::Manager) {
+            $months = collect(range(5, 0, -1))
+                ->map(fn (int $offset) => Carbon::now()->subMonths($offset)->startOfMonth());
+
+            $completedSteps = ProjectStep::query()
+                ->where('is_completed', true)
+                ->whereNotNull('completed_at')
+                ->where('completed_at', '>=', Carbon::now()->subMonths(5)->startOfMonth())
+                ->get(['completed_at', 'budget']);
+
+            $costsByMonth = $completedSteps
+                ->groupBy(fn (ProjectStep $step) => Carbon::parse($step->completed_at)->format('Y-m'))
+                ->map(fn ($steps) => (float) $steps->sum('budget'));
+
+            $costEvolution = [
+                'labels' => $months
+                    ->map(fn (Carbon $month) => $month->translatedFormat('M'))
+                    ->all(),
+                'values' => $months
+                    ->map(function (Carbon $month) use ($costsByMonth) {
+                        $key = $month->format('Y-m');
+
+                        return (float) ($costsByMonth[$key] ?? 0);
+                    })
+                    ->all(),
+            ];
+
+            $stockMaterialNames = Material::query()
+                ->where('quantity_in_stock', '>', 0)
+                ->orderByDesc('quantity_in_stock')
+                ->limit(4)
+                ->pluck('name')
+                ->filter()
+                ->map(fn ($name) => (string) $name)
+                ->values()
+                ->all();
+
             $data['projects'] = Project::with(['engineer', 'steps'])->latest()->get();
             $data['projectDeadlineAlerts'] = ProjectDeadlineAlerts::fromProjects($data['projects']);
             $data['stats'] = [
@@ -63,8 +101,10 @@ class DashboardController extends Controller
                 'total_workers' => User::where('role', UserRole::Worker)->count(),
                 'total_materials' => Material::sum('quantity_in_stock'),
                 'total_tasks' => Task::count(),
+                'stock_material_names' => $stockMaterialNames,
             ];
             $data['recentActivities'] = ActivityLog::with('user')->latest()->take(5)->get();
+            $data['costEvolution'] = $costEvolution;
             $data['materialDistribution'] = Material::select('category', DB::raw('sum(quantity_in_stock) as total'))
                 ->groupBy('category')
                 ->get()

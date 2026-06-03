@@ -204,6 +204,23 @@ test('manager can delete a material', function () {
     ]);
 });
 
+test('magasinier cannot delete a material', function () {
+    $magasinier = User::factory()->create(['role' => UserRole::Magasinier]);
+    $project = Project::factory()->create(['storekeeper_id' => $magasinier->id]);
+    $material = Material::factory()->create([
+        'project_id' => $project->id,
+        'storekeeper_id' => $magasinier->id,
+    ]);
+
+    $this->actingAs($magasinier)
+        ->delete(route('materials.destroy', ['material' => $material->id]))
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('materials', [
+        'id' => $material->id,
+    ]);
+});
+
 test('manager can allocate material to project', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $storekeeper = User::factory()->create(['role' => UserRole::Magasinier]);

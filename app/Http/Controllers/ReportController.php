@@ -61,7 +61,8 @@ class ReportController extends Controller
 
         $potentialRecipients = [];
         if ($user->role === UserRole::Manager) {
-            $potentialRecipients = User::where('role', '!=', UserRole::Manager)
+            $potentialRecipients = User::query()
+                ->whereIn('role', [UserRole::Engineer->value, UserRole::ChefChantier->value])
                 ->orderBy('role')
                 ->orderBy('name')
                 ->get(['id', 'name', 'role']);
@@ -79,6 +80,7 @@ class ReportController extends Controller
             'sentReports' => $sentReports,
             'potentialRecipients' => $potentialRecipients,
             'canSubmitReport' => in_array($userRoleValue, [
+                UserRole::Manager->value,
                 UserRole::Magasinier->value,
                 UserRole::Engineer->value,
                 UserRole::ChefChantier->value,
@@ -92,11 +94,8 @@ class ReportController extends Controller
         $user = $request->user();
         $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
 
-        if ($userRoleValue === UserRole::Manager->value) {
-            abort(403, 'Le manager ne soumet pas de rapport opérationnel.');
-        }
-
         if (! in_array($userRoleValue, [
+            UserRole::Manager->value,
             UserRole::Magasinier->value,
             UserRole::Engineer->value,
             UserRole::ChefChantier->value,
@@ -110,6 +109,22 @@ class ReportController extends Controller
             'project_id' => ['nullable', 'exists:projects,id'],
             'recipient_id' => ['nullable', 'exists:users,id'],
         ]);
+
+        if ($userRoleValue === UserRole::Manager->value) {
+            if (! isset($validated['recipient_id']) || ! $validated['recipient_id']) {
+                return back()->withErrors([
+                    'recipient_id' => 'Le manager doit choisir un destinataire.',
+                ]);
+            }
+
+            $recipient = User::query()->find((int) $validated['recipient_id']);
+            $recipientRoleValue = $recipient?->role instanceof UserRole ? $recipient->role->value : (string) $recipient?->role;
+            if (! $recipient || ! in_array($recipientRoleValue, [UserRole::Engineer->value, UserRole::ChefChantier->value], true)) {
+                return back()->withErrors([
+                    'recipient_id' => 'Le destinataire doit être un ingénieur ou un chef de chantier.',
+                ]);
+            }
+        }
 
         $recipientId = $validated['recipient_id'] ?? $this->resolveRecipientIdForUser($user, $userRoleValue, $validated['project_id'] ?? null);
 
@@ -134,7 +149,7 @@ class ReportController extends Controller
     private function resolveTargetLabel(string $role): string
     {
         return match ($role) {
-            UserRole::Manager->value => 'Destinataire au choix',
+            UserRole::Manager->value => 'Ingénieur ou Chef de chantier',
             UserRole::Engineer->value => 'Manager',
             UserRole::ChefChantier->value => 'Ingénieur',
             UserRole::Worker->value, UserRole::Magasinier->value => 'Ingénieur',
@@ -286,38 +301,8 @@ class ReportController extends Controller
 
     private function assertUserCanGenerateReport(User $user, UserRole $role, array $validated): void
     {
-        $type = $validated['type'];
-        $projectId = isset($validated['project_id']) ? (int) $validated['project_id'] : null;
-        $workerId = isset($validated['worker_id']) ? (int) $validated['worker_id'] : null;
-
-        if ($role === UserRole::Worker) {
-            abort(403, 'Les ouvriers ne peuvent pas générer de rapports.');
-        }
-
-        if ($role === UserRole::Manager) {
-            return;
-        }
-
-        if (in_array($type, ['global', 'activities'], true)) {
-            abort(403, 'Ce type de rapport est réservé au manager.');
-        }
-
-        if ($type === 'project') {
-            if (! $projectId) {
-                abort(422, 'Sélectionnez un projet pour générer ce rapport.');
-            }
-            if (! $this->userCanAccessProjectForReport($user, $role, $projectId)) {
-                abort(403, 'Accès non autorisé à ce projet.');
-            }
-        }
-
-        if ($type === 'worker') {
-            if (! $workerId) {
-                abort(422, 'Sélectionnez un ouvrier pour générer ce rapport.');
-            }
-            if (! $this->userCanAccessWorkerForReport($user, $role, $workerId)) {
-                abort(403, 'Accès non autorisé pour ce profil.');
-            }
+        if ($role !== UserRole::Manager) {
+            abort(403, 'Seul le manager peut générer des rapports.');
         }
     }
 

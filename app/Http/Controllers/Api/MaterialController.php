@@ -52,9 +52,10 @@ class MaterialController extends Controller
 
         // Manager sees all materials (optionally filtered by project)
         if ($user->role === UserRole::Manager) {
-            $materialsQuery = Material::when($projectFilter, function ($q) use ($projectFilter) {
-                $q->where('project_id', $projectFilter);
-            })->latest('updated_at');
+            $materialsQuery = Material::with(['project', 'project.storekeeper'])
+                ->when($projectFilter, function ($q) use ($projectFilter) {
+                    $q->where('project_id', $projectFilter);
+                })->latest('updated_at');
         } elseif ($user->role === UserRole::Magasinier) {
             $managedProjectIds = $this->magasinierProjectIds($user);
 
@@ -63,7 +64,9 @@ class MaterialController extends Controller
             }
 
             if ($projectFilter) {
-                $materialsQuery = Material::where('project_id', $projectFilter)->latest('updated_at');
+                $materialsQuery = Material::with(['project', 'project.storekeeper'])
+                    ->where('project_id', $projectFilter)
+                    ->latest('updated_at');
             } else {
                 $materialsQuery = Material::whereRaw('0 = 1');
             }
@@ -146,6 +149,24 @@ class MaterialController extends Controller
             })
             ->values();
 
+        $defaultUnitOptions = collect(['sacs', 'tonnes', 'milliers', 'm3', 'unite']);
+        $unitOptions = $materials
+            ->pluck('unit')
+            ->filter(fn ($unit) => filled($unit))
+            ->map(fn ($unit) => trim((string) $unit))
+            ->merge($defaultUnitOptions)
+            ->unique()
+            ->values()
+            ->all();
+
+        $categoryOptions = $materials
+            ->pluck('category')
+            ->filter(fn ($category) => filled($category))
+            ->map(fn ($category) => trim((string) $category))
+            ->unique()
+            ->values()
+            ->all();
+
         return Inertia::render('materials/index', [
             'materials' => $materials,
             'storekeeperAllocationGroups' => $storekeeperAllocationGroups,
@@ -153,6 +174,8 @@ class MaterialController extends Controller
             'movements' => $movements,
             'selectedProjectId' => $projectFilter,
             'selectedProjectName' => $selectedProject['name'] ?? null,
+            'unitOptions' => $unitOptions,
+            'categoryOptions' => $categoryOptions,
         ]);
     }
 
@@ -420,6 +443,10 @@ class MaterialController extends Controller
     {
         if (! $this->canManageMaterials()) {
             abort(403, 'Seul un magasinier ou manager peut supprimer des matériaux');
+        }
+
+        if (auth()->user()?->role === UserRole::Magasinier) {
+            abort(403, 'Le magasinier ne peut pas supprimer les matériels.');
         }
 
         $this->authorizeMaterialAccess(auth()->user(), $material);

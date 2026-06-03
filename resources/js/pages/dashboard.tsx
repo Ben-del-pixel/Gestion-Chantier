@@ -3,7 +3,7 @@ import React from 'react';
 import { ManagerDashboard, EngineerDashboard, WorkerDashboard } from '@/components/dashboards';
 import { UserRole } from '@/Enums/UserRole';
 
-export default function Dashboard({ stats, tasks, projects, recentActivities, materialDistribution, projectDeadlineAlerts }: any) {
+export default function Dashboard({ stats, tasks, projects, recentActivities, materialDistribution, projectDeadlineAlerts, costEvolution }: any) {
     const pageProps = usePage().props as any;
     const { auth } = pageProps;
     const roleValue = auth.user?.role;
@@ -30,6 +30,7 @@ export default function Dashboard({ stats, tasks, projects, recentActivities, ma
                         recentActivities={recentActivities}
                         materialDistribution={materialDistribution}
                         projectDeadlineAlerts={projectDeadlineAlerts}
+                        costEvolution={costEvolution}
                     />
                 )}
                 {roleValue === UserRole.Engineer.value && (

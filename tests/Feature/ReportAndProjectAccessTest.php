@@ -97,7 +97,7 @@ test('engineer cannot delete a project', function () {
     expect(Project::query()->whereKey($project->id)->exists())->toBeTrue();
 });
 
-test('chef project report api omits budget fields', function () {
+test('chef cannot generate project report', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $chef = User::factory()->create(['role' => UserRole::ChefChantier]);
     $project = Project::factory()->create([
@@ -106,15 +106,12 @@ test('chef project report api omits budget fields', function () {
         'budget' => 99000,
     ]);
 
-    $response = $this->actingAs($chef)
+    $this->actingAs($chef)
         ->postJson(route('reports.generate'), [
             'type' => 'project',
             'project_id' => $project->id,
         ])
-        ->assertOk()
-        ->json('data');
-
-    expect($response[0])->not->toHaveKeys(['budget', 'budget_from_steps']);
+        ->assertForbidden();
 });
 
 test('chef cannot generate global report', function () {
@@ -136,7 +133,7 @@ test('chef cannot generate global report', function () {
             'type' => 'project',
             'project_id' => $project->id,
         ])
-        ->assertOk();
+        ->assertForbidden();
 });
 
 test('chef cannot generate project report without project id', function () {
@@ -151,7 +148,7 @@ test('chef cannot generate project report without project id', function () {
         ->postJson(route('reports.generate'), [
             'type' => 'project',
         ])
-        ->assertStatus(422);
+        ->assertForbidden();
 });
 
 test('worker cannot generate reports', function () {
@@ -168,7 +165,23 @@ test('worker cannot generate reports', function () {
         ->assertForbidden();
 });
 
-test('chef can generate worker report for worker on their project', function () {
+test('engineer cannot generate reports', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $engineer = User::factory()->create(['role' => UserRole::Engineer]);
+    $project = Project::factory()->create([
+        'manager_id' => $manager->id,
+        'engineer_id' => $engineer->id,
+    ]);
+
+    $this->actingAs($engineer)
+        ->postJson(route('reports.generate'), [
+            'type' => 'project',
+            'project_id' => $project->id,
+        ])
+        ->assertForbidden();
+});
+
+test('chef cannot generate worker report for worker on their project', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
     $chef = User::factory()->create(['role' => UserRole::ChefChantier]);
     $worker = User::factory()->create(['role' => UserRole::Worker]);
@@ -193,5 +206,5 @@ test('chef can generate worker report for worker on their project', function () 
             'type' => 'worker',
             'worker_id' => $worker->id,
         ])
-        ->assertOk();
+        ->assertForbidden();
 });

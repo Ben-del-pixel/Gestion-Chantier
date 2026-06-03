@@ -65,13 +65,68 @@ it('engineer submits report to manager', function () {
     expect($report->recipient_id)->toBe($manager->id);
 });
 
-it('manager cannot submit operational report', function () {
+it('manager submits report to engineer', function () {
     $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $engineer = User::factory()->create(['role' => UserRole::Engineer]);
 
     $this->actingAs($manager)
         ->post(route('reports.submit'), [
-            'title' => 'Rapport',
+            'title' => 'Rapport managérial',
+            'content' => 'Contenu de test suffisamment long pour valider les contraintes minimales.',
+            'recipient_id' => $engineer->id,
+        ])
+        ->assertRedirect(route('reports.index'));
+
+    $report = ReportSubmission::query()->latest('id')->first();
+
+    expect($report)->not->toBeNull();
+    expect($report->sender_id)->toBe($manager->id);
+    expect($report->recipient_id)->toBe($engineer->id);
+});
+
+it('manager submits report to chef de chantier', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $chef = User::factory()->create(['role' => UserRole::ChefChantier]);
+
+    $this->actingAs($manager)
+        ->post(route('reports.submit'), [
+            'title' => 'Rapport managérial',
+            'content' => 'Contenu de test suffisamment long pour valider les contraintes minimales.',
+            'recipient_id' => $chef->id,
+        ])
+        ->assertRedirect(route('reports.index'));
+
+    $report = ReportSubmission::query()->latest('id')->first();
+
+    expect($report)->not->toBeNull();
+    expect($report->sender_id)->toBe($manager->id);
+    expect($report->recipient_id)->toBe($chef->id);
+});
+
+it('manager cannot submit report without recipient', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+
+    $this->actingAs($manager)
+        ->from(route('reports.index'))
+        ->post(route('reports.submit'), [
+            'title' => 'Rapport managérial',
             'content' => 'Contenu de test suffisamment long pour valider les contraintes minimales.',
         ])
-        ->assertForbidden();
+        ->assertRedirect(route('reports.index'))
+        ->assertSessionHasErrors(['recipient_id']);
+});
+
+it('manager cannot submit report to worker', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    $worker = User::factory()->create(['role' => UserRole::Worker]);
+
+    $this->actingAs($manager)
+        ->from(route('reports.index'))
+        ->post(route('reports.submit'), [
+            'title' => 'Rapport managérial',
+            'content' => 'Contenu de test suffisamment long pour valider les contraintes minimales.',
+            'recipient_id' => $worker->id,
+        ])
+        ->assertRedirect(route('reports.index'))
+        ->assertSessionHasErrors(['recipient_id']);
 });

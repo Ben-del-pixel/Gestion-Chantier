@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\Attendance;
+use App\Models\Material;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -34,8 +35,25 @@ test('manager dashboard exposes project deadline alerts', function () {
             ->component('dashboard')
             ->has('projectDeadlineAlerts.overdue', 1)
             ->has('projectDeadlineAlerts.ending_soon', 1)
+            ->has('costEvolution.labels', 6)
+            ->has('costEvolution.values', 6)
             ->has('deadlineNotifications')
             ->where('deadlineNotifications.unread_count', fn ($c) => (int) $c >= 1)
+        );
+});
+
+test('manager dashboard exposes stocked material names', function () {
+    $manager = User::factory()->create(['role' => UserRole::Manager]);
+    Material::factory()->create(['name' => 'Marteau', 'quantity_in_stock' => 6]);
+    Material::factory()->create(['name' => 'Bêche', 'quantity_in_stock' => 10]);
+    Material::factory()->create(['name' => 'Truelle', 'quantity_in_stock' => 0]);
+
+    $this->actingAs($manager)
+        ->get(route('dashboard'))
+        ->assertSuccessful()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('dashboard')
+            ->where('stats.stock_material_names', ['Bêche', 'Marteau'])
         );
 });
 

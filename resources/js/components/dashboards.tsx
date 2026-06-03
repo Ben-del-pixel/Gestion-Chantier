@@ -146,14 +146,18 @@ export const ManagerDashboard = ({
     recentActivities = [],
     materialDistribution = [],
     projectDeadlineAlerts = null,
+    costEvolution = { labels: [], values: [] },
 }: any) => {
     const { formatCurrency } = useCurrency();
 
+    const costLabels = Array.isArray(costEvolution?.labels) ? costEvolution.labels : [];
+    const costValues = Array.isArray(costEvolution?.values) ? costEvolution.values : [];
+
     const lineData = {
-        labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
+        labels: costLabels.length > 0 ? costLabels : ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
         datasets: [{
-            label: 'montant',
-            data: [45000, 52000, 48000, 61000, 55000, 68000],
+            label: 'coût mensuel',
+            data: costValues.length > 0 ? costValues : [0, 0, 0, 0, 0, 0],
             borderColor: '#3b82f6',
             backgroundColor: '#3b82f6',
             pointBackgroundColor: '#3b82f6',
@@ -189,8 +193,18 @@ export const ManagerDashboard = ({
                         <span className="text-[11px] font-semibold text-emerald-500">Stock</span>
                     </div>
                     <div className="mt-6 space-y-1">
-                        <div className="text-2xl font-semibold tracking-tight text-slate-950">{stats.total_materials || 0}</div>
                         <div className="text-sm text-slate-500">Matériaux en stock</div>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                            {(stats.stock_material_names ?? []).length > 0 ? (
+                                (stats.stock_material_names as string[]).map((materialName) => (
+                                    <Badge key={materialName} variant="outline" className="rounded-full border-blue-100 bg-blue-50 text-xs font-semibold text-blue-700">
+                                        {materialName}
+                                    </Badge>
+                                ))
+                            ) : (
+                                <span className="text-xs text-slate-400">Aucun matériau disponible</span>
+                            )}
+                        </div>
                     </div>
                 </div>
 

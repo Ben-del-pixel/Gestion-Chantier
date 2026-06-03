@@ -1,8 +1,8 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, ChevronRight, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Link as LinkIcon, Wrench, ChevronDown, User } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronRight, Package, Pencil, Plus, Search, Trash2, ClipboardCheck, TrendingUp, LayoutGrid, List, Wrench, ChevronDown, User } from 'lucide-react';
 import React from 'react';
 
-import { allocate, destroy, index as materialsIndex, returnMaterial, stockIn, stockOut, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
+import { destroy, index as materialsIndex, returnMaterial, stockIn, stockOut, store, update } from '@/actions/App/Http/Controllers/Api/MaterialController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/Api/ProjectController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,15 @@ type MaterialItem = {
         project_name: string;
         quantity: number;
     }[];
+    project?: {
+        id: number;
+        name: string;
+        storekeeper_id?: number;
+        storekeeper?: {
+            id: number;
+            name: string;
+        };
+    };
 };
 
 type AllocationLine = {
@@ -131,6 +140,8 @@ export default function MaterialsIndex({
     movements = [],
     selectedProjectId = null,
     selectedProjectName = null,
+    unitOptions: initialUnitOptions = [],
+    categoryOptions: initialCategoryOptions = [],
 }: { 
     materials: MaterialItem[]; 
     storekeeperAllocationGroups?: StorekeeperAllocationGroup[];
@@ -138,13 +149,15 @@ export default function MaterialsIndex({
     movements?: MaterialMovement[];
     selectedProjectId?: number | null;
     selectedProjectName?: string | null;
+    unitOptions?: string[];
+    categoryOptions?: string[];
 }) {
     const page = usePage().props as any;
     const authenticatedUser = page?.auth?.user;
     const canCheckInFromMaterials = authenticatedUser?.role === UserRole.Magasinier.value;
     const isMagasinier = authenticatedUser?.role === UserRole.Magasinier.value;
     const isManager = authenticatedUser?.role === UserRole.Manager.value;
-    const showChantierPicker = isMagasinier && !selectedProjectId;
+    const showChantierPicker = (isMagasinier || isManager) && !selectedProjectId;
     const activeChantierId = selectedProjectId ?? null;
     const activeChantierName =
         selectedProjectName ??
@@ -160,13 +173,15 @@ export default function MaterialsIndex({
     };
     const [searchTerm, setSearchTerm] = React.useState('');
     const [openDialog, setOpenDialog] = React.useState(false);
-    const [openAllocationDialog, setOpenAllocationDialog] = React.useState(false);
     const [openStockInDialog, setOpenStockInDialog] = React.useState(false);
     const [openStockOutDialog, setOpenStockOutDialog] = React.useState(false);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [editingMaterial, setEditingMaterial] = React.useState<MaterialItem | null>(null);
-    const [selectedMaterialForAllocation, setSelectedMaterialForAllocation] = React.useState<MaterialItem | null>(null);
     const [activeTab, setActiveTab] = React.useState('stock');
+    const [unitOptions, setUnitOptions] = React.useState<string[]>(initialUnitOptions);
+    const [categoryOptions, setCategoryOptions] = React.useState<string[]>(initialCategoryOptions);
+    const [newUnit, setNewUnit] = React.useState('');
+    const [newCategory, setNewCategory] = React.useState('');
     const [formData, setFormData] = React.useState({
         name: '',
         description: '',
@@ -176,12 +191,6 @@ export default function MaterialsIndex({
         category: '',
         project_id: '',
         project_step_id: '',
-    });
-    const [allocationFormData, setAllocationFormData] = React.useState({
-        material_id: '',
-        project_id: '',
-        quantity_requested: '',
-        comment: '',
     });
     const [stockMovementData, setStockMovementData] = React.useState({
         material_id: '',
@@ -248,6 +257,46 @@ export default function MaterialsIndex({
         });
     }, [normalizedMaterials, searchTerm]);
 
+    const groupedMaterials = React.useMemo(() => {
+        const groups: Record<string, {
+            storekeeper_name: string;
+            projects: Record<number, {
+                project_name: string;
+                materials: MaterialItem[];
+            }>;
+        }> = {};
+
+        filteredMaterials.forEach((material) => {
+            const storekeeperName = material.project?.storekeeper?.name || 'Stock Principal';
+            const projectId = material.project_id || 0;
+            const projectName = material.project?.name || 'Général';
+
+            if (!groups[storekeeperName]) {
+                groups[storekeeperName] = {
+                    storekeeper_name: storekeeperName,
+                    projects: {},
+                };
+            }
+
+            if (!groups[storekeeperName].projects[projectId]) {
+                groups[storekeeperName].projects[projectId] = {
+                    project_name: projectName,
+                    materials: [],
+                };
+            }
+
+            groups[storekeeperName].projects[projectId].materials.push(material);
+        });
+
+        // Convert nested objects to sorted arrays
+        return Object.values(groups)
+            .sort((a, b) => a.storekeeper_name.localeCompare(b.storekeeper_name))
+            .map(group => ({
+                ...group,
+                projects: Object.values(group.projects).sort((a, b) => a.project_name.localeCompare(b.project_name))
+            }));
+    }, [filteredMaterials]);
+
     const projectsWithStorekeeper = React.useMemo(
         () => projects.filter(
             (p) => p.storekeeper_id != null && p.storekeeper_id !== '' && (p.steps?.length ?? 0) > 0,
@@ -280,6 +329,16 @@ export default function MaterialsIndex({
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
 
+        if (name === 'unit' && value === '__new_unit__') {
+            setFormData((prev) => ({ ...prev, unit: '' }));
+            return;
+        }
+
+        if (name === 'category' && value === '__new_category__') {
+            setFormData((prev) => ({ ...prev, category: '' }));
+            return;
+        }
+
         setFormData((prev) => ({
             ...prev,
             [name]: value,
@@ -287,18 +346,33 @@ export default function MaterialsIndex({
         }));
     };
 
-    const handleAllocationFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        setAllocationFormData({
-            ...allocationFormData,
-            [e.target.name]: e.target.value,
-        });
+    const addCustomUnit = () => {
+        const trimmed = newUnit.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        setUnitOptions((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+        setFormData((prev) => ({ ...prev, unit: trimmed }));
+        setNewUnit('');
+    };
+
+    const addCustomCategory = () => {
+        const trimmed = newCategory.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        setCategoryOptions((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+        setFormData((prev) => ({ ...prev, category: trimmed }));
+        setNewCategory('');
     };
 
     const handleSubmitMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (isManager && !editingMaterial && !formData.project_id) {
-            alert('Sélectionnez un chantier pour lequel un magasinier responsable est déjà affecté.');
+        if (isManager && !editingMaterial && !activeChantierId && !formData.project_id) {
+            alert('Sélectionnez un chantier avant de créer un matériau.');
 
             return;
         }
@@ -320,7 +394,7 @@ export default function MaterialsIndex({
             const payload = editingMaterial
                 ? formFieldsWithoutProject
                 : isManager
-                    ? { ...formFieldsWithoutProject, project_id: Number(project_id) }
+                    ? { ...formFieldsWithoutProject, project_id: activeChantierId ?? Number(project_id) }
                     : isMagasinier && activeChantierId
                         ? { ...formFieldsWithoutProject, project_id: activeChantierId }
                         : formFieldsWithoutProject;
@@ -339,6 +413,8 @@ export default function MaterialsIndex({
                         project_id: '',
                         project_step_id: '',
                     });
+                    setNewUnit('');
+                    setNewCategory('');
                     setEditingMaterial(null);
                     setOpenDialog(false);
                     alert(editingMaterial ? 'Matériel mis à jour avec succès' : 'Matériel créé avec succès');
@@ -358,6 +434,14 @@ export default function MaterialsIndex({
     };
 
     const handleEdit = (material: MaterialItem) => {
+        if (material.unit && !unitOptions.includes(material.unit)) {
+            setUnitOptions((prev) => [...prev, material.unit]);
+        }
+
+        if (material.category && !categoryOptions.includes(material.category)) {
+            setCategoryOptions((prev) => [...prev, material.category]);
+        }
+
         setEditingMaterial(material);
         setFormData({
             name: material.name,
@@ -383,78 +467,6 @@ export default function MaterialsIndex({
             },
             onError: () => {
                 alert('Erreur lors de la suppression');
-            },
-        });
-    };
-
-    const handleOpenAllocationDialog = (material: MaterialItem) => {
-        setSelectedMaterialForAllocation(material);
-        const defaultProjectId =
-            isMagasinier && activeChantierId
-                ? String(activeChantierId)
-                : material.project_id != null && material.project_id !== undefined
-                    ? String(material.project_id)
-                    : '';
-        setAllocationFormData({
-            material_id: material.id.toString(),
-            project_id: defaultProjectId,
-            quantity_requested: '',
-            comment: '',
-        });
-        setOpenAllocationDialog(true);
-    };
-
-    const allocationProjectChoices = React.useMemo(() => {
-        const withStorekeeper = projects.filter((p) => p.storekeeper_id != null && p.storekeeper_id !== '');
-
-        if (isMagasinier && activeChantierId) {
-            return withStorekeeper.filter((p) => p.id === activeChantierId);
-        }
-
-        if (!selectedMaterialForAllocation?.project_id) {
-            return withStorekeeper;
-        }
-
-        return withStorekeeper.filter((p) => p.id === selectedMaterialForAllocation.project_id);
-    }, [activeChantierId, isMagasinier, projects, selectedMaterialForAllocation]);
-
-    const handleSubmitAllocation = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-
-        const materialId = parseInt(allocationFormData.material_id);
-        const quantityRequested = parseFloat(allocationFormData.quantity_requested);
-
-        // Validation instantanée du stock
-        const selectedMaterial = materials.find(m => m.id === materialId);
-
-        if (selectedMaterial && quantityRequested > selectedMaterial.quantity_in_stock) {
-            alert(`Stock insuffisant !\n\nQuantité demandée: ${quantityRequested} ${selectedMaterial.unit}\nStock disponible: ${selectedMaterial.quantity_in_stock} ${selectedMaterial.unit}\n\nVous ne pouvez pas affecter plus que le stock disponible.`);
-            setIsSubmitting(false);
-
-            return;
-        }
-
-        const data = {
-            material_id: materialId,
-            project_id: parseInt(allocationFormData.project_id),
-            quantity_requested: quantityRequested,
-            comment: allocationFormData.comment || null,
-        };
-
-        router.visit(allocate.url(), {
-            method: 'post',
-            data,
-            onSuccess: () => {
-                setAllocationFormData({ material_id: '', project_id: '', quantity_requested: '', comment: '' });
-                setSelectedMaterialForAllocation(null);
-                setOpenAllocationDialog(false);
-            },
-            onError: () => {
-                alert('Erreur lors de l\'affectation du matériau');
-            },
-            onFinish: () => {
-                setIsSubmitting(false);
             },
         });
     };
@@ -503,12 +515,14 @@ export default function MaterialsIndex({
     if (showChantierPicker) {
         return (
             <>
-                <Head title="Mes chantiers — Matériaux" />
+                <Head title="Chantiers — Matériaux" />
                 <div className="space-y-8">
                     <div>
-                        <h1 className="text-4xl font-black tracking-tight text-slate-900">Mes chantiers</h1>
+                        <h1 className="text-4xl font-black tracking-tight text-slate-900">{isManager ? 'Chantiers' : 'Mes chantiers'}</h1>
                         <p className="mt-1 font-medium text-slate-500">
-                            Choisissez un chantier pour gérer le stock, les entrées et les sorties de matériaux.
+                            {isManager
+                                ? 'Choisissez un chantier pour gérer son stock, ses entrées et ses sorties.'
+                                : 'Choisissez un chantier pour gérer le stock, les entrées et les sorties de matériaux.'}
                         </p>
                     </div>
 
@@ -561,7 +575,7 @@ export default function MaterialsIndex({
       <div className="space-y-6">
         <div className="flex flex-col gap-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              {isMagasinier && (
+              {(isMagasinier || isManager) && (
                 <Button
                   type="button"
                   variant="outline"
@@ -640,12 +654,26 @@ export default function MaterialsIndex({
                                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                                             required
                                         >
-                                            <option value="sacs">Sacs</option>
-                                            <option value="tonnes">Tonnes</option>
-                                            <option value="milliers">Milliers</option>
-                                            <option value="m3">m³</option>
-                                            <option value="unite">Unité</option>
+                                            <option value="">-- Choisir une unité --</option>
+                                            {unitOptions.map((unit) => (
+                                                <option key={unit} value={unit}>
+                                                    {unit}
+                                                </option>
+                                            ))}
+                                            <option value="__new_unit__">+ Ajouter une unité</option>
                                         </select>
+                                        {(formData.unit === '' || !unitOptions.includes(formData.unit)) && (
+                                            <div className="mt-2 flex gap-2">
+                                                <Input
+                                                    value={newUnit}
+                                                    onChange={(event) => setNewUnit(event.target.value)}
+                                                    placeholder="Nouvelle unité (ex: rouleaux)"
+                                                />
+                                                <Button type="button" variant="outline" onClick={addCustomUnit}>
+                                                    Ajouter
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -666,16 +694,36 @@ export default function MaterialsIndex({
 
                                 <div>
                                     <Label htmlFor="category">Catégorie</Label>
-                                    <Input
+                                    <select
                                         id="category"
                                         name="category"
                                         value={formData.category}
                                         onChange={handleFormChange}
-                                        placeholder="Ex: Cimenterie"
-                                    />
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                    >
+                                        <option value="">-- Choisir une catégorie --</option>
+                                        {categoryOptions.map((category) => (
+                                            <option key={category} value={category}>
+                                                {category}
+                                            </option>
+                                        ))}
+                                        <option value="__new_category__">+ Ajouter une catégorie</option>
+                                    </select>
+                                    {(formData.category === '' || !categoryOptions.includes(formData.category)) && (
+                                        <div className="mt-2 flex gap-2">
+                                            <Input
+                                                value={newCategory}
+                                                onChange={(event) => setNewCategory(event.target.value)}
+                                                placeholder="Nouvelle catégorie (ex: Plomberie)"
+                                            />
+                                            <Button type="button" variant="outline" onClick={addCustomCategory}>
+                                                Ajouter
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {isManager && !editingMaterial && (
+                                {isManager && !editingMaterial && !activeChantierId && (
                                     <div className="space-y-2">
                                         <Label htmlFor="material-project">Chantier (magasinier responsable) *</Label>
                                         {projectsWithStorekeeper.length === 0 ? (
@@ -743,7 +791,7 @@ export default function MaterialsIndex({
                                 <div className="flex justify-end gap-2 pt-2">
                                     <DialogClose asChild>
                                         <Button type="button" variant="outline" onClick={() => {
-  setEditingMaterial(null); setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '', project_id: '', project_step_id: '' }); 
+  setEditingMaterial(null); setFormData({ name: '', description: '', quantity_in_stock: '', unit: 'sacs', type: 'materiaux', category: '', project_id: '', project_step_id: '' }); setNewUnit(''); setNewCategory('');
 }}>Annuler</Button>
                                     </DialogClose>
                                     <Button
@@ -755,92 +803,6 @@ export default function MaterialsIndex({
                                         }
                                     >
                                         {isSubmitting ? 'Enregistrement...' : (editingMaterial ? 'Modifier' : 'Créer')}
-                                    </Button>
-                                </div>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-
-                    <Dialog open={openAllocationDialog} onOpenChange={setOpenAllocationDialog}>
-                        <DialogContent>
-                            <DialogTitle>Affecter un matériau à un chantier</DialogTitle>
-
-                            <form className="mt-4 space-y-4" onSubmit={handleSubmitAllocation}>
-                                <div>
-                                    <Label htmlFor="material-allocation">Matériau</Label>
-                                    <Input
-                                        id="material-allocation"
-                                        type="text"
-                                        value={selectedMaterialForAllocation?.name || ''}
-                                        disabled
-                                        className="bg-slate-100 text-slate-600"
-                                    />
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="project">Chantier/Projet *</Label>
-                                    {allocationProjectChoices.length === 0 ? (
-                                        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                            Aucun chantier éligible (magasinier requis). Complétez l&apos;affectation sur la fiche projet.
-                                        </p>
-                                    ) : (
-                                        <select
-                                            id="project"
-                                            name="project_id"
-                                            value={allocationFormData.project_id}
-                                            onChange={handleAllocationFormChange}
-                                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                            required
-                                        >
-                                            <option value="">-- Sélectionner un chantier --</option>
-                                            {allocationProjectChoices.map((project) => (
-                                                <option key={project.id} value={project.id.toString()}>
-                                                    {project.name}
-                                                    {project.storekeeper_name ? ` — ${project.storekeeper_name}` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="quantity">Quantité *</Label>
-                                    <Input
-                                        id="quantity"
-                                        name="quantity_requested"
-                                        type="number"
-                                        value={allocationFormData.quantity_requested}
-                                        onChange={handleAllocationFormChange}
-                                        placeholder="0"
-                                        required
-                                        step="0.01"
-                                        min="0.01"
-                                        className="flex-1"
-                                    />
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="comment">Commentaire (optionnel)</Label>
-                                    <textarea
-                                        id="comment"
-                                        name="comment"
-                                        value={allocationFormData.comment}
-                                        onChange={handleAllocationFormChange}
-                                        placeholder="Ex: Livraison le 25/04, sur site A..."
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        rows={3}
-                                    />
-                                </div>
-
-                                <div className="flex justify-end gap-2 pt-2">
-                                    <DialogClose asChild>
-                                        <Button type="button" variant="outline" onClick={() => {
-                                            setSelectedMaterialForAllocation(null);
-                                            setAllocationFormData({ material_id: '', project_id: '', quantity_requested: '', comment: '' });
-                                        }}>Annuler</Button>
-                                    </DialogClose>
-                                    <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700">
-                                        {isSubmitting ? 'Affectation en cours...' : 'Affecter le matériau'}
                                     </Button>
                                 </div>
                             </form>
@@ -942,7 +904,6 @@ export default function MaterialsIndex({
                                         required
                                     >
                                         <option value="">-- Sélectionner un motif --</option>
-                                        <option value="allocation">Affectation Chantier</option>
                                         <option value="perte">Perte / Vol</option>
                                         <option value="casse">Casse / Détérioration</option>
                                         <option value="ajustement">Ajustement d'inventaire</option>
@@ -1088,29 +1049,27 @@ export default function MaterialsIndex({
                                         )}
                                     </div>
 
-                                    {material.type === 'materiel' && (
-                                        <div className="grid grid-cols-2 gap-3 pt-2">
-                                            <Button
-                                                onClick={() => {
-                                                    setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
-                                                    setOpenStockInDialog(true);
-                                                }}
-                                                className="h-11 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
-                                            >
-                                                + Entrée
-                                            </Button>
-                                            <Button
-                                                onClick={() => {
-                                                    setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
-                                                    setOpenStockOutDialog(true);
-                                                }}
-                                                variant="outline"
-                                                className="h-11 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50"
-                                            >
-                                                - Sortie
-                                            </Button>
-                                        </div>
-                                    )}
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <Button
+                                            onClick={() => {
+                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
+                                                setOpenStockInDialog(true);
+                                            }}
+                                            className="h-11 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
+                                        >
+                                            + Entrée
+                                        </Button>
+                                        <Button
+                                            onClick={() => {
+                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
+                                                setOpenStockOutDialog(true);
+                                            }}
+                                            variant="outline"
+                                            className="h-11 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50"
+                                        >
+                                            - Sortie
+                                        </Button>
+                                    </div>
 
                                     {material.type === 'materiel' && material.allocations?.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-slate-100">
@@ -1137,22 +1096,20 @@ export default function MaterialsIndex({
                                     )}
 
                                     <div className="pt-4 space-y-3">
-                                        <Button onClick={() => handleOpenAllocationDialog(material)} className="h-11 w-full rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all">
-                                            <LinkIcon className="mr-2 h-4 w-4" />
-                                            Affecter au Chantier
-                                        </Button>
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className={`grid gap-3 ${isMagasinier ? 'grid-cols-1' : 'grid-cols-2'}`}>
                                             <Button onClick={() => handleEdit(material)} variant="outline" className="h-11 rounded-xl border-blue-100 bg-blue-50/50 font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">
                                                 <Pencil className="mr-2 h-4 w-4" />
                                                 Modifier
                                             </Button>
-                                            <Button
-                                                onClick={() => handleDelete(material.id)}
-                                                variant="outline"
-                                                className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            {!isMagasinier && (
+                                                <Button
+                                                    onClick={() => handleDelete(material.id)}
+                                                    variant="outline"
+                                                    className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
