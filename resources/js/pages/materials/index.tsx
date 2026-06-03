@@ -995,130 +995,172 @@ export default function MaterialsIndex({
             </div>
 
             {activeTab === 'stock' && (
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredMaterials.length > 0 ? filteredMaterials.map((material) => (
-                        <Card key={material.id} className="group relative rounded-[32px] border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 overflow-hidden">
-                            <CardHeader className="space-y-4 p-6 pb-0">
-                                <div className="flex items-start justify-between">
-                                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors duration-500 ${material.type === 'materiel' ? 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600' : 'bg-amber-100 text-amber-600 group-hover:bg-amber-600'} group-hover:text-white`}>
-                                        {material.type === 'materiel' ? <Wrench className="h-6 w-6" /> : <Package className="h-6 w-6" />}
+                <div className="space-y-6">
+                    {groupedMaterials.length > 0 ? (
+                        groupedMaterials.map((group) => (
+                            <Collapsible
+                                key={group.storekeeper_name}
+                                defaultOpen={true}
+                                className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40"
+                            >
+                                <CollapsibleTrigger className="group flex w-full items-center justify-between gap-4 p-6 text-left transition-colors hover:bg-slate-50/90">
+                                    <div className="flex items-center gap-5">
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 shadow-inner">
+                                            <User className="h-7 w-7" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-0.5">Responsable Magasin</p>
+                                            <p className="text-xl font-black text-slate-900">{group.storekeeper_name}</p>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <Badge variant="outline" className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${material.type === 'materiel' ? 'border-indigo-200 text-indigo-700 bg-indigo-50' : 'border-amber-200 text-amber-700 bg-amber-50'}`}>
-                                            {material.type === 'materiel' ? 'Équipement' : 'Consommable'}
+                                    <div className="flex items-center gap-4">
+                                        <Badge variant="outline" className="rounded-full bg-slate-100 px-4 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-600">
+                                            {group.projects.length} chantier{group.projects.length > 1 ? 's' : ''}
                                         </Badge>
-                                        <Badge className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${material.lowStock ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                            {material.lowStock ? 'Alerte Stock' : 'Disponible'}
-                                        </Badge>
+                                        <ChevronDown className="h-6 w-6 text-slate-400 transition-transform duration-300 group-data-[state=open]:rotate-180" />
                                     </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-2xl font-black leading-tight text-slate-900">{material.name}</CardTitle>
-                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{material.supplier}</p>
-                                    </div>
-                                    
-                                    <div className="flex gap-4 pt-2">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase text-slate-400">En Magasin</span>
-                                            <span className="text-xl font-black text-slate-900">{material.quantity_in_stock} {material.unit}</span>
-                                        </div>
-                                        {material.on_site_quantity > 0 && (
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-black uppercase text-blue-500">Sur Chantier</span>
-                                                <span className="text-xl font-black text-blue-600">{material.on_site_quantity} {material.unit}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardHeader>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="border-t border-slate-100 bg-slate-50/30 p-6">
+                                    <div className="space-y-10">
+                                        {group.projects.map((project) => (
+                                            <div key={project.project_name} className="space-y-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-1.5 w-10 rounded-full bg-blue-500 shadow-sm shadow-blue-500/20"></div>
+                                                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-500">Chantier : {project.project_name}</h3>
+                                                </div>
+                                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                                    {project.materials.map((material) => (
+                                                        <Card key={material.id} className="group relative rounded-[32px] border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/40 transition-all hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1 overflow-hidden">
+                                                            <CardHeader className="space-y-4 p-6 pb-0">
+                                                                <div className="flex items-start justify-between">
+                                                                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-colors duration-500 ${material.type === 'materiel' ? 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600' : 'bg-amber-100 text-amber-600 group-hover:bg-amber-600'} group-hover:text-white`}>
+                                                                        {material.type === 'materiel' ? <Wrench className="h-6 w-6" /> : <Package className="h-6 w-6" />}
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <Badge variant="outline" className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${material.type === 'materiel' ? 'border-indigo-200 text-indigo-700 bg-indigo-50' : 'border-amber-200 text-amber-700 bg-amber-50'}`}>
+                                                                            {material.type === 'materiel' ? 'Équipement' : 'Consommable'}
+                                                                        </Badge>
+                                                                        <Badge className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${material.lowStock ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                                            {material.lowStock ? 'Alerte Stock' : 'Disponible'}
+                                                                        </Badge>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <CardTitle className="text-2xl font-black leading-tight text-slate-900">{material.name}</CardTitle>
+                                                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{material.supplier}</p>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex gap-4 pt-2">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-[10px] font-black uppercase text-slate-400">En Magasin</span>
+                                                                            <span className="text-xl font-black text-slate-900">{material.quantity_in_stock} {material.unit}</span>
+                                                                        </div>
+                                                                        {material.on_site_quantity > 0 && (
+                                                                            <div className="flex flex-col">
+                                                                                <span className="text-[10px] font-black uppercase text-blue-500">Sur Chantier</span>
+                                                                                <span className="text-xl font-black text-blue-600">{material.on_site_quantity} {material.unit}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </CardHeader>
 
-                            <CardContent className="space-y-6 p-6">
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {material.type === 'materiel' ? (
-                                            <div className="rounded-2xl bg-indigo-50 p-4 border border-indigo-100 text-center">
-                                                <p className="text-[10px] font-black uppercase text-indigo-400 tracking-wider mb-1">Total Possédé</p>
-                                                <p className="text-xl font-black text-indigo-900">{material.quantity_in_stock + material.on_site_quantity} {material.unit}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100 text-center">
-                                                <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider mb-1">Stock Disponible</p>
-                                                <p className="text-xl font-black text-amber-900">{material.quantity_in_stock} {material.unit}</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                                            <CardContent className="space-y-6 p-6">
+                                                                <div className="space-y-6">
+                                                                    <div className="grid grid-cols-1 gap-3">
+                                                                        {material.type === 'materiel' ? (
+                                                                            <div className="rounded-2xl bg-indigo-50 p-4 border border-indigo-100 text-center">
+                                                                                <p className="text-[10px] font-black uppercase text-indigo-400 tracking-wider mb-1">Total Possédé</p>
+                                                                                <p className="text-xl font-black text-indigo-900">{material.quantity_in_stock + material.on_site_quantity} {material.unit}</p>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100 text-center">
+                                                                                <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider mb-1">Stock Disponible</p>
+                                                                                <p className="text-xl font-black text-amber-900">{material.quantity_in_stock} {material.unit}</p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
 
-                                    <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <Button
-                                            onClick={() => {
-                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
-                                                setOpenStockInDialog(true);
-                                            }}
-                                            className="h-11 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
-                                        >
-                                            + Entrée
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
-                                                setOpenStockOutDialog(true);
-                                            }}
-                                            variant="outline"
-                                            className="h-11 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50"
-                                        >
-                                            - Sortie
-                                        </Button>
-                                    </div>
+                                                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                                                        <Button
+                                                                            onClick={() => {
+                                                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
+                                                                                setOpenStockInDialog(true);
+                                                                            }}
+                                                                            className="h-11 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
+                                                                        >
+                                                                            + Entrée
+                                                                        </Button>
+                                                                        <Button
+                                                                            onClick={() => {
+                                                                                setStockMovementData((prev) => ({ ...prev, material_id: material.id.toString() }));
+                                                                                setOpenStockOutDialog(true);
+                                                                            }}
+                                                                            variant="outline"
+                                                                            className="h-11 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50"
+                                                                        >
+                                                                            - Sortie
+                                                                        </Button>
+                                                                    </div>
 
-                                    {material.type === 'materiel' && material.allocations?.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-slate-100">
-                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Utilisation en cours</p>
-                                            <div className="space-y-2">
-                                                {material.allocations.map((alloc) => (
-                                                    <div key={alloc.id} className="flex items-center justify-between bg-blue-50/50 p-2 rounded-xl border border-blue-100">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[11px] font-bold text-blue-900">{alloc.project_name}</span>
-                                                            <span className="text-[10px] text-blue-600 font-medium">{alloc.quantity} {material.unit}</span>
-                                                        </div>
-                                                        <Button 
-                                                            size="sm" 
-                                                            variant="ghost"
-                                                            onClick={() => router.visit(returnMaterial.url({ resourceRequest: alloc.id }), { method: 'post' })}
-                                                            className="h-7 px-2 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 hover:text-blue-800"
-                                                        >
-                                                            Remettre
-                                                        </Button>
-                                                    </div>
-                                                ))}
+                                                                    {material.type === 'materiel' && material.allocations?.length > 0 && (
+                                                                        <div className="mt-4 pt-4 border-t border-slate-100">
+                                                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Utilisation en cours</p>
+                                                                            <div className="space-y-2">
+                                                                                {material.allocations.map((alloc) => (
+                                                                                    <div key={alloc.id} className="flex items-center justify-between bg-blue-50/50 p-2 rounded-xl border border-blue-100">
+                                                                                        <div className="flex flex-col">
+                                                                                            <span className="text-[11px] font-bold text-blue-900">{alloc.project_name}</span>
+                                                                                            <span className="text-[10px] text-blue-600 font-medium">{alloc.quantity} {material.unit}</span>
+                                                                                        </div>
+                                                                                        <Button 
+                                                                                            size="sm" 
+                                                                                            variant="ghost"
+                                                                                            onClick={() => router.visit(returnMaterial.url({ resourceRequest: alloc.id }), { method: 'post' })}
+                                                                                            className="h-7 px-2 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                                                                                        >
+                                                                                            Remettre
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="pt-4 space-y-3">
+                                                                        <div className={`grid gap-3 ${isMagasinier ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                                                                            <Button onClick={() => handleEdit(material)} variant="outline" className="h-11 rounded-xl border-blue-100 bg-blue-50/50 font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">
+                                                                                <Pencil className="mr-2 h-4 w-4" />
+                                                                                Modifier
+                                                                            </Button>
+                                                                            {!isMagasinier && (
+                                                                                <Button
+                                                                                    onClick={() => handleDelete(material.id)}
+                                                                                    variant="outline"
+                                                                                    className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
+                                                                                >
+                                                                                    <Trash2 className="h-4 w-4" />
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </CardContent>
+                                                        </Card>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    <div className="pt-4 space-y-3">
-                                        <div className={`grid gap-3 ${isMagasinier ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                                            <Button onClick={() => handleEdit(material)} variant="outline" className="h-11 rounded-xl border-blue-100 bg-blue-50/50 font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all">
-                                                <Pencil className="mr-2 h-4 w-4" />
-                                                Modifier
-                                            </Button>
-                                            {!isMagasinier && (
-                                                <Button
-                                                    onClick={() => handleDelete(material.id)}
-                                                    variant="outline"
-                                                    className="h-11 rounded-xl border-rose-100 bg-rose-50/50 font-bold text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
+                                        ))}
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )) : (
-                        <div className="col-span-full py-20 text-center">
+                                </CollapsibleContent>
+                            </Collapsible>
+                        ))
+                    ) : (
+                        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 py-20 text-center">
+                            <Package className="mx-auto h-12 w-12 text-slate-300 mb-4" />
                             <p className="text-xl font-black text-slate-900">Aucun matériau trouvé</p>
-                            <p className="text-slate-500 font-medium">Réinitialisez les filtres pour voir tout le stock.</p>
+                            <p className="mt-2 font-medium text-slate-500">Essayez de modifier votre recherche ou filtrez par un autre chantier.</p>
                         </div>
                     )}
                 </div>
