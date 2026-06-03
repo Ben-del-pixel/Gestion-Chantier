@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\ProjectStep;
 use App\Models\ResourceRequest;
 use App\Models\User;
+use App\Support\MaterialPresets;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -149,23 +150,12 @@ class MaterialController extends Controller
             })
             ->values();
 
-        $defaultUnitOptions = collect(['sacs', 'tonnes', 'milliers', 'm3', 'unite']);
-        $unitOptions = $materials
-            ->pluck('unit')
-            ->filter(fn ($unit) => filled($unit))
-            ->map(fn ($unit) => trim((string) $unit))
-            ->merge($defaultUnitOptions)
-            ->unique()
-            ->values()
-            ->all();
-
-        $categoryOptions = $materials
-            ->pluck('category')
-            ->filter(fn ($category) => filled($category))
-            ->map(fn ($category) => trim((string) $category))
-            ->unique()
-            ->values()
-            ->all();
+        $presetSource = Material::query()
+            ->select(['name', 'unit', 'category'])
+            ->when($user->role === UserRole::Magasinier, function ($query) use ($user) {
+                $query->whereIn('project_id', $this->magasinierProjectIds($user));
+            })
+            ->get();
 
         return Inertia::render('materials/index', [
             'materials' => $materials,
@@ -174,8 +164,9 @@ class MaterialController extends Controller
             'movements' => $movements,
             'selectedProjectId' => $projectFilter,
             'selectedProjectName' => $selectedProject['name'] ?? null,
-            'unitOptions' => $unitOptions,
-            'categoryOptions' => $categoryOptions,
+            'nameOptions' => MaterialPresets::nameOptions($presetSource),
+            'unitOptions' => MaterialPresets::unitOptions($presetSource),
+            'categoryOptions' => MaterialPresets::categoryOptions($presetSource),
         ]);
     }
 

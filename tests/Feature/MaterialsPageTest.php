@@ -39,6 +39,9 @@ test('authenticated users can view materials page', function () {
             ->component('materials/index')
             ->has('materials', 1)
             ->has('storekeeperAllocationGroups')
+            ->has('nameOptions')
+            ->has('unitOptions')
+            ->has('categoryOptions')
             ->where('materials.0.name', 'Ciment')
         );
 });

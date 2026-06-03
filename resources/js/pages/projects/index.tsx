@@ -124,12 +124,18 @@ export default function ProjectsIndex({
   storekeepers = [],
   projectDeadlineAlerts,
   canViewBudget = true,
+  materialNameOptions = [],
+  materialUnitOptions = [],
+  materialCategoryOptions = [],
 }: {
   projects: ProjectItem[];
   engineers: Array<{ id: number; name: string }>;
   storekeepers?: Array<{ id: number; name: string }>;
   projectDeadlineAlerts?: ProjectDeadlineAlertsShape | null;
   canViewBudget?: boolean;
+  materialNameOptions?: string[];
+  materialUnitOptions?: string[];
+  materialCategoryOptions?: string[];
 }) {
   const page = usePage().props as any;
   const canCreateProject = page?.auth?.user?.role === UserRole.Manager.value;
@@ -140,6 +146,9 @@ export default function ProjectsIndex({
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [openDialog, setOpenDialog] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [nameOptions, setNameOptions] = React.useState<string[]>(materialNameOptions);
+  const [unitOptions, setUnitOptions] = React.useState<string[]>(materialUnitOptions);
+  const [categoryOptions, setCategoryOptions] = React.useState<string[]>(materialCategoryOptions);
   const [formData, setFormData] = React.useState({
     name: '',
     description: '',
@@ -151,6 +160,9 @@ export default function ProjectsIndex({
     steps: [{ name: '', budget: '' }],
     materials: [] as MaterialFormItem[],
   });
+
+  const appendUniqueOption = (options: string[], value: string): string[] =>
+    options.includes(value) ? options : [...options, value];
 
   const totalBudgetFromSteps = React.useMemo(
     () => formData.steps.reduce((sum, step) => sum + (Number(step.budget) || 0), 0),
@@ -655,13 +667,44 @@ export default function ProjectsIndex({
                                 )}
                               </select>
                             </div>
-                            <Input
-                              value={material.name}
-                              onChange={(e) => handleMaterialChange(index, 'name', e.target.value)}
-                              placeholder="Nom (ex: Ciment)"
-                              className="h-9"
-                              required
-                            />
+                            <div>
+                              <Label className="text-xs text-slate-500">Type de matériau *</Label>
+                              <select
+                                value={material.name && nameOptions.includes(material.name) ? material.name : ''}
+                                onChange={(e) => {
+                                  if (e.target.value === '__new_name__') {
+                                    handleMaterialChange(index, 'name', '');
+                                    return;
+                                  }
+                                  handleMaterialChange(index, 'name', e.target.value);
+                                }}
+                                className="mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                                required={!material.name}
+                              >
+                                <option value="">-- Choisir --</option>
+                                {nameOptions.map((name) => (
+                                  <option key={name} value={name}>
+                                    {name}
+                                  </option>
+                                ))}
+                                <option value="__new_name__">+ Ajouter un type</option>
+                              </select>
+                              {(!material.name || !nameOptions.includes(material.name)) && (
+                                <Input
+                                  value={material.name}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    handleMaterialChange(index, 'name', value);
+                                    if (value.trim()) {
+                                      setNameOptions((prev) => appendUniqueOption(prev, value.trim()));
+                                    }
+                                  }}
+                                  placeholder="Nouveau type (ex: Bêche, Marteau)"
+                                  className="mt-2 h-9"
+                                  required
+                                />
+                              )}
+                            </div>
                             <div className="grid grid-cols-2 gap-2">
                               <Input
                                 type="number"
@@ -673,17 +716,41 @@ export default function ProjectsIndex({
                                 className="h-9"
                               />
                               <select
-                                value={material.unit}
-                                onChange={(e) => handleMaterialChange(index, 'unit', e.target.value)}
+                                value={material.unit && unitOptions.includes(material.unit) ? material.unit : ''}
+                                onChange={(e) => {
+                                  if (e.target.value === '__new_unit__') {
+                                    handleMaterialChange(index, 'unit', '');
+                                    return;
+                                  }
+                                  handleMaterialChange(index, 'unit', e.target.value);
+                                }}
                                 className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                                required={!material.unit}
                               >
-                                <option value="sacs">Sacs</option>
-                                <option value="tonnes">Tonnes</option>
-                                <option value="m3">m³</option>
-                                <option value="unite">Unité</option>
-                                <option value="litres">Litres</option>
+                                <option value="">-- Unité --</option>
+                                {unitOptions.map((unit) => (
+                                  <option key={unit} value={unit}>
+                                    {unit}
+                                  </option>
+                                ))}
+                                <option value="__new_unit__">+ Ajouter</option>
                               </select>
                             </div>
+                            {(!material.unit || !unitOptions.includes(material.unit)) && (
+                              <Input
+                                value={material.unit}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  handleMaterialChange(index, 'unit', value);
+                                  if (value.trim()) {
+                                    setUnitOptions((prev) => appendUniqueOption(prev, value.trim()));
+                                  }
+                                }}
+                                placeholder="Nouvelle unité"
+                                className="h-9"
+                                required
+                              />
+                            )}
                             <select
                               value={material.type}
                               onChange={(e) => handleMaterialChange(index, 'type', e.target.value)}
@@ -692,6 +759,42 @@ export default function ProjectsIndex({
                               <option value="materiaux">Consommable</option>
                               <option value="materiel">Équipement</option>
                             </select>
+                            <div>
+                              <Label className="text-xs text-slate-500">Catégorie</Label>
+                              <select
+                                value={material.category && categoryOptions.includes(material.category) ? material.category : ''}
+                                onChange={(e) => {
+                                  if (e.target.value === '__new_category__') {
+                                    handleMaterialChange(index, 'category', '');
+                                    return;
+                                  }
+                                  handleMaterialChange(index, 'category', e.target.value);
+                                }}
+                                className="mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                              >
+                                <option value="">-- Catégorie --</option>
+                                {categoryOptions.map((category) => (
+                                  <option key={category} value={category}>
+                                    {category}
+                                  </option>
+                                ))}
+                                <option value="__new_category__">+ Ajouter</option>
+                              </select>
+                              {(!material.category || !categoryOptions.includes(material.category)) && (
+                                <Input
+                                  value={material.category}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    handleMaterialChange(index, 'category', value);
+                                    if (value.trim()) {
+                                      setCategoryOptions((prev) => appendUniqueOption(prev, value.trim()));
+                                    }
+                                  }}
+                                  placeholder="Nouvelle catégorie"
+                                  className="mt-2 h-9"
+                                />
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

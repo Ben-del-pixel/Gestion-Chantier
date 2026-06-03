@@ -140,6 +140,7 @@ export default function MaterialsIndex({
     movements = [],
     selectedProjectId = null,
     selectedProjectName = null,
+    nameOptions: initialNameOptions = [],
     unitOptions: initialUnitOptions = [],
     categoryOptions: initialCategoryOptions = [],
 }: { 
@@ -149,6 +150,7 @@ export default function MaterialsIndex({
     movements?: MaterialMovement[];
     selectedProjectId?: number | null;
     selectedProjectName?: string | null;
+    nameOptions?: string[];
     unitOptions?: string[];
     categoryOptions?: string[];
 }) {
@@ -178,8 +180,10 @@ export default function MaterialsIndex({
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [editingMaterial, setEditingMaterial] = React.useState<MaterialItem | null>(null);
     const [activeTab, setActiveTab] = React.useState('stock');
+    const [nameOptions, setNameOptions] = React.useState<string[]>(initialNameOptions);
     const [unitOptions, setUnitOptions] = React.useState<string[]>(initialUnitOptions);
     const [categoryOptions, setCategoryOptions] = React.useState<string[]>(initialCategoryOptions);
+    const [newName, setNewName] = React.useState('');
     const [newUnit, setNewUnit] = React.useState('');
     const [newCategory, setNewCategory] = React.useState('');
     const [formData, setFormData] = React.useState({
@@ -313,6 +317,22 @@ export default function MaterialsIndex({
             }));
     }, [filteredMaterials]);
 
+    const stockNameLists = React.useMemo(() => {
+        const inStock = filteredMaterials.filter((material) => material.quantity > 0);
+
+        const uniqueNames = (items: typeof inStock) =>
+            [...new Set(items.map((material) => material.name.trim()).filter(Boolean))].sort((a, b) =>
+                a.localeCompare(b, 'fr'),
+            );
+
+        return {
+            all: uniqueNames(inStock),
+            consumables: uniqueNames(inStock.filter((material) => material.type === 'materiaux')),
+            equipment: uniqueNames(inStock.filter((material) => material.type === 'materiel')),
+            lowStock: uniqueNames(inStock.filter((material) => material.lowStock)),
+        };
+    }, [filteredMaterials]);
+
     const projectsWithStorekeeper = React.useMemo(
         () => projects.filter(
             (p) => p.storekeeper_id != null && p.storekeeper_id !== '' && (p.steps?.length ?? 0) > 0,
@@ -355,6 +375,11 @@ export default function MaterialsIndex({
             return;
         }
 
+        if (name === 'name' && value === '__new_name__') {
+            setFormData((prev) => ({ ...prev, name: '' }));
+            return;
+        }
+
         setFormData((prev) => ({
             ...prev,
             [name]: value,
@@ -382,6 +407,17 @@ export default function MaterialsIndex({
         setCategoryOptions((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
         setFormData((prev) => ({ ...prev, category: trimmed }));
         setNewCategory('');
+    };
+
+    const addCustomName = () => {
+        const trimmed = newName.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        setNameOptions((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+        setFormData((prev) => ({ ...prev, name: trimmed }));
+        setNewName('');
     };
 
     const handleSubmitMaterial = async (e: React.FormEvent) => {
@@ -450,6 +486,10 @@ export default function MaterialsIndex({
     };
 
     const handleEdit = (material: MaterialItem) => {
+        if (material.name && !nameOptions.includes(material.name)) {
+            setNameOptions((prev) => [...prev, material.name]);
+        }
+
         if (material.unit && !unitOptions.includes(material.unit)) {
             setUnitOptions((prev) => [...prev, material.unit]);
         }
@@ -660,15 +700,48 @@ export default function MaterialsIndex({
 
                             <form className="mt-4 space-y-4" onSubmit={handleSubmitMaterial}>
                                 <div>
-                                    <Label htmlFor="name">Nom du matériau *</Label>
-                                    <Input
-                                        id="name"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={handleFormChange}
-                                        placeholder="Ex: Ciment Portland"
-                                        required
-                                    />
+                                    <Label htmlFor="name">Type de matériau *</Label>
+                                    {editingMaterial ? (
+                                        <Input
+                                            id="name"
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleFormChange}
+                                            placeholder="Ex: Bêche, Marteau, Ciment..."
+                                            required
+                                        />
+                                    ) : (
+                                        <>
+                                            <select
+                                                id="name"
+                                                name="name"
+                                                value={formData.name}
+                                                onChange={handleFormChange}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                                required
+                                            >
+                                                <option value="">-- Choisir un matériau --</option>
+                                                {nameOptions.map((name) => (
+                                                    <option key={name} value={name}>
+                                                        {name}
+                                                    </option>
+                                                ))}
+                                                <option value="__new_name__">+ Ajouter un type</option>
+                                            </select>
+                                            {(formData.name === '' || !nameOptions.includes(formData.name)) && (
+                                                <div className="mt-2 flex gap-2">
+                                                    <Input
+                                                        value={newName}
+                                                        onChange={(event) => setNewName(event.target.value)}
+                                                        placeholder="Nouveau type (ex: Bêche, Marteau)"
+                                                    />
+                                                    <Button type="button" variant="outline" onClick={addCustomName}>
+                                                        Ajouter
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
@@ -735,7 +808,7 @@ export default function MaterialsIndex({
                                 </div>
 
                                 <div>
-                                    <Label htmlFor="category">Catégorie</Label>
+                                    <Label htmlFor="category">Catégorie du matériau</Label>
                                     <select
                                         id="category"
                                         name="category"
@@ -967,35 +1040,84 @@ export default function MaterialsIndex({
                 </div>
         </div>
 
-        {/* Premium Stats Row */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div className="rounded-3xl bg-blue-500 p-6 text-white shadow-xl shadow-blue-500/20 group transition-transform hover:-translate-y-1">
-                <div className="flex items-center justify-between opacity-80 mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider">Total Articles</p>
-                    <Package className="h-6 w-6" />
+        {/* Stock overview — noms des matériaux, pas des totaux */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 lg:col-span-3">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+                        <Package className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Inventaire</p>
+                        <p className="text-lg font-black text-slate-900">Matériaux en stock</p>
+                    </div>
                 </div>
-                <p className="text-4xl font-black">{normalizedMaterials.length}</p>
+                <div className="flex flex-wrap gap-2">
+                    {stockNameLists.all.length > 0 ? (
+                        stockNameLists.all.map((materialName) => (
+                            <Badge
+                                key={materialName}
+                                variant="outline"
+                                className="rounded-full border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800"
+                            >
+                                {materialName}
+                            </Badge>
+                        ))
+                    ) : (
+                        <p className="text-sm font-medium text-slate-500">Aucun matériau en stock pour le moment.</p>
+                    )}
+                </div>
               </div>
-              <div className="rounded-3xl bg-emerald-500 p-6 text-white shadow-xl shadow-emerald-500/20 group transition-transform hover:-translate-y-1">
-                <div className="flex items-center justify-between opacity-80 mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider">Consommables</p>
-                    <List className="h-6 w-6" />
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/80 p-6 shadow-lg">
+                <div className="flex items-center gap-2 mb-3">
+                    <List className="h-5 w-5 text-emerald-600" />
+                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Consommables</p>
                 </div>
-                <p className="text-4xl font-black">{normalizedMaterials.filter(m => m.type === 'materiaux').length}</p>
+                <div className="flex flex-wrap gap-2">
+                    {stockNameLists.consumables.length > 0 ? (
+                        stockNameLists.consumables.map((materialName) => (
+                            <Badge key={materialName} variant="outline" className="rounded-full border-emerald-200 bg-white text-xs font-semibold text-emerald-800">
+                                {materialName}
+                            </Badge>
+                        ))
+                    ) : (
+                        <p className="text-xs text-emerald-700/80">—</p>
+                    )}
+                </div>
               </div>
-              <div className="rounded-3xl bg-amber-500 p-6 text-white shadow-xl shadow-amber-500/20 group transition-transform hover:-translate-y-1">
-                <div className="flex items-center justify-between opacity-80 mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider">Alertes Stock</p>
-                    <AlertTriangle className="h-6 w-6" />
+              <div className="rounded-3xl border border-indigo-200 bg-indigo-50/80 p-6 shadow-lg">
+                <div className="flex items-center gap-2 mb-3">
+                    <Wrench className="h-5 w-5 text-indigo-600" />
+                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Équipements</p>
                 </div>
-                <p className="text-4xl font-black">{normalizedMaterials.filter(m => m.lowStock).length}</p>
+                <div className="flex flex-wrap gap-2">
+                    {stockNameLists.equipment.length > 0 ? (
+                        stockNameLists.equipment.map((materialName) => (
+                            <Badge key={materialName} variant="outline" className="rounded-full border-indigo-200 bg-white text-xs font-semibold text-indigo-800">
+                                {materialName}
+                            </Badge>
+                        ))
+                    ) : (
+                        <p className="text-xs text-indigo-700/80">—</p>
+                    )}
+                </div>
               </div>
-              <div className="rounded-3xl bg-indigo-600 p-6 text-white shadow-xl shadow-indigo-600/20 group transition-transform hover:-translate-y-1">
-                <div className="flex items-center justify-between opacity-80 mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider">Matériel Sorti</p>
-                    <TrendingUp className="h-6 w-6" />
+              <div className="rounded-3xl border border-amber-200 bg-amber-50/80 p-6 shadow-lg">
+                <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Alertes stock</p>
                 </div>
-                <p className="text-4xl font-black">{normalizedMaterials.filter(m => m.type === 'materiel').reduce((acc, m) => acc + m.on_site_quantity, 0)}</p>
+                <div className="flex flex-wrap gap-2">
+                    {stockNameLists.lowStock.length > 0 ? (
+                        stockNameLists.lowStock.map((materialName) => (
+                            <Badge key={materialName} variant="outline" className="rounded-full border-amber-200 bg-white text-xs font-semibold text-amber-900">
+                                {materialName}
+                            </Badge>
+                        ))
+                    ) : (
+                        <p className="text-xs text-amber-700/80">Aucune alerte</p>
+                    )}
+                </div>
               </div>
         </div>
 

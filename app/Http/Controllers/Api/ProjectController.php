@@ -9,6 +9,7 @@ use App\Models\Material;
 use App\Models\Project;
 use App\Models\ProjectStep;
 use App\Models\User;
+use App\Support\MaterialPresets;
 use App\Support\ProjectDeadlineAlerts;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -59,12 +60,17 @@ class ProjectController extends Controller
             $projects = $this->concealBudgetFromProjects($projects);
         }
 
+        $materialPresets = Material::query()->select(['name', 'unit', 'category'])->get();
+
         return Inertia::render('projects/index', [
             'projects' => $projects,
             'engineers' => $engineers,
             'storekeepers' => $storekeepers,
             'projectDeadlineAlerts' => ProjectDeadlineAlerts::fromProjects($projects),
             'canViewBudget' => UserRole::canViewBudgetFor($user->role),
+            'materialNameOptions' => MaterialPresets::nameOptions($materialPresets),
+            'materialUnitOptions' => MaterialPresets::unitOptions($materialPresets),
+            'materialCategoryOptions' => MaterialPresets::categoryOptions($materialPresets),
         ]);
     }
 

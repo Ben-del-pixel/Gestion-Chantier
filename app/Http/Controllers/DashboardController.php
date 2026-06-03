@@ -85,9 +85,10 @@ class DashboardController extends Controller
 
             $stockMaterialNames = Material::query()
                 ->where('quantity_in_stock', '>', 0)
-                ->orderByDesc('quantity_in_stock')
-                ->limit(4)
+                ->orderBy('name')
                 ->pluck('name')
+                ->unique()
+                ->take(12)
                 ->filter()
                 ->map(fn ($name) => (string) $name)
                 ->values()
